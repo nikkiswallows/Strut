@@ -10,7 +10,7 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { queryClient } from "@/lib/query-client";
-import { listTags } from "@/lib/server/catalog";
+import { app } from "@/lib/http";
 import { fetchMyProfile, postProfile } from "@/lib/profile-api";
 import { readLocalSession } from "@/lib/local-session";
 import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
@@ -28,22 +28,22 @@ function Onboarding() {
   });
   const identityTags = useQuery({
     queryKey: ["tags", "identity"],
-    queryFn: () => listTags({ data: "identity" }),
+    queryFn: () => app<string[]>("tags", { kind: "identity" }),
     enabled: Boolean(user),
   });
   const pronounTags = useQuery({
     queryKey: ["tags", "pronoun"],
-    queryFn: () => listTags({ data: "pronoun" }),
+    queryFn: () => app<string[]>("tags", { kind: "pronoun" }),
     enabled: Boolean(user),
   });
   const interestTags = useQuery({
     queryKey: ["tags", "interest"],
-    queryFn: () => listTags({ data: "interest" }),
+    queryFn: () => app<string[]>("tags", { kind: "interest" }),
     enabled: Boolean(user),
   });
   const lookingTags = useQuery({
     queryKey: ["tags", "looking"],
-    queryFn: () => listTags({ data: "looking" }),
+    queryFn: () => app<string[]>("tags", { kind: "looking" }),
     enabled: Boolean(user),
   });
 

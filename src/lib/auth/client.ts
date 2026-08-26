@@ -228,21 +228,7 @@ function waitForPopupToken(popup: Window): Promise<string | null> {
  * preview the local clear is sufficient, so it always resolves.
  */
 export async function signOut(redirectTo = "/"): Promise<void> {
-  await runSignOut({
-    livePreview: inLivePreview(),
-    hasBearer: Boolean(getBearerToken()),
-    // Better Auth resolves with `{ error }` instead of rejecting, so surface a
-    // failed response as a rejection for the sequence to act on.
-    requestSignOut: async () => {
-      const { error } = await authClient.signOut();
-      if (error) throw new Error(error.message ?? "Sign-out failed");
-    },
-    clearToken: () => {
-      setBearerToken(null);
-      clearLocalSession();
-    },
-    redirect: () => {
-      window.location.href = redirectTo;
-    },
-  });
+  setBearerToken(null);
+  clearLocalSession();
+  window.location.href = redirectTo;
 }

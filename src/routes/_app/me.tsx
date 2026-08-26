@@ -10,9 +10,8 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
-import { listTags } from "@/lib/server/catalog";
-import { getMyProfile } from "@/lib/server/profiles";
-import { postProfile } from "@/lib/profile-api";
+import { app } from "@/lib/http";
+import { fetchMyProfile, postProfile } from "@/lib/profile-api";
 import {
   IDENTITIES,
   identityLine,
@@ -30,22 +29,22 @@ export const Route = createFileRoute("/_app/me")({ component: Me });
 
 function Me() {
   const user = useCurrentUser();
-  const me = useQuery({ queryKey: ["me"], queryFn: () => getMyProfile() });
+  const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMyProfile() });
   const identityTags = useQuery({
     queryKey: ["tags", "identity"],
-    queryFn: () => listTags({ data: "identity" }),
+    queryFn: () => app<string[]>("tags", { kind: "identity" }),
   });
   const pronounTags = useQuery({
     queryKey: ["tags", "pronoun"],
-    queryFn: () => listTags({ data: "pronoun" }),
+    queryFn: () => app<string[]>("tags", { kind: "pronoun" }),
   });
   const interestTags = useQuery({
     queryKey: ["tags", "interest"],
-    queryFn: () => listTags({ data: "interest" }),
+    queryFn: () => app<string[]>("tags", { kind: "interest" }),
   });
   const lookingTags = useQuery({
     queryKey: ["tags", "looking"],
-    queryFn: () => listTags({ data: "looking" }),
+    queryFn: () => app<string[]>("tags", { kind: "looking" }),
   });
   const p = me.data;
   const [editing, setEditing] = useState(false);

@@ -1,7 +1,8 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { addTag, type TagKind } from "@/lib/server/catalog";
+import { app } from "@/lib/http";
+import type { TagKind } from "@/lib/server/catalog";
 import { queryClient } from "@/lib/query-client";
 import { cn, unique } from "@/lib/utils";
 
@@ -119,7 +120,7 @@ function AddCustom({
     setDraft("");
     setOpen(false);
     try {
-      await addTag({ data: { kind, label } });
+      await app("addTag", { kind, label });
       void queryClient.invalidateQueries({ queryKey: ["tags", kind] });
     } catch {
       // Keep the chip on the profile even if the shared catalog write fails.

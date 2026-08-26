@@ -98,64 +98,58 @@ async function deliverSms(to: string, code: string, host: string): Promise<"sms"
   return "sms";
 }
 
+export async function issuePhoneCode(input: SendInput, host = "strut.app") {
+  const data = cleanSend(input);
+  const sql = await getSql();
+  const recent = await sql.query<{ n: number }>(
+    `select count(*)::int as n from phone_otps
+     where phone_e164 = $1 and created_at > now() - interval '10 minutes'`,
+    [data.e164],
+  );
+  if ((recent[0]?.n ?? 0) >= MAX_SENDS) {
+    throw new Error("Too many codes. Wait a few minutes and try again.");
+  }
+
+  const last = await sql.query<{ created_at: string }>(
+    `select created_at from phone_otps
+     where phone_e164 = $1
+     order by created_at desc
+     limit 1`,
+    [data.e164],
+  );
+  if (last[0]) {
+    const age = Date.now() - new Date(last[0].created_at).getTime();
+    if (age >= 0 && age < RESEND_MS) {
+      const wait = Math.ceil((RESEND_MS - age) / 1000);
+      throw new Error(`Wait ${wait}s before requesting another code.`);
+    }
+  }
+
+  const code = await generateOtp();
+  const codeHash = await hashOtp(data.e164, code);
+  const expires = new Date(Date.now() + OTP_TTL_MS).toISOString();
+
+  await sql.query(`delete from phone_otps where phone_e164 = $1 and expires_at < now()`, [
+    data.e164,
+  ]);
+  await sql.query(
+    `insert into phone_otps (phone_e164, code_hash, expires_at) values ($1, $2, $3)`,
+    [data.e164, codeHash, expires],
+  );
+
+  const delivery = await deliverSms(data.e164, code, host);
+  return {
+    e164: data.e164,
+    delivery,
+    expiresIn: 300,
+    resendIn: Math.floor(RESEND_MS / 1000),
+    previewCode: delivery === "preview" ? code : null,
+  };
+}
+
 export const sendPhoneCode = createServerFn({ method: "POST" })
-  .validator((input: SendInput) => cleanSend(input))
-  .handler(async ({ data }) => {
-    const sql = await getSql();
-    const recent = await sql.query<{ n: number }>(
-      `select count(*)::int as n from phone_otps
-       where phone_e164 = $1 and created_at > now() - interval '10 minutes'`,
-      [data.e164],
-    );
-    if ((recent[0]?.n ?? 0) >= MAX_SENDS) {
-      throw new Error("Too many codes. Wait a few minutes and try again.");
-    }
-
-    const last = await sql.query<{ created_at: string }>(
-      `select created_at from phone_otps
-       where phone_e164 = $1
-       order by created_at desc
-       limit 1`,
-      [data.e164],
-    );
-    if (last[0]) {
-      const age = Date.now() - new Date(last[0].created_at).getTime();
-      if (age >= 0 && age < RESEND_MS) {
-        const wait = Math.ceil((RESEND_MS - age) / 1000);
-        throw new Error(`Wait ${wait}s before requesting another code.`);
-      }
-    }
-
-    const code = await generateOtp();
-    const codeHash = await hashOtp(data.e164, code);
-    const expires = new Date(Date.now() + OTP_TTL_MS).toISOString();
-
-    await sql.query(`delete from phone_otps where phone_e164 = $1 and expires_at < now()`, [
-      data.e164,
-    ]);
-    await sql.query(
-      `insert into phone_otps (phone_e164, code_hash, expires_at) values ($1, $2, $3)`,
-      [data.e164, codeHash, expires],
-    );
-
-    let host = "strut.app";
-    try {
-      const { getRequest } = await import("@tanstack/react-start/server");
-      const req = getRequest();
-      if (req) host = new URL(req.url).host;
-    } catch {
-      /* keep fallback host */
-    }
-
-    const delivery = await deliverSms(data.e164, code, host);
-    return {
-      e164: data.e164,
-      delivery,
-      expiresIn: 300,
-      resendIn: Math.floor(RESEND_MS / 1000),
-      previewCode: delivery === "preview" ? code : null,
-    };
-  });
+  .validator((input: SendInput) => input)
+  .handler(async ({ data }) => issuePhoneCode(data));
 
 export async function consumePhoneOtp(e164: string, code: string): Promise<void> {
   const sql = await getSql();

@@ -6,8 +6,7 @@ import { toast } from "sonner";
 import { ProfileCard } from "@/components/profile-card";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/query-client";
-import { listDiscover } from "@/lib/server/profiles";
-import { toggleLike } from "@/lib/server/social";
+import { app } from "@/lib/http";
 import {
   DISCOVER_TABS,
   LOOKING_FOR,
@@ -31,12 +30,13 @@ function Discover() {
 
   const profiles = useQuery({
     queryKey: ["discover", tab, miles, lookingFor, role, q],
-    queryFn: () => listDiscover({ data: { tab, miles, lookingFor, role, q } }),
+    queryFn: () =>
+      app<Profile[]>("discover", { tab, miles, lookingFor, role, q }),
     placeholderData: keepPreviousData,
   });
 
   const like = useMutation({
-    mutationFn: (p: Profile) => toggleLike({ data: p.userId }),
+    mutationFn: (p: Profile) => app<{ liked: boolean; matched: boolean }>("like", { userId: p.userId }),
     onMutate: async (p) => {
       await queryClient.cancelQueries({ queryKey: ["discover"] });
       const key = ["discover", tab, miles, lookingFor, role, q] as const;

@@ -72,92 +72,133 @@ export type DiscoverInput = {
   q?: string;
 };
 
-export const listDiscover = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((input: DiscoverInput | undefined) => ({
+export function normalizeDiscover(input: DiscoverInput | undefined) {
+  return {
     tab: (input?.tab as DiscoverTab | undefined) ?? "nearby",
     miles: clampMiles(input?.miles),
     lookingFor: input?.lookingFor ?? "",
     role: input?.role ?? "",
     q: input?.q ?? "",
-  }))
-  .handler(async ({ context, data }) => {
-    await ensureSeed();
-    const sql = await getSql();
-    const meRows = await sql.query<ProfileRow>(
-      `select ${PROFILE_COLS} from profiles where user_id = $1`,
-      [context.userId],
-    );
-    const origin = originOf(meRows[0] ? mapProfile(meRows[0]) : null);
+  };
+}
 
-    const lookingFor = data.lookingFor.trim() || null;
-    const role =
-      data.role && (ROLES as readonly string[]).includes(data.role as (typeof ROLES)[number])
-        ? data.role
-        : null;
-    const q = data.q.trim() ? `%${data.q.trim().toLowerCase()}%` : null;
+export async function listDiscoverForUser(
+  userId: string,
+  input: DiscoverInput | undefined,
+) {
+  const data = normalizeDiscover(input);
+  await ensureSeed();
+  const sql = await getSql();
+  const meRows = await sql.query<ProfileRow>(
+    `select ${PROFILE_COLS} from profiles where user_id = $1`,
+    [userId],
+  );
+  const origin = originOf(meRows[0] ? mapProfile(meRows[0]) : null);
 
-    const params: unknown[] = [context.userId];
-    let where = `user_id <> $1 and onboarded = true`;
-    if (role) {
-      params.push(role);
-      where += ` and role = $${params.length}`;
-    }
-    if (q) {
-      params.push(q);
-      where += ` and (lower(display_name) like $${params.length} or lower(handle) like $${params.length} or lower(coalesce(location,'')) like $${params.length})`;
-    }
+  const lookingFor = data.lookingFor.trim() || null;
+  const role =
+    data.role && (ROLES as readonly string[]).includes(data.role as (typeof ROLES)[number])
+      ? data.role
+      : null;
+  const q = data.q.trim() ? `%${data.q.trim().toLowerCase()}%` : null;
 
-    const rows = await sql.query<ProfileRow>(
-      `select ${PROFILE_COLS},
-              exists(select 1 from likes l where l.from_user_id = $1 and l.to_user_id = profiles.user_id) as liked_by_me,
-              exists(select 1 from likes l where l.from_user_id = profiles.user_id and l.to_user_id = $1) as likes_me
-       from profiles
-       where ${where}
-       order by last_active desc, id desc
-       limit 200`,
-      params,
-    );
+  const params: unknown[] = [userId];
+  let where = `user_id <> $1 and onboarded = true`;
+  if (role) {
+    params.push(role);
+    where += ` and role = $${params.length}`;
+  }
+  if (q) {
+    params.push(q);
+    where += ` and (lower(display_name) like $${params.length} or lower(handle) like $${params.length} or lower(coalesce(location,'')) like $${params.length})`;
+  }
 
-    const tab = DISCOVER_TABS.find((t) => t.id === data.tab) ?? DISCOVER_TABS[0]!;
-    const match = new Set(tab.match.map((s) => s.toLowerCase()));
+  const rows = await sql.query<ProfileRow>(
+    `select ${PROFILE_COLS},
+            exists(select 1 from likes l where l.from_user_id = $1 and l.to_user_id = profiles.user_id) as liked_by_me,
+            exists(select 1 from likes l where l.from_user_id = profiles.user_id and l.to_user_id = $1) as likes_me
+     from profiles
+     where ${where}
+     order by last_active desc, id desc
+     limit 200`,
+    params,
+  );
 
-    return rows
-      .map((row) => {
-        const profile = mapProfile(row);
-        const there =
-          profile.lat != null && profile.lng != null
-            ? { lat: profile.lat, lng: profile.lng }
-            : coordForLocation(profile.location);
-        return {
-          ...profile,
-          photos: profile.photos.slice(0, 6),
-          distanceMiles: there ? milesBetween(origin, there) : null,
-        };
-      })
-      .filter((profile) => {
-        if (profile.userId === context.userId) return false;
-        if (match.size) {
-          const labels = [...(profile.identities ?? []), identityLine(profile)]
-            .join(" ")
-            .toLowerCase();
-          const hit = [...match].some((token) => labels.includes(token));
-          if (!hit) return false;
-          if (tab.id === "women") {
-            if (labels.includes("trans") || labels.includes("t-girl")) return false;
-          }
+  const tab = DISCOVER_TABS.find((t) => t.id === data.tab) ?? DISCOVER_TABS[0]!;
+  const match = new Set(tab.match.map((s) => s.toLowerCase()));
+
+  return rows
+    .map((row) => {
+      const profile = mapProfile(row);
+      const there =
+        profile.lat != null && profile.lng != null
+          ? { lat: profile.lat, lng: profile.lng }
+          : coordForLocation(profile.location);
+      return {
+        ...profile,
+        photos: profile.photos.slice(0, 6),
+        distanceMiles: there ? milesBetween(origin, there) : null,
+      };
+    })
+    .filter((profile) => {
+      if (profile.userId === userId) return false;
+      if (match.size) {
+        const labels = [...(profile.identities ?? []), identityLine(profile)]
+          .join(" ")
+          .toLowerCase();
+        const hit = [...match].some((token) => labels.includes(token));
+        if (!hit) return false;
+        if (tab.id === "women") {
+          if (labels.includes("trans") || labels.includes("t-girl")) return false;
         }
-        if (lookingFor) {
-          const want = lookingFor.toLowerCase();
-          const hit = (profile.lookingFor ?? []).some((item) => item.toLowerCase() === want);
-          if (!hit) return false;
-        }
-        if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
-        return true;
-      })
-      .sort((a, b) => (a.distanceMiles ?? 9_999) - (b.distanceMiles ?? 9_999))
-      .slice(0, 80);
-  });
+      }
+      if (lookingFor) {
+        const want = lookingFor.toLowerCase();
+        const hit = (profile.lookingFor ?? []).some((item) => item.toLowerCase() === want);
+        if (!hit) return false;
+      }
+      if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
+      return true;
+    })
+    .sort((a, b) => (a.distanceMiles ?? 9_999) - (b.distanceMiles ?? 9_999))
+    .slice(0, 80);
+}
+
+export async function getProfileForViewerUser(userId: string, handleRaw: string) {
+  const handle = handleRaw.replace(/^@/, "").toLowerCase();
+  await ensureSeed();
+  const sql = await getSql();
+  const rows = await sql.query<ProfileRow>(
+    `select ${PROFILE_COLS},
+            exists(select 1 from likes l where l.from_user_id = $2 and l.to_user_id = profiles.user_id) as liked_by_me,
+            exists(select 1 from likes l where l.from_user_id = profiles.user_id and l.to_user_id = $2) as likes_me,
+            exists(select 1 from follows f where f.follower_id = $2 and f.following_id = profiles.user_id) as following,
+            (select count(*)::int from likes l where l.to_user_id = profiles.user_id) as like_count
+     from profiles
+     where handle = $1`,
+    [handle, userId],
+  );
+  const profile = rows[0] ? mapProfile(rows[0]) : null;
+  if (!profile) return null;
+  const meRows = await sql.query<ProfileRow>(
+    `select ${PROFILE_COLS} from profiles where user_id = $1`,
+    [userId],
+  );
+  const origin = originOf(meRows[0] ? mapProfile(meRows[0]) : null);
+  const there =
+    profile.lat != null && profile.lng != null
+      ? { lat: profile.lat, lng: profile.lng }
+      : coordForLocation(profile.location);
+  return {
+    ...profile,
+    distanceMiles: there ? milesBetween(origin, there) : null,
+  };
+}
+
+export const listDiscover = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: DiscoverInput | undefined) => normalizeDiscover(input))
+  .handler(async ({ context, data }) => listDiscoverForUser(context.userId, data));
 
 export const listFeatured = createServerFn({ method: "GET" }).handler(async () => {
   await ensureSeed();

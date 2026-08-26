@@ -6,10 +6,10 @@ import { PhotoViewer } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
 import { formatMiles } from "@/lib/geo";
 import { queryClient } from "@/lib/query-client";
+import { app } from "@/lib/http";
 import { postOpenChat } from "@/lib/messages-api";
 import { fetchMyProfile } from "@/lib/profile-api";
-import { getProfileForViewer } from "@/lib/server/profiles";
-import { toggleFollow, toggleLike } from "@/lib/server/social";
+import type { Profile } from "@/lib/types";
 import { asPhotoList, identityLine, lookingLine, pronounLine, shownAge } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +21,11 @@ function ProfilePage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMyProfile() });
   const profile = useQuery({
     queryKey: ["profile", handle],
-    queryFn: () => getProfileForViewer({ data: handle }),
+    queryFn: () => app<Profile>("view", { handle }),
   });
 
   const like = useMutation({
-    mutationFn: () => toggleLike({ data: profile.data!.userId }),
+    mutationFn: () => app<{ liked: boolean; matched: boolean }>("like", { userId: profile.data!.userId }),
     onSuccess: async (res) => {
       await queryClient.invalidateQueries({ queryKey: ["profile", handle] });
       await queryClient.invalidateQueries({ queryKey: ["likes"] });
@@ -34,7 +34,7 @@ function ProfilePage() {
     },
   });
   const follow = useMutation({
-    mutationFn: () => toggleFollow({ data: profile.data!.userId }),
+    mutationFn: () => app("follow", { userId: profile.data!.userId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile", handle] }),
   });
   const message = useMutation({

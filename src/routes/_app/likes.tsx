@@ -3,17 +3,17 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ProfileCard } from "@/components/profile-card";
 import { queryClient } from "@/lib/query-client";
-import { listLikes, toggleLike } from "@/lib/server/social";
-import type { Profile } from "@/lib/types";
+import { app } from "@/lib/http";
+import type { LikeBundle, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/likes")({ component: Likes });
 
 function Likes() {
   const [tab, setTab] = useState<"matches" | "incoming" | "outgoing">("matches");
-  const likes = useQuery({ queryKey: ["likes"], queryFn: () => listLikes() });
+  const likes = useQuery({ queryKey: ["likes"], queryFn: () => app<LikeBundle>("likes") });
   const like = useMutation({
-    mutationFn: (p: Profile) => toggleLike({ data: p.userId }),
+    mutationFn: (p: Profile) => app("like", { userId: p.userId }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["likes"] });
       void queryClient.invalidateQueries({ queryKey: ["discover"] });

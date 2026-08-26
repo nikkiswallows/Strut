@@ -1,6 +1,7 @@
 import { getBearerToken } from "@/lib/auth/client";
 import { markOnboarded, writeLocalSession } from "@/lib/local-session";
 import type { ProfileInput } from "@/lib/server/profiles";
+import type { Profile } from "@/lib/types";
 import { storeSessionBearer } from "@/lib/session-bearer";
 
 export async function ensureLocalSession(displayName?: string): Promise<string | null> {
@@ -47,7 +48,7 @@ function authHeaders(token: string | null): HeadersInit {
   };
 }
 
-export async function fetchMyProfile() {
+export async function fetchMyProfile(): Promise<Profile | null> {
   const token = getBearerToken();
   if (!token) return null;
   const res = await fetch("/api/profile", {
@@ -57,7 +58,7 @@ export async function fetchMyProfile() {
   });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error("Could not load your profile.");
-  const profile = await res.json();
+  const profile = (await res.json()) as Profile | null;
   if (profile?.onboarded) markOnboarded();
   return profile;
 }

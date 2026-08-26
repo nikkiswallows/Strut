@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { Avatar, Photo } from "@/components/photo";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
-import { createPost, listFeed, togglePostLike } from "@/lib/server/social";
-import { getMyProfile } from "@/lib/server/profiles";
+import { app } from "@/lib/http";
+import { fetchMyProfile } from "@/lib/profile-api";
 import { queryClient } from "@/lib/query-client";
+import type { FeedPost } from "@/lib/types";
 import { cn, fileToJpegDataUrl, timeAgo } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/feed")({ component: Feed });
@@ -16,11 +17,11 @@ export const Route = createFileRoute("/_app/feed")({ component: Feed });
 function Feed() {
   const [body, setBody] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const me = useQuery({ queryKey: ["me"], queryFn: () => getMyProfile() });
-  const feed = useQuery({ queryKey: ["feed"], queryFn: () => listFeed() });
+  const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMyProfile() });
+  const feed = useQuery({ queryKey: ["feed"], queryFn: () => app<FeedPost[]>("feed") });
 
   const post = useMutation({
-    mutationFn: () => createPost({ data: { body, photoUrl } }),
+    mutationFn: () => app("createPost", { body, photoUrl }),
     onSuccess: async () => {
       setBody("");
       setPhotoUrl(null);
@@ -30,7 +31,7 @@ function Feed() {
   });
 
   const like = useMutation({
-    mutationFn: (id: number) => togglePostLike({ data: id }),
+    mutationFn: (id: number) => app("postLike", { postId: id }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["feed"] }),
   });
 

@@ -13,7 +13,6 @@ import {
   isValidNational,
   type Country,
 } from "@/lib/phone";
-import { sendPhoneCode } from "@/lib/server/phone";
 import { captureAuthToken } from "@/lib/session-bearer";
 import { writeLocalSession } from "@/lib/local-session";
 import { cn } from "@/lib/utils";
@@ -111,9 +110,14 @@ export function PhoneAuth({
     }
     setBusy(true);
     try {
-      const result = await sendPhoneCode({
-        data: { iso: nextIso, national: nextNational },
+      const res = await fetch("/api/phone/start", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ iso: nextIso, national: nextNational }),
       });
+      const result = (await res.json().catch(() => null)) as SendResult & { error?: string };
+      if (!res.ok) throw new Error(result?.error || "Could not send a code.");
       setSent(result);
       setIso(nextIso);
       setNational(nextNational);
