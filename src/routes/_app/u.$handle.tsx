@@ -176,8 +176,6 @@ function ProfilePage() {
         )}
         {p.matched ? (
           <p className="mt-3 text-center text-sm text-accent">You matched. The chat is open.</p>
-        ) : p.isSeed ? (
-          <p className="mt-3 text-center text-xs text-subtle">They write back. Say hello.</p>
         ) : null}
       </div>
     </div>

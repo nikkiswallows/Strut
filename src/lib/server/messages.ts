@@ -3,7 +3,7 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import type { ChatMessage, ConversationPreview } from "@/lib/types";
 import { parseJson } from "@/lib/utils";
-import { generateSeedReply, isSeedUser } from "./bot";
+import { generateSeedReply, isSeedUser, typingDelayMs } from "./bot";
 import { ensureSeed } from "./seed";
 
 export const listConversations = createServerFn({ method: "GET" })
@@ -173,11 +173,33 @@ export const sendMessage = createServerFn({ method: "POST" })
          limit 24`,
         [data.conversationId],
       );
+      const me = await sql.query<{
+        display_name: string;
+        identities: unknown;
+        role: string | null;
+        location: string | null;
+        looking_for_list: unknown;
+      }>(
+        `select display_name, identities, role, location, looking_for_list
+         from profiles where user_id = $1`,
+        [context.userId],
+      );
+      const mine = me[0];
       const reply = await generateSeedReply({
         seedUserId: otherId,
         history: history.map((m) => ({ senderId: m.sender_id, body: m.body })),
+        viewer: mine
+          ? {
+              displayName: mine.display_name,
+              identities: parseJson<string[]>(mine.identities, []),
+              role: mine.role,
+              location: mine.location,
+              lookingFor: parseJson<string[]>(mine.looking_for_list, []),
+            }
+          : null,
       });
       if (reply) {
+        await new Promise((resolve) => setTimeout(resolve, typingDelayMs(reply)));
         await sql.query(
           `insert into messages (conversation_id, sender_id, body) values ($1, $2, $3)`,
           [data.conversationId, otherId, reply],

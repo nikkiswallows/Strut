@@ -61,7 +61,7 @@ function Thread() {
             <p className="font-medium leading-tight">{data.other.displayName}</p>
             <p className="text-xs text-subtle">
               @{data.other.handle}
-              {data.other.isSeed ? " · writes back" : ""}
+              {data.other.isSeed ? " · Active now" : ""}
             </p>
           </div>
         </Link>
