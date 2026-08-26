@@ -104,7 +104,7 @@ function Login() {
           <img src={HERO_STREET} alt="" className="absolute inset-0 size-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-10">
-            <p className="font-display text-5xl leading-tight">Black first. Then you talk.</p>
+            <p className="font-display text-5xl leading-tight">BBC first. Then you talk.</p>
           </div>
         </div>
 

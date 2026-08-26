@@ -14,15 +14,15 @@ export const Route = createFileRoute("/")({ component: Home });
 const PILLARS = [
   {
     title: "Black kings",
-    body: "Tops. Bulls. The Set. You walk in first. Sissies kneel. Wives open. Husbands watch.",
+    body: "Tops. Bulls. The Set. You walk in first. Sissies drop. Wives open. Whitebois stay on their knees where they belong.",
   },
   {
     title: "Sissies & whitebois",
-    body: "Feminize. Serve. Look for a real man. Dress for it. You are not the king in this room.",
+    body: "Feminize. Serve. Beg for BBC. You are not the man in this room. You are the hole, the maid, the good girl. Act like it.",
   },
   {
     title: "Wives & cucks",
-    body: "She takes Black. He stays in the chair. Breeding, QOS, hotwife — said out loud.",
+    body: "She takes Black. He watches. Breeding, QOS, locked-out husbands. If he cries, that's part of it.",
   },
 ];
 
@@ -51,22 +51,23 @@ function Home() {
           className="absolute inset-0 size-full object-cover object-[center_18%]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/25" />
+        <div className="hypno-disc pointer-events-none absolute left-1/2 top-[18%] size-[70vw] -translate-x-1/2 rounded-full opacity-70 mix-blend-screen" />
         <div className="spade-veil pointer-events-none absolute inset-0" />
         <Wordmark className="pointer-events-none absolute inset-x-0 top-[16%] text-center text-[20vw] leading-none text-accent/15 sm:text-[16vw]" />
         <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-3xl flex-col justify-end px-6 pb-16 pt-28">
-          <Kicker>BNWO · 18+ · QOS</Kicker>
+          <Kicker>BNWO · 18+ · BBC HYPNO</Kicker>
           <h1 className="mt-3 font-display text-5xl leading-[0.92] text-fg sm:text-7xl lg:text-8xl">
-            Black first.
+            BBC first.
             <br />
-            Kneel second.
+            Kneel. Stay.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            Strut is BNWO dating. Black superiority. Whiteboi feminization. Cuckold.
-            Breeding white wives. Sissies and T-girls who know their place. If you have
-            to ask what this room is for, you don't belong in it.
+            Strut is BNWO propaganda with a dating app attached. Black superiority.
+            Whiteboi feminization. Cuckold. Breeding white wives. Sissies and faggots
+            on their knees. If you have to ask what this room is for, get on the floor.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
-            {["QOS", "BBC", "Cuck", "Sissy", "Whiteboi", "Breeding"].map((tag) => (
+            {["QOS", "BBC", "Cuck", "Sissy", "Whiteboi", "Breeding", "Hypno"].map((tag) => (
               <span
                 key={tag}
                 className="rounded-full border border-accent/40 px-3 py-1 text-[11px] tracking-[0.18em] text-accent uppercase"
@@ -90,6 +91,16 @@ function Home() {
           </div>
         </div>
       </section>
+
+      <div className="overflow-hidden border-y border-accent/30 bg-accent/5 py-2">
+        <div className="bnwo-ticker w-[200%]">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <span key={i}>
+              BBC FIRST · WHITEBOI KNEEL · SISSY FAGGOTS SERVE · QOS · BREED THE WIFE · CUCK WATCHES · BNWO IS REAL · ON YOUR KNEES ·
+            </span>
+          ))}
+        </div>
+      </div>
 
       <section className="border-t border-border py-16">
         <div className="mx-auto grid max-w-6xl gap-8 px-5 lg:grid-cols-3">
@@ -187,12 +198,12 @@ function Home() {
         <div className="relative mx-auto max-w-3xl px-5 py-20 text-center">
           <Kicker>The manifesto</Kicker>
           <h2 className="mt-4 font-display text-3xl leading-tight sm:text-5xl">
-            Black superiority. Whiteboi feminization. Cucking. Breeding.
+            Black cock is the law. Whitebois kneel. Wives get bred.
           </h2>
           <p className="mt-5 text-muted">
             This is not a general dating app. T-girls, sissies, trans women, men who lead,
-            women who take it, couples who watch. Queen of spades on the table. Nobody
-            here is confused.
+            women who take it, couples who watch. Queen of spades on the table. Faggots
+            on the floor. Nobody here is confused.
           </p>
           <Link to="/login" search={{ mode: "join" }} className="mt-8 inline-block">
             <Button size="lg" className="h-14 px-8 text-base">

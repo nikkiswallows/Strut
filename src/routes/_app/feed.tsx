@@ -47,7 +47,7 @@ function Feed() {
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="font-display text-4xl">The room</h1>
-      <p className="mt-1 text-sm text-muted">Looks, nights, leftover filth. Black first.</p>
+      <p className="mt-1 text-sm text-muted">Looks, leftover filth, whitebois on display. Black first.</p>
 
       <form
         className="mt-6 rounded-xl border border-border bg-surface p-4"

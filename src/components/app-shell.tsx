@@ -5,16 +5,16 @@ import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { readLocalSession } from "@/lib/local-session";
 import { fetchMyProfile } from "@/lib/profile-api";
-import { listConversations } from "@/lib/server/messages";
+import { fetchConversations } from "@/lib/messages-api";
 import { cn } from "@/lib/utils";
 import { Logo, Mark } from "./logo";
 import { Avatar } from "./photo";
 
 const NAV = [
-  { to: "/discover", label: "Discover", icon: Compass },
+  { to: "/discover", label: "Order", icon: Compass },
   { to: "/feed", label: "Room", icon: Newspaper },
   { to: "/likes", label: "Claimed", icon: Heart },
-  { to: "/inbox", label: "Inbox", icon: MessageCircle },
+  { to: "/inbox", label: "DMs", icon: MessageCircle },
   { to: "/me", label: "Me", icon: UserRound },
 ] as const;
 
@@ -31,8 +31,8 @@ export function AppShell() {
   });
   const inbox = useQuery({
     queryKey: ["conversations"],
-    queryFn: () => listConversations(),
-    enabled: Boolean(user) && Boolean(me.data?.onboarded),
+    queryFn: async () => (await fetchConversations()).conversations,
+    enabled: Boolean(user) && Boolean(me.data?.onboarded || readLocalSession()?.onboarded),
   });
 
   if (isPending) {

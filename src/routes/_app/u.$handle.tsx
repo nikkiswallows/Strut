@@ -6,8 +6,9 @@ import { PhotoViewer } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
 import { formatMiles } from "@/lib/geo";
 import { queryClient } from "@/lib/query-client";
-import { openConversation } from "@/lib/server/messages";
-import { getMyProfile, getProfileForViewer } from "@/lib/server/profiles";
+import { postOpenChat } from "@/lib/messages-api";
+import { fetchMyProfile } from "@/lib/profile-api";
+import { getProfileForViewer } from "@/lib/server/profiles";
 import { toggleFollow, toggleLike } from "@/lib/server/social";
 import { asPhotoList, identityLine, lookingLine, pronounLine, shownAge } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/_app/u/$handle")({ component: ProfilePage
 function ProfilePage() {
   const { handle } = Route.useParams();
   const navigate = useNavigate();
-  const me = useQuery({ queryKey: ["me"], queryFn: () => getMyProfile() });
+  const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMyProfile() });
   const profile = useQuery({
     queryKey: ["profile", handle],
     queryFn: () => getProfileForViewer({ data: handle }),
@@ -37,7 +38,7 @@ function ProfilePage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile", handle] }),
   });
   const message = useMutation({
-    mutationFn: () => openConversation({ data: profile.data!.userId }),
+    mutationFn: () => postOpenChat(profile.data!.userId),
     onSuccess: (res) => navigate({ to: "/inbox/$id", params: { id: String(res.id) } }),
     onError: (err: Error) => toast.error(err.message),
   });

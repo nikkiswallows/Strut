@@ -222,7 +222,7 @@ function Onboarding() {
         <div className="mt-8 animate-fade-up" key={step}>
           {step === 0 && (
             <div className="space-y-4">
-              <h1 className="font-display text-5xl leading-[0.92]">Name yourself.</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">Name the slut.</h1>
               <Field label="Display name">
                 <Input
                   value={displayName}

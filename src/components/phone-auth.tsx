@@ -185,11 +185,11 @@ export function PhoneAuth({
         >
           <div>
             <h1 className="font-display text-4xl leading-[0.95] sm:text-5xl">
-              {join ? "Your number." : "Welcome back."}
+              {join ? "On your knees." : "Welcome back."}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               {join
-                ? "We’ll text a code. Then you say if you’re a king, a sissy, a wife, or a cuck."
+                ? "We’ll text a code. Then you say if you’re a king, a sissy faggot, a wife, or a cuck."
                 : "Sign in with the number on your account. We’ll text a code."}
             </p>
           </div>

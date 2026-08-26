@@ -31,7 +31,17 @@ export const authMiddleware = createMiddleware({ type: "function" })
     // cookie, so forward it to the server. Null when deployed (cookie auth), so
     // this is a no-op there.
     const { getBearerToken } = await import("./client");
-    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
+    let token = getBearerToken() ?? undefined;
+    if (!token && typeof window !== "undefined") {
+      try {
+        const sid =
+          window.localStorage.getItem("strut.sid") || window.sessionStorage.getItem("strut.sid");
+        token = sid?.split("\t")[0] || undefined;
+      } catch {
+        /* ignore */
+      }
+    }
+    return next({ sendContext: { bearerToken: token } });
   })
   .server(async ({ next, context }) => {
     // ONLY import `*.server` modules here. This file is dual client/server

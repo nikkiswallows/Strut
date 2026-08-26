@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useMatches } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar } from "@/components/photo";
-import { listConversations } from "@/lib/server/messages";
+import { fetchConversations } from "@/lib/messages-api";
 import { timeAgo } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/inbox")({ component: Inbox });
@@ -9,19 +9,22 @@ export const Route = createFileRoute("/_app/inbox")({ component: Inbox });
 function Inbox() {
   const matches = useMatches();
   const nested = matches.some((m) => m.fullPath.includes("$id"));
-  const inbox = useQuery({ queryKey: ["conversations"], queryFn: () => listConversations() });
+  const inbox = useQuery({
+    queryKey: ["conversations"],
+    queryFn: async () => (await fetchConversations()).conversations,
+  });
 
   return (
     <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
       <div className={nested ? "hidden lg:block" : ""}>
         <div className="px-4 pt-4 lg:px-0 lg:pt-0">
-          <h1 className="font-display text-4xl">Inbox</h1>
-          <p className="mt-1 text-sm text-muted">Private. They write back. Serve in the DMs.</p>
+          <h1 className="font-display text-4xl">DMs</h1>
+          <p className="mt-1 text-sm text-muted">Kneel in the thread. They write back in character.</p>
         </div>
         <div className="mt-5 divide-y divide-border rounded-xl border border-border bg-surface">
           {(inbox.data ?? []).length === 0 && !inbox.isPending ? (
             <p className="px-4 py-10 text-center text-sm text-muted">
-              No conversations yet. Open a profile and say hi.
+              No conversations yet. Open a king and confess.
             </p>
           ) : null}
           {(inbox.data ?? []).map((c) => (

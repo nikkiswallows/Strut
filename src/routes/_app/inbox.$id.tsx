@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Avatar } from "@/components/photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getConversation, sendMessage } from "@/lib/server/messages";
+import { fetchThread, postBotReply, postSendChat } from "@/lib/messages-api";
 import { queryClient } from "@/lib/query-client";
 import { cn } from "@/lib/utils";
 
@@ -16,24 +16,36 @@ function Thread() {
   const { id } = Route.useParams();
   const convId = Number(id);
   const [body, setBody] = useState("");
+  const [waitingBot, setWaitingBot] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   const thread = useQuery({
     queryKey: ["conversation", convId],
-    queryFn: () => getConversation({ data: convId }),
+    queryFn: async () => (await fetchThread(convId)).thread,
     enabled: Number.isFinite(convId),
   });
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [thread.data?.messages.length, thread.isFetching]);
+  }, [thread.data?.messages.length, thread.isFetching, waitingBot]);
 
   const send = useMutation({
-    mutationFn: () => sendMessage({ data: { conversationId: convId, body } }),
-    onSuccess: async () => {
+    mutationFn: async () => {
+      const text = body.trim();
       setBody("");
+      const sent = await postSendChat(convId, text);
       await queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
       await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      if (sent.seed) {
+        setWaitingBot(true);
+        try {
+          await postBotReply(convId);
+        } finally {
+          setWaitingBot(false);
+        }
+        await queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
+        await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      }
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -68,21 +80,23 @@ function Thread() {
       </div>
       <div className="hide-scrollbar flex-1 space-y-2 overflow-y-auto px-4 py-4 lg:px-0">
         {data.messages.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted">Say hello. That's the whole first move.</p>
+          <p className="py-10 text-center text-sm text-muted">
+            On your knees in the DMs. Say it. They write back.
+          </p>
         ) : null}
         {data.messages.map((m) => (
           <div key={m.id} className={cn("flex", m.mine ? "justify-end" : "justify-start")}>
             <p
               className={cn(
                 "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-                m.mine ? "rounded-br-md bg-fg text-bg" : "rounded-bl-md bg-elevated text-fg",
+                m.mine ? "rounded-br-md bg-accent text-accent-fg" : "rounded-bl-md bg-elevated text-fg",
               )}
             >
               {m.body}
             </p>
           </div>
         ))}
-        {send.isPending ? (
+        {waitingBot ? (
           <div className="flex justify-start">
             <p className="rounded-2xl rounded-bl-md bg-elevated px-3.5 py-2 text-sm text-subtle">
               {data.other.displayName} is writing…
@@ -95,17 +109,17 @@ function Thread() {
         className="flex gap-2 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:px-0"
         onSubmit={(e) => {
           e.preventDefault();
-          if (body.trim() && !send.isPending) send.mutate();
+          if (body.trim() && !send.isPending && !waitingBot) send.mutate();
         }}
       >
         <Input
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Write a message"
-          disabled={send.isPending}
+          placeholder="Serve. Beg. Confess."
+          disabled={send.isPending || waitingBot}
         />
-        <Button type="submit" disabled={!body.trim() || send.isPending}>
-          {send.isPending ? "…" : "Send"}
+        <Button type="submit" disabled={!body.trim() || send.isPending || waitingBot}>
+          {send.isPending || waitingBot ? "…" : "Send"}
         </Button>
       </form>
     </div>

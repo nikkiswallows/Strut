@@ -77,7 +77,7 @@ function Discover() {
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
           <p className="text-xs tracking-[0.28em] text-accent uppercase">BNWO · Discover</p>
-          <h1 className="font-display text-5xl leading-[0.9]">Discover</h1>
+          <h1 className="font-display text-5xl leading-[0.9]">The order</h1>
         </div>
         <button
           type="button"
