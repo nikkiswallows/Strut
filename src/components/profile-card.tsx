@@ -46,7 +46,7 @@ export function ProfileCard({
               ) : null}
             </p>
             <p className="mt-0.5 truncate text-xs text-muted">
-              {[ident, distance ?? profile.location?.split(",")[0] ?? "Nearby"]
+              {[ident, profile.role, distance ?? profile.location?.split(",")[0] ?? "Nearby"]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
@@ -64,12 +64,12 @@ export function ProfileCard({
           }}
           className={cn(
             "absolute top-2.5 right-2.5 grid size-11 place-items-center rounded-full backdrop-blur-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
-            profile.likedByMe
-              ? "bg-accent text-accent-fg"
-              : "bg-bg/45 text-fg hover:bg-bg/70",
+            profile.likedByMe ? "bg-accent text-accent-fg" : "bg-bg/45 text-fg hover:bg-bg/70",
           )}
         >
-          <Heart className={cn("size-4 transition-transform duration-150", profile.likedByMe && "fill-current scale-110")} />
+          <Heart
+            className={cn("size-4 transition-transform duration-150", profile.likedByMe && "fill-current scale-110")}
+          />
         </button>
       ) : null}
     </article>

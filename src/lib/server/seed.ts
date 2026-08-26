@@ -28,10 +28,7 @@ function canonLooking(raw: string): string {
 
 function identitiesOf(p: SeedProfile): string[] {
   if (p.identities?.length) return p.identities;
-  const id = canonIdentity(p.identity);
-  if (id === "Trans woman") return ["Trans woman", "Woman"];
-  if (id === "T-Girl") return ["T-Girl"];
-  return [id];
+  return [canonIdentity(p.identity)];
 }
 
 async function runSeed() {
@@ -49,13 +46,13 @@ async function runSeed() {
       insert into profiles (
         user_id, handle, display_name, age, identity, pronouns, bio, location,
         looking_for, photos, interests, height_cm, is_seed, auto_match, onboarded, last_active,
-        identities, pronoun_list, hide_age, lat, lng
+        identities, pronoun_list, hide_age, lat, lng, role
       ) values (
         ${p.userId}, ${p.handle}, ${p.displayName}, ${p.age}, ${identity}, ${p.pronouns},
         ${p.bio}, ${p.location}, ${lookingFor}, ${JSON.stringify(p.photos)},
         ${JSON.stringify(p.interests)}, ${p.heightCm}, true, ${p.autoMatch}, true, now(),
         ${JSON.stringify(identities)}, ${JSON.stringify(pronouns)}, ${hideAge},
-        ${coord?.lat ?? null}, ${coord?.lng ?? null}
+        ${coord?.lat ?? null}, ${coord?.lng ?? null}, ${p.role}
       )
       on conflict (user_id) do update set
         handle = excluded.handle,
@@ -74,7 +71,10 @@ async function runSeed() {
         pronoun_list = excluded.pronoun_list,
         hide_age = excluded.hide_age,
         lat = excluded.lat,
-        lng = excluded.lng
+        lng = excluded.lng,
+        role = excluded.role,
+        is_seed = true,
+        onboarded = true
     `;
   }
 
@@ -94,16 +94,20 @@ async function runSeed() {
   }
 
   const pairs: Array<[string, string]> = [
-    ["seed-aria", "seed-blair"],
-    ["seed-blair", "seed-aria"],
+    ["seed-aria", "seed-marcus"],
+    ["seed-marcus", "seed-aria"],
+    ["seed-blair", "seed-devon"],
+    ["seed-devon", "seed-blair"],
     ["seed-dana", "seed-pilar"],
     ["seed-pilar", "seed-dana"],
-    ["seed-faye", "seed-remy"],
-    ["seed-hana", "seed-iris"],
+    ["seed-iris", "seed-andre"],
+    ["seed-hana", "seed-sloane"],
     ["seed-luna", "seed-mira"],
     ["seed-sage", "seed-quinn"],
     ["seed-eden", "seed-jules"],
     ["seed-wests", "seed-aria"],
+    ["seed-tessa", "seed-ellis"],
+    ["seed-maya", "seed-remy"],
   ];
   for (const [from, to] of pairs) {
     await sql`

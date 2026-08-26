@@ -29,7 +29,7 @@ function ProfilePage() {
       await queryClient.invalidateQueries({ queryKey: ["profile", handle] });
       await queryClient.invalidateQueries({ queryKey: ["likes"] });
       await queryClient.invalidateQueries({ queryKey: ["discover"] });
-      if (res.matched) toast.success("It's a match.");
+      if (res.matched) toast.success("It's a match. Say something.");
     },
   });
   const follow = useMutation({
@@ -81,11 +81,19 @@ function ProfilePage() {
             {distance ? ` · ${distance}` : ""}
           </p>
         ) : null}
-        {p.lookingFor ? (
-          <p className="mt-3 inline-flex rounded-full bg-elevated px-3 py-1 text-xs text-muted">
-            Looking for {p.lookingFor.toLowerCase()}
-          </p>
-        ) : null}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {p.role ? (
+            <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-fg">{p.role}</span>
+          ) : null}
+          {p.lookingFor ? (
+            <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
+              Looking for {p.lookingFor.toLowerCase()}
+            </span>
+          ) : null}
+          {p.heightCm ? (
+            <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">{p.heightCm} cm</span>
+          ) : null}
+        </div>
         {p.bio ? <p className="mt-4 text-[15px] leading-relaxed text-fg">{p.bio}</p> : null}
         {p.interests.length ? (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -109,6 +117,7 @@ function ProfilePage() {
               className="flex-1"
               variant={p.likedByMe ? "accent" : "outline"}
               onClick={() => like.mutate()}
+              disabled={like.isPending}
             >
               <Heart className={cn("size-4", p.likedByMe && "fill-current")} />
               {p.likedByMe ? "Liked" : "Like"}
@@ -128,7 +137,9 @@ function ProfilePage() {
           </div>
         )}
         {p.matched ? (
-          <p className="mt-3 text-center text-sm text-accent">You matched. Say something.</p>
+          <p className="mt-3 text-center text-sm text-accent">You matched. The chat is open.</p>
+        ) : p.isSeed ? (
+          <p className="mt-3 text-center text-xs text-subtle">They write back. Say hello.</p>
         ) : null}
       </div>
     </div>

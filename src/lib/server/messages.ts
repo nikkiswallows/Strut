@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
-import { SEED_PROFILES } from "@/lib/seed-data";
 import type { ChatMessage, ConversationPreview } from "@/lib/types";
 import { parseJson } from "@/lib/utils";
+import { generateSeedReply, isSeedUser } from "./bot";
 import { ensureSeed } from "./seed";
 
 export const listConversations = createServerFn({ method: "GET" })
@@ -121,6 +121,7 @@ export const getConversation = createServerFn({ method: "POST" })
         handle: o.handle,
         displayName: o.display_name,
         photo: photos[0] ?? null,
+        isSeed: isSeedUser(o.user_id),
       },
       messages: messages.map(
         (m): ChatMessage => ({
@@ -160,20 +161,32 @@ export const sendMessage = createServerFn({ method: "POST" })
     await sql.query(`update conversations set last_message_at = now() where id = $1`, [
       data.conversationId,
     ]);
+    await sql.query(`update profiles set last_active = now() where user_id = $1`, [
+      context.userId,
+    ]);
 
-    const prior = await sql.query<{ n: number }>(
-      `select count(*)::int as n from messages where conversation_id = $1`,
-      [data.conversationId],
-    );
-    const seed = SEED_PROFILES.find((p) => p.userId === otherId);
-    if (seed && Number(prior[0]?.n ?? 0) === 1) {
-      await sql.query(
-        `insert into messages (conversation_id, sender_id, body) values ($1, $2, $3)`,
-        [data.conversationId, otherId, seed.reply],
+    if (isSeedUser(otherId)) {
+      const history = await sql.query<{ sender_id: string; body: string }>(
+        `select sender_id, body from messages
+         where conversation_id = $1
+         order by created_at asc
+         limit 24`,
+        [data.conversationId],
       );
-      await sql.query(`update conversations set last_message_at = now() where id = $1`, [
-        data.conversationId,
-      ]);
+      const reply = await generateSeedReply({
+        seedUserId: otherId,
+        history: history.map((m) => ({ senderId: m.sender_id, body: m.body })),
+      });
+      if (reply) {
+        await sql.query(
+          `insert into messages (conversation_id, sender_id, body) values ($1, $2, $3)`,
+          [data.conversationId, otherId, reply],
+        );
+        await sql.query(`update conversations set last_message_at = now() where id = $1`, [
+          data.conversationId,
+        ]);
+      }
     }
+
     return { ok: true };
   });

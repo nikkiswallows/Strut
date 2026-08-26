@@ -5,7 +5,7 @@ import { Logo, Wordmark } from "@/components/logo";
 import { Photo } from "@/components/photo";
 import { Button } from "@/components/ui/button";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { HERO_PHOTO, HERO_STREET, STARTER_LOOKS } from "@/lib/seed-data";
+import { HERO_LOCKER, HERO_PHOTO, HERO_STREET } from "@/lib/seed-data";
 import { listFeatured } from "@/lib/server/profiles";
 import { shownAge } from "@/lib/types";
 
@@ -38,22 +38,20 @@ function Home() {
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-bg/20" />
         <Wordmark className="pointer-events-none absolute inset-x-0 top-[18%] text-center text-[22vw] leading-none text-fg/10 sm:text-[18vw]" />
         <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-3xl flex-col justify-end px-6 pb-16 pt-28">
-          <p className="text-xs tracking-[0.32em] text-accent uppercase">
-            Dating, on your terms
-          </p>
+          <p className="text-xs tracking-[0.32em] text-accent uppercase">18+ dating</p>
           <h1 className="mt-3 font-display text-6xl leading-[0.88] text-fg sm:text-7xl lg:text-8xl">
             Walk in.
             <br />
             Be seen.
           </h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
-            Strut is where T-Girls, sissies, and trans women meet — for dates,
-            nights out, and the kind of attention that actually lands.
+            Strut is for T-girls, sissies, trans women — and the men, women, and
+            couples who actually want them. Dates, nights, and attention that lands.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link to="/login" search={{ mode: "join" }}>
               <Button size="lg" className="h-14 w-full text-base sm:w-auto">
-                Continue with phone
+                Join Strut
                 <ArrowRight className="size-4" />
               </Button>
             </Link>
@@ -69,8 +67,8 @@ function Home() {
       <section className="border-t border-border py-14">
         <div className="mx-auto max-w-6xl px-5">
           <div className="mb-6">
-            <p className="text-xs tracking-[0.28em] text-subtle uppercase">Nearby tonight</p>
-            <h2 className="mt-1 font-display text-5xl">The room is already full.</h2>
+            <p className="text-xs tracking-[0.28em] text-subtle uppercase">Already in the room</p>
+            <h2 className="mt-1 font-display text-5xl">T-girls, sissies, admirers, couples.</h2>
           </div>
           <div className="hide-scrollbar -mx-5 flex gap-3 overflow-x-auto px-5 pb-2">
             {(featured.data ?? []).map((p) => {
@@ -93,7 +91,7 @@ function Home() {
                     <div className="absolute inset-x-0 bottom-0 p-3">
                       <p className="font-display text-lg leading-tight">{p.displayName}</p>
                       <p className="text-[11px] text-muted">
-                        {[age, p.location?.split(",")[0]].filter(Boolean).join(" · ")}
+                        {[p.identities[0], age, p.role].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                   </div>
@@ -111,40 +109,34 @@ function Home() {
             <h2 className="mt-2 font-display text-5xl leading-tight">
               Nearby like a grid.
               <br />
-              Tabs like Twitter.
+              Honest like a profile.
             </h2>
             <ul className="mt-8 space-y-6">
               {[
                 {
                   title: "Discover",
-                  body: "People near you, filtered by T-Girls, sissies, women, men, and couples — within the miles you choose.",
+                  body: "People near you — T-girls, sissies, men, women, couples — with top, bottom, or switch on the profile.",
                 },
                 {
-                  title: "Post",
-                  body: "Share a look, a night, a thought. Follow the people whose taste you trust.",
+                  title: "Like & match",
+                  body: "Likes and matches save to your account. Mutual likes light up. Then you talk.",
                 },
                 {
                   title: "Talk",
-                  body: "Matches open a private chat. No paywalls. No boosts. Just the conversation.",
+                  body: "Private chat, no paywalls. Seed profiles write back in character. Be decent in the DMs.",
                 },
               ].map((item) => (
                 <li key={item.title}>
-                  <p className="text-sm font-medium tracking-wide text-accent uppercase">
-                    {item.title}
-                  </p>
+                  <p className="text-sm font-medium tracking-wide text-accent uppercase">{item.title}</p>
                   <p className="mt-1 text-muted">{item.body}</p>
                 </li>
               ))}
             </ul>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <img src={HERO_STREET} alt="" className="h-72 w-full rounded-xl object-cover sm:h-96" />
             <img
-              src={HERO_STREET}
-              alt=""
-              className="h-72 w-full rounded-xl object-cover sm:h-96"
-            />
-            <img
-              src={STARTER_LOOKS[2]}
+              src={HERO_LOCKER}
               alt=""
               className="mt-10 h-72 w-full rounded-xl object-cover sm:h-96"
             />
@@ -155,9 +147,7 @@ function Home() {
       <footer className="border-t border-border px-5 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <Logo markClassName="size-9" wordClassName="text-3xl" />
-          <p className="text-xs text-subtle">
-            18+ only. Dating, not a marketplace. Be kind in the DMs.
-          </p>
+          <p className="text-xs text-subtle">18+ only. Dating, not a marketplace. Be kind in the DMs.</p>
         </div>
       </footer>
     </div>

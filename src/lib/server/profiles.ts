@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/geo";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
-import { DISCOVER_TABS, LOOKING_FOR, type DiscoverTab } from "@/lib/types";
+import { DISCOVER_TABS, LOOKING_FOR, ROLES, type DiscoverTab } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
 import { ensureSeed } from "./seed";
@@ -68,6 +68,7 @@ export type DiscoverInput = {
   tab?: DiscoverTab | string;
   miles?: number;
   lookingFor?: string;
+  role?: string;
   q?: string;
 };
 
@@ -77,6 +78,7 @@ export const listDiscover = createServerFn({ method: "POST" })
     tab: (input?.tab as DiscoverTab | undefined) ?? "nearby",
     miles: clampMiles(input?.miles),
     lookingFor: input?.lookingFor ?? "",
+    role: input?.role ?? "",
     q: input?.q ?? "",
   }))
   .handler(async ({ context, data }) => {
@@ -92,6 +94,10 @@ export const listDiscover = createServerFn({ method: "POST" })
       data.lookingFor && (LOOKING_FOR as readonly string[]).includes(data.lookingFor)
         ? data.lookingFor
         : null;
+    const role =
+      data.role && (ROLES as readonly string[]).includes(data.role as (typeof ROLES)[number])
+        ? data.role
+        : null;
     const q = data.q.trim() ? `%${data.q.trim().toLowerCase()}%` : null;
 
     const params: unknown[] = [context.userId];
@@ -99,6 +105,10 @@ export const listDiscover = createServerFn({ method: "POST" })
     if (lookingFor) {
       params.push(lookingFor);
       where += ` and looking_for = $${params.length}`;
+    }
+    if (role) {
+      params.push(role);
+      where += ` and role = $${params.length}`;
     }
     if (q) {
       params.push(q);
@@ -151,7 +161,7 @@ export const listFeatured = createServerFn({ method: "GET" }).handler(async () =
     `select ${PROFILE_COLS} from profiles
      where is_seed = true and onboarded = true
      order by id
-     limit 18`,
+     limit 24`,
   );
   return rows.map(mapProfile);
 });
@@ -163,6 +173,7 @@ export type ProfileInput = {
   hideAge?: boolean;
   identities: string[];
   pronouns: string[];
+  role?: string | null;
   bio: string;
   location: string | null;
   lookingFor: string | null;
@@ -185,6 +196,11 @@ function cleanProfile(input: ProfileInput) {
   const interests = unique(input.interests).slice(0, 16);
   const location = input.location?.trim().slice(0, 80) || null;
   const coord = coordForLocation(location);
+  const roleRaw = input.role?.trim() || null;
+  const role =
+    roleRaw && (ROLES as readonly string[]).includes(roleRaw as (typeof ROLES)[number])
+      ? roleRaw
+      : null;
   return {
     handle,
     displayName,
@@ -194,6 +210,7 @@ function cleanProfile(input: ProfileInput) {
     pronouns,
     identity: identities[0] ?? null,
     pronounText: pronouns[0] ?? null,
+    role,
     bio: input.bio.trim().slice(0, 500),
     location,
     lookingFor: input.lookingFor?.trim() || null,
@@ -223,10 +240,10 @@ export const saveMyProfile = createServerFn({ method: "POST" })
       `insert into profiles (
          user_id, handle, display_name, age, identity, pronouns, bio, location,
          looking_for, photos, interests, height_cm, onboarded, last_active,
-         identities, pronoun_list, hide_age, lat, lng
+         identities, pronoun_list, hide_age, lat, lng, role
        ) values (
          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,true,now(),
-         $13::jsonb,$14::jsonb,$15::boolean,$16,$17
+         $13::jsonb,$14::jsonb,$15::boolean,$16,$17,$18
        )
        on conflict (user_id) do update set
          handle = excluded.handle,
@@ -245,6 +262,7 @@ export const saveMyProfile = createServerFn({ method: "POST" })
          hide_age = excluded.hide_age,
          lat = excluded.lat,
          lng = excluded.lng,
+         role = excluded.role,
          onboarded = true,
          last_active = now()
        returning ${PROFILE_COLS}`,
@@ -266,13 +284,14 @@ export const saveMyProfile = createServerFn({ method: "POST" })
         data.hideAge,
         data.lat,
         data.lng,
+        data.role,
       ],
     );
     return mapProfile(rows[0]!);
   });
 
 function clampMiles(value: number | undefined): number {
-  if (value == null || Number.isNaN(Number(value))) return 50;
+  if (value == null || Number.isNaN(Number(value))) return 100;
   return Math.max(1, Math.min(500, Math.round(Number(value))));
 }
 

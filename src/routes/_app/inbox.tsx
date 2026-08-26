@@ -14,12 +14,14 @@ function Inbox() {
   return (
     <div className="lg:grid lg:grid-cols-[280px_1fr] lg:gap-8">
       <div className={nested ? "hidden lg:block" : ""}>
-        <h1 className="font-display text-4xl">Inbox</h1>
-        <p className="mt-1 text-sm text-muted">Matches, late nights, leftover texts.</p>
+        <div className="px-4 pt-4 lg:px-0 lg:pt-0">
+          <h1 className="font-display text-4xl">Inbox</h1>
+          <p className="mt-1 text-sm text-muted">Saved chats. They write back.</p>
+        </div>
         <div className="mt-5 divide-y divide-border rounded-xl border border-border bg-surface">
           {(inbox.data ?? []).length === 0 && !inbox.isPending ? (
             <p className="px-4 py-10 text-center text-sm text-muted">
-              No conversations yet. Match with someone first.
+              No conversations yet. Open a profile and say hi.
             </p>
           ) : null}
           {(inbox.data ?? []).map((c) => (
@@ -47,11 +49,7 @@ function Inbox() {
         </div>
       </div>
       <div className={nested ? "block" : "hidden lg:grid lg:place-items-center"}>
-        {nested ? (
-          <Outlet />
-        ) : (
-          <p className="text-sm text-subtle">Pick a conversation.</p>
-        )}
+        {nested ? <Outlet /> : <p className="text-sm text-subtle">Pick a conversation.</p>}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ export const IDENTITIES = [
   "Questioning",
   "Woman",
   "Man",
+  "Admirer",
   "Couple",
   "Group",
 ] as const;
@@ -16,6 +17,8 @@ export const IDENTITIES = [
 export const LOOKING_FOR = ["Friends", "Dates", "Relationship", "Now", "Chat"] as const;
 
 export const PRONOUNS = ["she/her", "they/them", "she/they", "he/him", "he/they", "any"] as const;
+
+export const ROLES = ["Top", "Bottom", "Switch", "Side"] as const;
 
 export const INTERESTS = [
   "Fashion",
@@ -44,17 +47,17 @@ export const DISCOVER_TABS = [
   { id: "nearby", label: "Nearby", match: [] as string[] },
   { id: "tgirls", label: "T-Girls", match: ["T-Girl", "Trans woman"] },
   { id: "sissies", label: "Sissies", match: ["Sissy", "Crossdresser", "Femboy"] },
+  { id: "men", label: "Men", match: ["Man", "Admirer"] },
   { id: "women", label: "Women", match: ["Woman"] },
-  { id: "men", label: "Men", match: ["Man"] },
   { id: "couples", label: "Couples", match: ["Couple", "Group"] },
 ] as const;
 
 export const MILE_STOPS = [5, 10, 25, 50, 100, 250, 500] as const;
 
 export type DiscoverTab = (typeof DISCOVER_TABS)[number]["id"];
-
 export type Identity = (typeof IDENTITIES)[number];
 export type LookingFor = (typeof LOOKING_FOR)[number];
+export type Role = (typeof ROLES)[number];
 
 export type Profile = {
   id: number;
@@ -65,6 +68,7 @@ export type Profile = {
   hideAge: boolean;
   identities: string[];
   pronouns: string[];
+  role: string | null;
   bio: string;
   location: string | null;
   lookingFor: string | null;
@@ -95,6 +99,10 @@ export function identityLine(profile: Pick<Profile, "identities">): string {
 
 export function pronounLine(profile: Pick<Profile, "pronouns">): string {
   return profile.pronouns.filter(Boolean).join(" · ");
+}
+
+export function roleLine(profile: Pick<Profile, "role">): string | null {
+  return profile.role?.trim() || null;
 }
 
 export type FeedPost = {

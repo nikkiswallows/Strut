@@ -9,12 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { formatMiles } from "@/lib/geo";
 import { queryClient } from "@/lib/query-client";
-import { STARTER_LOOKS } from "@/lib/seed-data";
 import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
-import { IDENTITIES, identityLine, INTERESTS, LOOKING_FOR, pronounLine, PRONOUNS, shownAge } from "@/lib/types";
+import {
+  IDENTITIES,
+  identityLine,
+  INTERESTS,
+  LOOKING_FOR,
+  pronounLine,
+  PRONOUNS,
+  ROLES,
+  shownAge,
+} from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/me")({ component: Me });
@@ -43,10 +50,12 @@ function Me() {
   const [location, setLocation] = useState("");
   const [identities, setIdentities] = useState<string[]>([]);
   const [pronouns, setPronouns] = useState<string[]>([]);
+  const [role, setRole] = useState("");
   const [lookingFor, setLookingFor] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
+  const [heightCm, setHeightCm] = useState("");
 
   useEffect(() => {
     if (!p) return;
@@ -57,10 +66,12 @@ function Me() {
     setLocation(p.location ?? "");
     setIdentities(p.identities);
     setPronouns(p.pronouns);
+    setRole(p.role ?? "");
     setLookingFor(p.lookingFor ?? "");
     setPhotos(p.photos);
     setBio(p.bio);
     setInterests(p.interests);
+    setHeightCm(p.heightCm ? String(p.heightCm) : "");
   }, [p]);
 
   const save = useMutation({
@@ -74,17 +85,18 @@ function Me() {
           location,
           identities,
           pronouns,
+          role,
           lookingFor,
           photos,
           bio,
           interests,
-          heightCm: p?.heightCm ?? null,
+          heightCm: heightCm ? Number(heightCm) : null,
         },
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       setEditing(false);
-      toast.success("Profile updated.");
+      toast.success("Profile saved.");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -117,28 +129,28 @@ function Me() {
           <h2 className="mt-5 font-display text-4xl">
             {p.displayName}
             {ageShown ? <span className="ml-2 font-sans text-xl text-muted">{ageShown}</span> : null}
-            {p.hideAge ? (
-              <span className="ml-2 align-middle font-sans text-xs tracking-wide text-subtle uppercase">
-                Age hidden
-              </span>
-            ) : null}
           </h2>
           <p className="text-sm text-muted">
             @{p.handle}
             {identityLine(p) ? ` · ${identityLine(p)}` : ""}
             {pronounLine(p) ? ` · ${pronounLine(p)}` : ""}
           </p>
-          {p.location ? (
-            <p className="mt-1 text-sm text-muted">
-              {p.location}
-              {p.distanceMiles != null ? ` · ${formatMiles(p.distanceMiles)}` : ""}
-            </p>
-          ) : null}
-          {p.lookingFor ? (
-            <p className="mt-3 inline-flex rounded-full bg-elevated px-3 py-1 text-xs text-muted">
-              Looking for {p.lookingFor.toLowerCase()}
-            </p>
-          ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {p.role ? (
+              <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-fg">
+                {p.role}
+              </span>
+            ) : null}
+            {p.lookingFor ? (
+              <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
+                Looking for {p.lookingFor.toLowerCase()}
+              </span>
+            ) : null}
+            {p.heightCm ? (
+              <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">{p.heightCm} cm</span>
+            ) : null}
+          </div>
+          {p.location ? <p className="mt-2 text-sm text-muted">{p.location}</p> : null}
           {p.bio ? <p className="mt-3 leading-relaxed">{p.bio}</p> : null}
           {p.interests.length ? (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -158,6 +170,10 @@ function Me() {
           className="mt-6 space-y-4 animate-fade-up"
           onSubmit={(e) => {
             e.preventDefault();
+            if (photos.length === 0) {
+              toast.error("Add at least one photo of you.");
+              return;
+            }
             save.mutate();
           }}
         >
@@ -175,6 +191,15 @@ function Me() {
               <Input value={location} onChange={(e) => setLocation(e.target.value)} />
             </Field>
           </div>
+          <Field label="Height (cm)">
+            <Input
+              type="number"
+              min={120}
+              max={220}
+              value={heightCm}
+              onChange={(e) => setHeightCm(e.target.value)}
+            />
+          </Field>
           <button
             type="button"
             onClick={() => setHideAge((v) => !v)}
@@ -200,6 +225,7 @@ function Me() {
             kind="pronoun"
             max={6}
           />
+          <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
           <SingleChips
             label="Looking for"
             options={[...LOOKING_FOR]}
@@ -210,9 +236,6 @@ function Me() {
             <Textarea value={bio} maxLength={500} onChange={(e) => setBio(e.target.value)} />
           </Field>
           <PhotoEditor photos={photos} onChange={setPhotos} />
-          <Button type="button" variant="outline" className="w-full" onClick={() => setPhotos(STARTER_LOOKS)}>
-            Use my saved looks
-          </Button>
           <MultiChips
             label="Interests"
             options={interestTags.data ?? [...INTERESTS]}
@@ -226,7 +249,7 @@ function Me() {
               Cancel
             </Button>
             <Button type="submit" className="flex-1" disabled={save.isPending}>
-              Save
+              {save.isPending ? "Saving…" : "Save"}
             </Button>
           </div>
         </form>

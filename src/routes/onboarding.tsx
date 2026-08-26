@@ -10,10 +10,9 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
-import { STARTER_LOOKS } from "@/lib/seed-data";
 import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
-import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS } from "@/lib/types";
+import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
@@ -47,13 +46,15 @@ function Onboarding() {
   const [handle, setHandle] = useState("");
   const [age, setAge] = useState("24");
   const [hideAge, setHideAge] = useState(false);
-  const [location, setLocation] = useState("Costa Mesa, CA");
+  const [location, setLocation] = useState("");
   const [identities, setIdentities] = useState<string[]>(["T-Girl"]);
   const [pronouns, setPronouns] = useState<string[]>(["she/her"]);
+  const [role, setRole] = useState("Switch");
   const [lookingFor, setLookingFor] = useState("Dates");
-  const [photos, setPhotos] = useState<string[]>(STARTER_LOOKS);
+  const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
-  const [interests, setInterests] = useState<string[]>(["Fashion", "Nights out"]);
+  const [interests, setInterests] = useState<string[]>([]);
+  const [heightCm, setHeightCm] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -66,13 +67,15 @@ function Onboarding() {
     if (me.data) {
       setAge(me.data.age ? String(me.data.age) : "24");
       setHideAge(me.data.hideAge);
-      setLocation(me.data.location ?? "Costa Mesa, CA");
+      setLocation(me.data.location ?? "");
       setIdentities(me.data.identities.length ? me.data.identities : ["T-Girl"]);
       setPronouns(me.data.pronouns.length ? me.data.pronouns : ["she/her"]);
+      setRole(me.data.role ?? "Switch");
       setLookingFor(me.data.lookingFor ?? "Dates");
-      setPhotos(me.data.photos.length ? me.data.photos : STARTER_LOOKS);
+      setPhotos(me.data.photos.length ? me.data.photos : []);
       setBio(me.data.bio);
-      setInterests(me.data.interests.length ? me.data.interests : ["Fashion", "Nights out"]);
+      setInterests(me.data.interests);
+      setHeightCm(me.data.heightCm ? String(me.data.heightCm) : "");
     }
     setHydrated(true);
   }, [hydrated, me.data, me.isPending, user]);
@@ -88,11 +91,12 @@ function Onboarding() {
           location,
           identities,
           pronouns,
+          role,
           lookingFor,
           photos,
           bio,
           interests,
-          heightCm: null,
+          heightCm: heightCm ? Number(heightCm) : null,
         },
       }),
     onSuccess: async () => {
@@ -129,9 +133,7 @@ function Onboarding() {
                   i <= step ? "bg-accent" : "bg-elevated",
                 )}
               />
-              <span className="mt-2 block text-[10px] tracking-wide text-subtle uppercase">
-                {label}
-              </span>
+              <span className="mt-2 block text-[10px] tracking-wide text-subtle uppercase">{label}</span>
             </button>
           ))}
         </div>
@@ -180,6 +182,17 @@ function Onboarding() {
                   />
                 </Field>
               </div>
+              <Field label="Height (cm)" hint="Optional.">
+                <Input
+                  type="number"
+                  min={120}
+                  max={220}
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(e.target.value)}
+                  placeholder="175"
+                  inputMode="numeric"
+                />
+              </Field>
               <button
                 type="button"
                 onClick={() => setHideAge((v) => !v)}
@@ -198,7 +211,7 @@ function Onboarding() {
               <h1 className="font-display text-5xl leading-[0.92]">Identity</h1>
               <MultiChips
                 label="Identity"
-                hint="Pick as many as you like."
+                hint="T-girl, sissy, man, woman, couple — pick what fits."
                 options={identityTags.data ?? [...IDENTITIES]}
                 value={identities}
                 onChange={setIdentities}
@@ -212,6 +225,7 @@ function Onboarding() {
                 kind="pronoun"
                 max={6}
               />
+              <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
               <SingleChips
                 label="Looking for"
                 options={[...LOOKING_FOR]}
@@ -225,12 +239,9 @@ function Onboarding() {
             <div className="space-y-5">
               <h1 className="font-display text-5xl leading-[0.92]">Put a face to it.</h1>
               <p className="text-sm text-muted">
-                Your main look sits large. Drag the rest into the order you want.
+                Your photos. Not someone else's. Main look sits large — drag the rest into order.
               </p>
               <PhotoEditor photos={photos} onChange={setPhotos} />
-              <Button variant="outline" className="w-full" onClick={() => setPhotos(STARTER_LOOKS)}>
-                Reset to saved looks
-              </Button>
             </div>
           )}
 
@@ -277,7 +288,7 @@ function Onboarding() {
                   return;
                 }
                 if (step === 2 && photos.length === 0) {
-                  toast.error("Add at least one photo.");
+                  toast.error("Add at least one photo of you.");
                   return;
                 }
                 setStep(step + 1);

@@ -19,6 +19,9 @@ const CITIES: Record<string, Coord> = {
   "oakland, ca": { lat: 37.8044, lng: -122.2712 },
   "hollywood, ca": { lat: 34.0928, lng: -118.3287 },
   "newport beach, ca": { lat: 33.6189, lng: -117.9298 },
+  "huntington beach, ca": { lat: 33.6595, lng: -117.9988 },
+  "fullerton, ca": { lat: 33.8704, lng: -117.9243 },
+  "orange, ca": { lat: 33.7879, lng: -117.8531 },
 };
 
 export const DEFAULT_COORD: Coord = CITIES["costa mesa, ca"]!;

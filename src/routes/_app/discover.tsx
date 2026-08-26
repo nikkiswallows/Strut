@@ -1,43 +1,74 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ProfileCard } from "@/components/profile-card";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/query-client";
 import { listDiscover } from "@/lib/server/profiles";
 import { toggleLike } from "@/lib/server/social";
-import { DISCOVER_TABS, LOOKING_FOR, MILE_STOPS, type DiscoverTab, type Profile } from "@/lib/types";
+import {
+  DISCOVER_TABS,
+  LOOKING_FOR,
+  MILE_STOPS,
+  ROLES,
+  type DiscoverTab,
+  type Profile,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/discover")({ component: Discover });
 
 function Discover() {
   const [tab, setTab] = useState<DiscoverTab>("nearby");
-  const [miles, setMiles] = useState(50);
+  const [miles, setMiles] = useState(100);
   const [lookingFor, setLookingFor] = useState("");
+  const [role, setRole] = useState("");
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const profiles = useQuery({
-    queryKey: ["discover", tab, miles, lookingFor, q],
-    queryFn: () => listDiscover({ data: { tab, miles, lookingFor, q } }),
+    queryKey: ["discover", tab, miles, lookingFor, role, q],
+    queryFn: () => listDiscover({ data: { tab, miles, lookingFor, role, q } }),
   });
 
   const like = useMutation({
     mutationFn: (p: Profile) => toggleLike({ data: p.userId }),
+    onMutate: async (p) => {
+      await queryClient.cancelQueries({ queryKey: ["discover"] });
+      const key = ["discover", tab, miles, lookingFor, role, q] as const;
+      const prev = queryClient.getQueryData<Profile[]>(key);
+      if (prev) {
+        queryClient.setQueryData<Profile[]>(
+          key,
+          prev.map((row) =>
+            row.userId === p.userId
+              ? { ...row, likedByMe: !row.likedByMe, matched: !row.likedByMe && Boolean(row.likesMe) }
+              : row,
+          ),
+        );
+      }
+      return { prev, key };
+    },
     onSuccess: (res, p) => {
       void queryClient.invalidateQueries({ queryKey: ["discover"] });
       void queryClient.invalidateQueries({ queryKey: ["likes"] });
       if (res.matched) toast.success(`You and ${p.displayName} matched.`);
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error, _p, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(ctx.key, ctx.prev);
+      toast.error(err.message);
+    },
   });
 
   const milesLabel = miles >= 500 ? "Any distance" : `Within ${miles} mi`;
   const activeTab = DISCOVER_TABS.find((t) => t.id === tab) ?? DISCOVER_TABS[0]!;
+  const filterBits = useMemo(
+    () => [activeTab.label, lookingFor && `looking for ${lookingFor.toLowerCase()}`, role, milesLabel].filter(Boolean),
+    [activeTab.label, lookingFor, role, milesLabel],
+  );
 
   return (
     <div>
@@ -66,7 +97,10 @@ function Discover() {
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-subtle" />
         <Input
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (!e.target.value.trim()) setQ("");
+          }}
           placeholder="Search names, cities…"
           className="pl-10"
         />
@@ -99,10 +133,8 @@ function Discover() {
         </div>
       </div>
 
-      {lookingFor ? (
-        <p className="mb-3 text-xs text-subtle">
-          {activeTab.label} · looking for {lookingFor.toLowerCase()} · {milesLabel}
-        </p>
+      {lookingFor || role ? (
+        <p className="mb-3 text-xs text-subtle">{filterBits.join(" · ")}</p>
       ) : null}
 
       {profiles.isError ? (
@@ -161,9 +193,7 @@ function Discover() {
                 </button>
               ))}
             </div>
-            <p className="mt-5 mb-2 text-xs font-medium tracking-wide text-muted uppercase">
-              Looking for
-            </p>
+            <p className="mt-5 mb-2 text-xs font-medium tracking-wide text-muted uppercase">Looking for</p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -186,6 +216,34 @@ function Discover() {
                   )}
                 >
                   {lf}
+                </button>
+              ))}
+            </div>
+            <p className="mt-5 mb-2 text-xs font-medium tracking-wide text-muted uppercase">
+              Top / bottom / switch
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setRole("")}
+                className={cn(
+                  "h-10 rounded-full px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
+                  !role ? "bg-fg text-bg" : "bg-elevated text-muted",
+                )}
+              >
+                Any
+              </button>
+              {ROLES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(role === r ? "" : r)}
+                  className={cn(
+                    "h-10 rounded-full px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
+                    role === r ? "bg-fg text-bg" : "bg-elevated text-muted",
+                  )}
+                >
+                  {r}
                 </button>
               ))}
             </div>
