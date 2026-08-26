@@ -17,6 +17,7 @@ import {
   identityLine,
   INTERESTS,
   LOOKING_FOR,
+  lookingLine,
   pronounLine,
   PRONOUNS,
   ROLES,
@@ -41,6 +42,10 @@ function Me() {
     queryKey: ["tags", "interest"],
     queryFn: () => listTags({ data: "interest" }),
   });
+  const lookingTags = useQuery({
+    queryKey: ["tags", "looking"],
+    queryFn: () => listTags({ data: "looking" }),
+  });
   const p = me.data;
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState("");
@@ -51,7 +56,7 @@ function Me() {
   const [identities, setIdentities] = useState<string[]>([]);
   const [pronouns, setPronouns] = useState<string[]>([]);
   const [role, setRole] = useState("");
-  const [lookingFor, setLookingFor] = useState("");
+  const [lookingFor, setLookingFor] = useState<string[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
@@ -67,7 +72,7 @@ function Me() {
     setIdentities(p.identities);
     setPronouns(p.pronouns);
     setRole(p.role ?? "");
-    setLookingFor(p.lookingFor ?? "");
+    setLookingFor(p.lookingFor);
     setPhotos(p.photos);
     setBio(p.bio);
     setInterests(p.interests);
@@ -141,9 +146,9 @@ function Me() {
                 {p.role}
               </span>
             ) : null}
-            {p.lookingFor ? (
+            {lookingLine(p) ? (
               <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
-                Looking for {p.lookingFor.toLowerCase()}
+                {lookingLine(p)}
               </span>
             ) : null}
             {p.heightCm ? (
@@ -226,11 +231,14 @@ function Me() {
             max={6}
           />
           <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
-          <SingleChips
+          <MultiChips
             label="Looking for"
-            options={[...LOOKING_FOR]}
+            hint="Pick as many as you want."
+            options={lookingTags.data ?? [...LOOKING_FOR]}
             value={lookingFor}
             onChange={setLookingFor}
+            kind="looking"
+            max={8}
           />
           <Field label="Bio">
             <Textarea value={bio} maxLength={500} onChange={(e) => setBio(e.target.value)} />

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/geo";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
-import { DISCOVER_TABS, LOOKING_FOR, ROLES, type DiscoverTab } from "@/lib/types";
+import { DISCOVER_TABS, ROLES, type DiscoverTab } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
 import { ensureSeed } from "./seed";
@@ -90,10 +90,7 @@ export const listDiscover = createServerFn({ method: "POST" })
     );
     const origin = originOf(meRows[0] ? mapProfile(meRows[0]) : null);
 
-    const lookingFor =
-      data.lookingFor && (LOOKING_FOR as readonly string[]).includes(data.lookingFor)
-        ? data.lookingFor
-        : null;
+    const lookingFor = data.lookingFor.trim() || null;
     const role =
       data.role && (ROLES as readonly string[]).includes(data.role as (typeof ROLES)[number])
         ? data.role
@@ -102,10 +99,6 @@ export const listDiscover = createServerFn({ method: "POST" })
 
     const params: unknown[] = [context.userId];
     let where = `user_id <> $1 and onboarded = true`;
-    if (lookingFor) {
-      params.push(lookingFor);
-      where += ` and looking_for = $${params.length}`;
-    }
     if (role) {
       params.push(role);
       where += ` and role = $${params.length}`;
@@ -147,6 +140,11 @@ export const listDiscover = createServerFn({ method: "POST" })
           const hit = profile.identities.some((id) => match.has(id.toLowerCase()));
           if (!hit) return false;
         }
+        if (lookingFor) {
+          const want = lookingFor.toLowerCase();
+          const hit = profile.lookingFor.some((item) => item.toLowerCase() === want);
+          if (!hit) return false;
+        }
         if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
         return true;
       })
@@ -176,11 +174,17 @@ export type ProfileInput = {
   role?: string | null;
   bio: string;
   location: string | null;
-  lookingFor: string | null;
+  lookingFor?: string[] | string | null;
   photos: string[];
   interests: string[];
   heightCm: number | null;
 };
+
+function asLookingList(value: string[] | string | null | undefined): string[] {
+  if (Array.isArray(value)) return unique(value).slice(0, 8);
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
 
 function cleanProfile(input: ProfileInput) {
   const handle = slugifyHandle(input.handle);
@@ -213,7 +217,7 @@ function cleanProfile(input: ProfileInput) {
     role,
     bio: input.bio.trim().slice(0, 500),
     location,
-    lookingFor: input.lookingFor?.trim() || null,
+    lookingFor: asLookingList(input.lookingFor),
     photos: input.photos.filter(Boolean).slice(0, 8),
     interests,
     heightCm:
@@ -239,11 +243,11 @@ export const saveMyProfile = createServerFn({ method: "POST" })
     const rows = await sql.query<ProfileRow>(
       `insert into profiles (
          user_id, handle, display_name, age, identity, pronouns, bio, location,
-         looking_for, photos, interests, height_cm, onboarded, last_active,
+         looking_for, looking_for_list, photos, interests, height_cm, onboarded, last_active,
          identities, pronoun_list, hide_age, lat, lng, role
        ) values (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,true,now(),
-         $13::jsonb,$14::jsonb,$15::boolean,$16,$17,$18
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,true,now(),
+         $14::jsonb,$15::jsonb,$16::boolean,$17,$18,$19
        )
        on conflict (user_id) do update set
          handle = excluded.handle,
@@ -254,6 +258,7 @@ export const saveMyProfile = createServerFn({ method: "POST" })
          bio = excluded.bio,
          location = excluded.location,
          looking_for = excluded.looking_for,
+         looking_for_list = excluded.looking_for_list,
          photos = excluded.photos,
          interests = excluded.interests,
          height_cm = excluded.height_cm,
@@ -275,7 +280,8 @@ export const saveMyProfile = createServerFn({ method: "POST" })
         data.pronounText,
         data.bio,
         data.location,
-        data.lookingFor,
+        data.lookingFor[0] ?? null,
+        JSON.stringify(data.lookingFor),
         JSON.stringify(data.photos),
         JSON.stringify(data.interests),
         data.heightCm,

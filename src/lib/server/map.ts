@@ -2,11 +2,11 @@ import { parseJson } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
 
 export const PROFILE_COLS = `id, user_id, handle, display_name, age, identity, pronouns, bio,
-  location, looking_for, photos, interests, height_cm, is_seed,
+  location, looking_for, looking_for_list, photos, interests, height_cm, is_seed,
   last_active, onboarded, created_at, identities, pronoun_list, hide_age, lat, lng, role`;
 
 export const PROFILE_COLS_P = `p.id, p.user_id, p.handle, p.display_name, p.age, p.identity, p.pronouns, p.bio,
-  p.location, p.looking_for, p.photos, p.interests, p.height_cm, p.is_seed,
+  p.location, p.looking_for, p.looking_for_list, p.photos, p.interests, p.height_cm, p.is_seed,
   p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.lat, p.lng, p.role`;
 
 export type ProfileRow = {
@@ -20,6 +20,7 @@ export type ProfileRow = {
   bio: string;
   location: string | null;
   looking_for: string | null;
+  looking_for_list?: unknown;
   photos: unknown;
   interests: unknown;
   height_cm: number | null;
@@ -66,7 +67,7 @@ export function mapProfile(row: ProfileRow): Profile {
     role: row.role?.trim() || null,
     bio: row.bio ?? "",
     location: row.location,
-    lookingFor: row.looking_for,
+    lookingFor: asList(row.looking_for_list, row.looking_for),
     photos: parseJson<string[]>(row.photos, []),
     interests: parseJson<string[]>(row.interests, []),
     heightCm: row.height_cm == null ? null : Number(row.height_cm),

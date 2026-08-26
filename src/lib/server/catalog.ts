@@ -1,24 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
-import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
-import { IDENTITIES, INTERESTS, PRONOUNS } from "@/lib/types";
+import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS } from "@/lib/types";
 import { unique } from "@/lib/utils";
 
-export type TagKind = "identity" | "pronoun" | "interest";
+export type TagKind = "identity" | "pronoun" | "interest" | "looking";
 
 const BASE: Record<TagKind, readonly string[]> = {
   identity: IDENTITIES,
   pronoun: PRONOUNS,
   interest: INTERESTS,
+  looking: LOOKING_FOR,
 };
 
 function cleanKind(kind: string): TagKind {
-  if (kind === "identity" || kind === "pronoun" || kind === "interest") return kind;
+  if (kind === "identity" || kind === "pronoun" || kind === "interest" || kind === "looking") {
+    return kind;
+  }
   throw new Error("Unknown tag.");
 }
 
-export const listTags = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+export const listTags = createServerFn({ method: "GET" })
   .validator((kind: TagKind) => cleanKind(kind))
   .handler(async ({ data: kind }) => {
     const sql = await getSql();
@@ -30,7 +31,6 @@ export const listTags = createServerFn({ method: "POST" })
   });
 
 export const addTag = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
   .validator((input: { kind: TagKind; label: string }) => {
     const kind = cleanKind(input.kind);
     const label = input.label.trim().replace(/\s+/g, " ").slice(0, 28);

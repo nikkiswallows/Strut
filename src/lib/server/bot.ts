@@ -13,7 +13,7 @@ Profile:
 - Pronouns: ${seed.pronounList?.join(", ") ?? seed.pronouns}
 - Role: ${seed.role}
 - Location: ${seed.location}
-- Looking for: ${seed.lookingFor}
+- Looking for: ${Array.isArray(seed.lookingFor) ? seed.lookingFor.join(", ") : seed.lookingFor}
 - Height: ${seed.heightCm} cm
 - Interests: ${seed.interests.join(", ")}
 - Bio: ${seed.bio}

@@ -71,7 +71,7 @@ export type Profile = {
   role: string | null;
   bio: string;
   location: string | null;
-  lookingFor: string | null;
+  lookingFor: string[];
   photos: string[];
   interests: string[];
   heightCm: number | null;
@@ -103,6 +103,12 @@ export function pronounLine(profile: Pick<Profile, "pronouns">): string {
 
 export function roleLine(profile: Pick<Profile, "role">): string | null {
   return profile.role?.trim() || null;
+}
+
+export function lookingLine(profile: Pick<Profile, "lookingFor">): string | null {
+  const items = (profile.lookingFor ?? []).map((s) => s.trim()).filter(Boolean);
+  if (!items.length) return null;
+  return `Looking for ${items.join(" · ").toLowerCase()}`;
 }
 
 export type FeedPost = {

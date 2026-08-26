@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { addTag, type TagKind } from "@/lib/server/catalog";
+import { queryClient } from "@/lib/query-client";
 import { cn, unique } from "@/lib/utils";
 
 export function MultiChips({
@@ -107,7 +108,6 @@ function AddCustom({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
 
   async function submit() {
     const label = draft.trim().replace(/\s+/g, " ");
@@ -115,16 +115,14 @@ function AddCustom({
       toast.error("Give it at least two characters.");
       return;
     }
-    setBusy(true);
+    onAdd(label);
+    setDraft("");
+    setOpen(false);
     try {
-      const saved = await addTag({ data: { kind, label } });
-      onAdd(saved);
-      setDraft("");
-      setOpen(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add that.");
-    } finally {
-      setBusy(false);
+      await addTag({ data: { kind, label } });
+      void queryClient.invalidateQueries({ queryKey: ["tags", kind] });
+    } catch {
+      // Keep the chip on the profile even if the shared catalog write fails.
     }
   }
 
@@ -160,9 +158,8 @@ function AddCustom({
       />
       <button
         type="button"
-        disabled={busy}
         onClick={() => void submit()}
-        className="h-11 rounded-lg bg-fg px-4 text-sm font-medium text-bg transition-transform duration-150 ease-out active:scale-[0.96] disabled:opacity-40"
+        className="h-11 rounded-lg bg-fg px-4 text-sm font-medium text-bg transition-transform duration-150 ease-out active:scale-[0.96]"
       >
         Add
       </button>

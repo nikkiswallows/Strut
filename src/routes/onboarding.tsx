@@ -40,6 +40,11 @@ function Onboarding() {
     queryFn: () => listTags({ data: "interest" }),
     enabled: Boolean(user),
   });
+  const lookingTags = useQuery({
+    queryKey: ["tags", "looking"],
+    queryFn: () => listTags({ data: "looking" }),
+    enabled: Boolean(user),
+  });
 
   const [step, setStep] = useState(0);
   const [displayName, setDisplayName] = useState("");
@@ -50,7 +55,7 @@ function Onboarding() {
   const [identities, setIdentities] = useState<string[]>(["T-Girl"]);
   const [pronouns, setPronouns] = useState<string[]>(["she/her"]);
   const [role, setRole] = useState("Switch");
-  const [lookingFor, setLookingFor] = useState("Dates");
+  const [lookingFor, setLookingFor] = useState<string[]>(["Dates"]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
@@ -71,7 +76,7 @@ function Onboarding() {
       setIdentities(me.data.identities.length ? me.data.identities : ["T-Girl"]);
       setPronouns(me.data.pronouns.length ? me.data.pronouns : ["she/her"]);
       setRole(me.data.role ?? "Switch");
-      setLookingFor(me.data.lookingFor ?? "Dates");
+      setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : ["Dates"]);
       setPhotos(me.data.photos.length ? me.data.photos : []);
       setBio(me.data.bio);
       setInterests(me.data.interests);
@@ -226,11 +231,14 @@ function Onboarding() {
                 max={6}
               />
               <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
-              <SingleChips
+              <MultiChips
                 label="Looking for"
-                options={[...LOOKING_FOR]}
+                hint="Pick as many as you want."
+                options={lookingTags.data ?? [...LOOKING_FOR]}
                 value={lookingFor}
                 onChange={setLookingFor}
+                kind="looking"
+                max={8}
               />
             </div>
           )}

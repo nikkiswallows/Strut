@@ -9,7 +9,7 @@ import { queryClient } from "@/lib/query-client";
 import { openConversation } from "@/lib/server/messages";
 import { getMyProfile, getProfileForViewer } from "@/lib/server/profiles";
 import { toggleFollow, toggleLike } from "@/lib/server/social";
-import { identityLine, pronounLine, shownAge } from "@/lib/types";
+import { identityLine, lookingLine, pronounLine, shownAge } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/u/$handle")({ component: ProfilePage });
@@ -85,9 +85,9 @@ function ProfilePage() {
           {p.role ? (
             <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-fg">{p.role}</span>
           ) : null}
-          {p.lookingFor ? (
+          {lookingLine(p) ? (
             <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
-              Looking for {p.lookingFor.toLowerCase()}
+              {lookingLine(p)}
             </span>
           ) : null}
           {p.heightCm ? (
