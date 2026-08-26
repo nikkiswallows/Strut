@@ -28,7 +28,7 @@ function Login() {
   const { mode } = Route.useSearch();
   const { user, isPending } = useCurrentUserState();
   const [join, setJoin] = useState(mode === "join");
-  const [method, setMethod] = useState<"phone" | "email">("email");
+  const [method, setMethod] = useState<"phone" | "email">("phone");
   const [phonePhase, setPhonePhase] = useState<"number" | "code">("number");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -94,7 +94,7 @@ function Login() {
           <img src={HERO_STREET} alt="" className="absolute inset-0 size-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-10">
-            <p className="font-display text-5xl leading-tight">The night already knows your name.</p>
+            <p className="font-display text-5xl leading-tight">Black first. Then you talk.</p>
           </div>
         </div>
 
@@ -113,8 +113,8 @@ function Login() {
                 </h1>
                 <p className="mt-2 text-sm text-muted">
                   {join
-                    ? "Email and a password. Then we dress the profile."
-                    : "Sign in to keep matching, posting, and talking."}
+                    ? "Email and a password. Then you say what you are to the order."
+                    : "Sign in. Kings, sissies, wives, and cucks are already here."}
                 </p>
                 <form onSubmit={onEmailSubmit} className="mt-8 space-y-3.5">
                   {join ? (
@@ -153,7 +153,7 @@ function Login() {
                     />
                   </Field>
                   <Button type="submit" size="lg" className="mt-2 h-14 w-full text-base" disabled={busy || !authEnabled}>
-                    {busy ? "One moment…" : join ? "Join Strut" : "Sign in"}
+                    {busy ? "One moment…" : join ? "Enter the order" : "Sign in"}
                   </Button>
                 </form>
               </>
@@ -174,7 +174,7 @@ function Login() {
                     key={p.providerId}
                     variant="outline"
                     className="h-12 w-full"
-                    onClick={() => signIn(p.providerId, { callbackURL: "/onboarding" })}
+                    onClick={() => signIn(p.providerId, { callbackURL: "/discover" })}
                   >
                     Continue with {p.label}
                   </Button>
@@ -195,7 +195,7 @@ function Login() {
             )}
 
             <p className="mt-8 text-center text-sm text-muted">
-              {join ? "Already on Strut?" : "New here?"}{" "}
+              {join ? "Already in the order?" : "New here?"}{" "}
               <button
                 type="button"
                 className="text-fg underline-offset-4 hover:underline"
@@ -207,7 +207,9 @@ function Login() {
               </>
             )}
           </div>
-          <p className="mt-8 text-center text-xs text-subtle">18+ only. Be decent.</p>
+          <p className="mt-8 text-center text-xs tracking-wide text-subtle uppercase">
+            18+ only · BNWO · QOS · Serve in the DMs
+          </p>
         </div>
       </div>
     </div>

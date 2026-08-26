@@ -54,19 +54,18 @@ async function runSeed() {
     const pronouns = p.pronounList?.length ? p.pronounList : [p.pronouns];
     const coord = coordForLocation(p.location);
     const hideAge = Boolean(p.hideAge);
-    const ethnicity = p.ethnicity?.trim() || null;
 
     await sql`
       insert into profiles (
         user_id, handle, display_name, age, identity, pronouns, bio, location,
         looking_for, looking_for_list, photos, interests, height_cm, is_seed, auto_match, onboarded, last_active,
-        identities, pronoun_list, hide_age, lat, lng, role, ethnicity
+        identities, pronoun_list, hide_age, lat, lng, role
       ) values (
         ${p.userId}, ${p.handle}, ${p.displayName}, ${p.age}, ${identity}, ${p.pronouns},
         ${p.bio}, ${p.location}, ${lookingFor[0] ?? null}, ${JSON.stringify(lookingFor)}, ${JSON.stringify(p.photos)},
         ${JSON.stringify(p.interests)}, ${p.heightCm}, true, ${p.autoMatch}, true, now(),
         ${JSON.stringify(identities)}, ${JSON.stringify(pronouns)}, ${hideAge},
-        ${coord?.lat ?? null}, ${coord?.lng ?? null}, ${p.role}, ${ethnicity}
+        ${coord?.lat ?? null}, ${coord?.lng ?? null}, ${p.role}
       )
       on conflict (user_id) do update set
         handle = excluded.handle,
@@ -88,26 +87,10 @@ async function runSeed() {
         lat = excluded.lat,
         lng = excluded.lng,
         role = excluded.role,
-        ethnicity = excluded.ethnicity,
         is_seed = true,
         onboarded = true
     `;
   }
-
-  const keep = SEED_PROFILES.map((p) => p.userId);
-  await sql.query(
-    `delete from likes
-     where from_user_id in (select user_id from profiles where is_seed = true and not (user_id = any($1::text[])))
-        or to_user_id in (select user_id from profiles where is_seed = true and not (user_id = any($1::text[])))`,
-    [keep],
-  );
-  await sql.query(
-    `delete from posts where user_id in (select user_id from profiles where is_seed = true and not (user_id = any($1::text[])))`,
-    [keep],
-  );
-  await sql.query(`delete from profiles where is_seed = true and not (user_id = any($1::text[]))`, [
-    keep,
-  ]);
 
   await sql`delete from posts where user_id like 'seed-%'`;
   for (const post of SEED_POSTS) {
@@ -145,11 +128,6 @@ async function runSeed() {
     ["seed-set", "seed-wren"],
     ["seed-set", "seed-wests"],
     ["seed-sloane", "seed-set"],
-    ["seed-todd", "seed-marcus"],
-    ["seed-grant", "seed-andre"],
-    ["seed-chloe", "seed-malik"],
-    ["seed-malik", "seed-chloe"],
-    ["seed-malik", "seed-wren"],
   ];
   for (const [from, to] of pairs) {
     await sql`

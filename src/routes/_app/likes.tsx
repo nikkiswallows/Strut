@@ -30,7 +30,7 @@ function Likes() {
 
   return (
     <div>
-      <h1 className="font-display text-4xl">Likes</h1>
+      <h1 className="font-display text-4xl">Claimed</h1>
       <p className="mt-1 text-sm text-muted">Saved to your account. Mutual likes are matches.</p>
       <div className="mt-5 flex gap-1 rounded-full bg-elevated p-1">
         {(

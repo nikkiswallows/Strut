@@ -22,7 +22,6 @@ import { Route as AppInboxIndexRouteImport } from './routes/_app/inbox.index'
 import { Route as AppInboxIdRouteImport } from './routes/_app/inbox.$id'
 import { Route as AppUHandleRouteImport } from './routes/_app/u.$handle'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as ApiPhoneLoginRouteImport } from './routes/api/phone/login'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,11 +87,6 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPhoneLoginRoute = ApiPhoneLoginRouteImport.update({
-  id: '/api/phone/login',
-  path: '/api/phone/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -106,7 +100,6 @@ export interface FileRoutesByFullPath {
   '/inbox/$id': typeof AppInboxIdRoute
   '/u/$handle': typeof AppUHandleRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/phone/login': typeof ApiPhoneLoginRoute
   '/inbox/': typeof AppInboxIndexRoute
 }
 export interface FileRoutesByTo {
@@ -120,7 +113,6 @@ export interface FileRoutesByTo {
   '/inbox/$id': typeof AppInboxIdRoute
   '/u/$handle': typeof AppUHandleRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/phone/login': typeof ApiPhoneLoginRoute
   '/inbox': typeof AppInboxIndexRoute
 }
 export interface FileRoutesById {
@@ -137,7 +129,6 @@ export interface FileRoutesById {
   '/_app/inbox/$id': typeof AppInboxIdRoute
   '/_app/u/$handle': typeof AppUHandleRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/phone/login': typeof ApiPhoneLoginRoute
   '/_app/inbox/': typeof AppInboxIndexRoute
 }
 export interface FileRouteTypes {
@@ -154,7 +145,6 @@ export interface FileRouteTypes {
     | '/inbox/$id'
     | '/u/$handle'
     | '/api/auth/$'
-    | '/api/phone/login'
     | '/inbox/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -168,7 +158,6 @@ export interface FileRouteTypes {
     | '/inbox/$id'
     | '/u/$handle'
     | '/api/auth/$'
-    | '/api/phone/login'
     | '/inbox'
   id:
     | '__root__'
@@ -184,7 +173,6 @@ export interface FileRouteTypes {
     | '/_app/inbox/$id'
     | '/_app/u/$handle'
     | '/api/auth/$'
-    | '/api/phone/login'
     | '/_app/inbox/'
   fileRoutesById: FileRoutesById
 }
@@ -194,7 +182,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiPhoneLoginRoute: typeof ApiPhoneLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -290,13 +277,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/phone/login': {
-      id: '/api/phone/login'
-      path: '/api/phone/login'
-      fullPath: '/api/phone/login'
-      preLoaderRoute: typeof ApiPhoneLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -340,7 +320,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiPhoneLoginRoute: ApiPhoneLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

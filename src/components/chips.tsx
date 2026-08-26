@@ -68,13 +68,11 @@ export function SingleChips({
   options,
   value,
   onChange,
-  allowEmpty,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (next: string) => void;
-  allowEmpty?: boolean;
 }) {
   return (
     <div>
@@ -86,9 +84,9 @@ export function SingleChips({
             <button
               key={opt}
               type="button"
-              onClick={() => onChange(on && allowEmpty ? "" : opt)}
+              onClick={() => onChange(opt)}
               className={cn(
-                "h-11 rounded-full px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
+                "h-10 rounded-full px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
                 on ? "bg-fg text-bg" : "bg-elevated text-muted hover:text-fg",
               )}
             >

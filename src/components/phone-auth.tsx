@@ -13,8 +13,7 @@ import {
   isValidNational,
   type Country,
 } from "@/lib/phone";
-import { sendPhoneCode } from "@/lib/server/phone";
-import { captureAuthToken } from "@/lib/session-bearer";
+import { sendPhoneCode, verifyPhoneCode } from "@/lib/server/phone";
 import { cn } from "@/lib/utils";
 
 const BEARER_KEY = "grok-auth.bearer-token";
@@ -131,28 +130,16 @@ export function PhoneAuth({
     if (digits.length !== 6 || busy) return;
     setBusy(true);
     try {
-      const res = await fetch("/api/phone/login", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ iso, national, code: digits }),
+      const result = await verifyPhoneCode({
+        data: { iso, national, code: digits },
       });
-      const payload = (await res.json().catch(() => null)) as {
-        token?: string;
-        isNew?: boolean;
-        error?: string;
-      } | null;
-      if (!res.ok) {
-        throw new Error(payload?.error || "Could not verify that code.");
-      }
-      captureAuthToken(payload, res);
-      if (payload?.token) attachSession(payload.token);
+      attachSession(result.token);
       try {
         await authClient.getSession();
       } catch {
         /* session store recovers on next fetch */
       }
-      window.location.href = payload?.isNew ? "/onboarding" : "/discover";
+      window.location.href = result.isNew ? "/onboarding" : "/discover";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not verify that code.");
       setBusy(false);
@@ -179,11 +166,11 @@ export function PhoneAuth({
         >
           <div>
             <h1 className="font-display text-4xl leading-[0.95] sm:text-5xl">
-              {join ? "Your number, please." : "Welcome back."}
+              {join ? "Your number." : "Welcome back."}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               {join
-                ? "We’ll text a code. That’s how we know it’s you — then we dress the profile."
+                ? "We’ll text a code. Then you say if you’re a king, a sissy, a wife, or a cuck."
                 : "Sign in with the number on your account. We’ll text a code."}
             </p>
           </div>

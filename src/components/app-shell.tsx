@@ -12,8 +12,8 @@ import { Avatar } from "./photo";
 
 const NAV = [
   { to: "/discover", label: "Discover", icon: Compass },
-  { to: "/feed", label: "Feed", icon: Newspaper },
-  { to: "/likes", label: "Likes", icon: Heart },
+  { to: "/feed", label: "Room", icon: Newspaper },
+  { to: "/likes", label: "Claimed", icon: Heart },
   { to: "/inbox", label: "Inbox", icon: MessageCircle },
   { to: "/me", label: "Me", icon: UserRound },
 ] as const;
@@ -91,6 +91,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-30 h-0.5 bg-accent" />
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-border px-4 py-7 lg:flex">
         <Link
           to="/discover"

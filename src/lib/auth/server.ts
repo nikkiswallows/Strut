@@ -91,31 +91,7 @@ export const authConfigured =
 // it derives the origin per-request from the (proxied) host, validated against the
 // preview allowlist, which makes the OAuth `redirect_uri` the concrete preview URL
 // the broker's preview client accepts.
-function originOf(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  try {
-    return new URL(value.includes("://") ? value : `https://${value}`).origin;
-  } catch {
-    return undefined;
-  }
-}
-
-function deployedHostOrigins(): string[] {
-  const out: string[] = [];
-  const vercelUrl = env("VERCEL_URL");
-  if (vercelUrl) {
-    const origin = originOf(vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`);
-    if (origin) out.push(origin);
-  }
-  const vercelProd = env("VERCEL_PROJECT_PRODUCTION_URL");
-  if (vercelProd) {
-    const origin = originOf(vercelProd.includes("://") ? vercelProd : `https://${vercelProd}`);
-    if (origin) out.push(origin);
-  }
-  return out;
-}
-
-const explicitBaseURL = env("BETTER_AUTH_URL")?.replace(/\/+$/, "") || undefined;
+const explicitBaseURL = env("BETTER_AUTH_URL");
 // Explicit `string[]` (not a readonly tuple) — Better Auth's DynamicBaseURLConfig
 // requires a mutable `allowedHosts: string[]`.
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
@@ -139,38 +115,15 @@ const baseURL = explicitBaseURL ?? {
 
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
-// Always include this deployment's own host: BETTER_AUTH_URL may be a grok.me
-// (or custom) URL while people open the Vercel alias, and first-party POSTs
-// from that alias must still pass CSRF.
-const staticTrustedOrigins: string[] = [
-  ...(explicitBaseURL ? [originOf(explicitBaseURL) ?? explicitBaseURL] : []),
-  ...previewAllowedHosts,
-  ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
-  ...LOCAL_DEV_ORIGINS,
-  ...deployedHostOrigins(),
-].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
-
-const trustedOrigins = async (request?: Request): Promise<string[]> => {
-  const origins = [...staticTrustedOrigins];
-  if (!request) return origins;
-  try {
-    const url = new URL(request.url);
-    origins.push(url.origin);
-    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-    const forwardedProto =
-      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
-      (url.protocol === "http:" ? "http" : "https");
-    if (forwardedHost) origins.push(`${forwardedProto}://${forwardedHost}`);
-    const headerOrigin = request.headers.get("origin");
-    if (headerOrigin && headerOrigin !== "null") {
-      const parsed = originOf(headerOrigin);
-      if (parsed && (parsed === url.origin || origins.includes(parsed))) origins.push(parsed);
-    }
-  } catch {
-    /* ignore malformed request URLs */
-  }
-  return origins.filter((value, index, all) => all.indexOf(value) === index);
-};
+const trustedOrigins: string[] = explicitBaseURL
+  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
+  : [
+      // Host wildcards (matched against Origin's host)
+      ...previewAllowedHosts,
+      // Full-origin wildcards (matched against Origin)
+      ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
+      ...LOCAL_DEV_ORIGINS,
+    ];
 
 const databaseUrl = env("DATABASE_URL");
 

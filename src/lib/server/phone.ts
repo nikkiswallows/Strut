@@ -157,87 +157,12 @@ export const sendPhoneCode = createServerFn({ method: "POST" })
     };
   });
 
-async function applySetCookies(cookies: string[]): Promise<void> {
-  if (cookies.length === 0) return;
-  try {
-    const { setCookie } = await import("@tanstack/react-start/server");
-    const { parseSetCookieHeader, toCookieOptions } = await import("better-auth/cookies");
-    for (const raw of cookies) {
-      const parsed = parseSetCookieHeader(raw);
-      for (const [name, attr] of parsed) {
-        if (!attr.value) continue;
-        const options = toCookieOptions(attr);
-        setCookie(name, attr.value, {
-          path: options.path ?? "/",
-          httpOnly: options.httpOnly ?? true,
-          secure: options.secure ?? true,
-          sameSite: options.sameSite ?? "lax",
-          maxAge: options.maxAge,
-          expires: options.expires,
-        });
-      }
-    }
-  } catch {
-    /* HTTP route copies Set-Cookie itself */
-  }
-}
-
-function authForwardHeaders(request: Request, origin: string): Headers {
-  const headers = new Headers({
-    "content-type": "application/json",
-    origin,
-    referer: request.headers.get("referer") || `${origin}/`,
-  });
-  const cookie = request.headers.get("cookie");
-  if (cookie) headers.set("cookie", cookie);
-  for (const key of ["host", "x-forwarded-host", "x-forwarded-proto", "x-forwarded-for", "user-agent"]) {
-    const value = request.headers.get(key);
-    if (value) headers.set(key, value);
-  }
-  return headers;
-}
-
-async function betterAuthEmail(
-  request: Request,
-  opts: { email: string; password: string; name: string; signUp: boolean },
-): Promise<{ token: string; cookies: string[] }> {
+async function createPhoneSession(e164: string): Promise<{ token: string; isNew: boolean }> {
+  const { getRequest } = await import("@tanstack/react-start/server");
   const { auth } = await import("@/lib/auth/server");
-  const origin =
-    request.headers.get("origin") ||
-    (() => {
-      try {
-        return new URL(request.url).origin;
-      } catch {
-        return "http://localhost:8080";
-      }
-    })();
-  const path = opts.signUp ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
-  const body = opts.signUp
-    ? JSON.stringify({ email: opts.email, password: opts.password, name: opts.name, rememberMe: true })
-    : JSON.stringify({ email: opts.email, password: opts.password, rememberMe: true });
-  const res = await auth.handler(
-    new Request(`${origin}${path}`, {
-      method: "POST",
-      headers: authForwardHeaders(request, origin),
-      body,
-    }),
-  );
-  const cookies = res.headers.getSetCookie();
-  const json = (await res.json().catch(() => null)) as
-    | { token?: string; user?: { id?: string }; message?: string }
-    | null;
-  if (!res.ok) {
-    throw new Error(json?.message || "Could not sign in.");
-  }
-  const token = json?.token || res.headers.get("set-auth-token") || "";
-  if (!token) throw new Error("Could not sign in.");
-  return { token, cookies };
-}
-
-async function createPhoneSession(
-  e164: string,
-  request: Request,
-): Promise<{ token: string; isNew: boolean; cookies: string[] }> {
+  const request = getRequest();
+  if (!request) throw new Error("Could not start a session.");
+  const headers = request.headers;
   const email = phoneEmail(e164);
   const password = await phonePassword(e164);
   const name = `Member ${e164.slice(-4)}`;
@@ -248,35 +173,41 @@ async function createPhoneSession(
     [e164],
   );
 
-  const signIn = () => betterAuthEmail(request, { email, password, name, signUp: false });
-  const signUp = () => betterAuthEmail(request, { email, password, name, signUp: true });
+  const signIn = async () => {
+    const res = await auth.api.signInEmail({
+      body: { email, password, rememberMe: true },
+      headers,
+    });
+    if (!res?.token) throw new Error("Could not sign in.");
+    return res.token;
+  };
 
-  let token: string;
-  let cookies: string[] = [];
-  let isNew = !existing[0];
+  const signUp = async () => {
+    const res = await auth.api.signUpEmail({
+      body: { email, password, name },
+      headers,
+    });
+    if (res?.token) return res.token;
+    return signIn();
+  };
 
   if (existing[0]) {
-    const signed = await signIn();
-    token = signed.token;
-    cookies = signed.cookies;
-  } else {
-    try {
-      const signed = await signUp();
-      token = signed.token;
-      cookies = signed.cookies;
-      isNew = true;
-    } catch {
-      const signed = await signIn();
-      token = signed.token;
-      cookies = signed.cookies;
-      isNew = false;
-    }
+    const token = await signIn();
+    return { token, isNew: false };
   }
 
-  const { auth } = await import("@/lib/auth/server");
+  let token: string;
+  let isNew = true;
+  try {
+    token = await signUp();
+  } catch {
+    token = await signIn();
+    isNew = false;
+  }
+
   const session = await auth.api.getSession({
     headers: (() => {
-      const next = new Headers(request.headers);
+      const next = new Headers(headers);
       next.set("Authorization", `Bearer ${token}`);
       return next;
     })(),
@@ -291,78 +222,47 @@ async function createPhoneSession(
     [e164, userId],
   );
 
-  await applySetCookies(cookies);
-  return { token, isNew, cookies };
-}
-
-async function consumePhoneOtp(e164: string, code: string): Promise<void> {
-  const sql = await getSql();
-  const rows = await sql.query<OtpRow>(
-    `select id, code_hash, attempts, expires_at, created_at
-     from phone_otps
-     where phone_e164 = $1
-     order by created_at desc
-     limit 1`,
-    [e164],
-  );
-  const row = rows[0];
-  if (!row) throw new Error("Request a new code first.");
-  if (new Date(row.expires_at).getTime() < Date.now()) {
-    await sql.query(`delete from phone_otps where id = $1`, [row.id]);
-    throw new Error("That code expired. Request a new one.");
-  }
-  if (row.attempts >= MAX_ATTEMPTS) {
-    await sql.query(`delete from phone_otps where id = $1`, [row.id]);
-    throw new Error("Too many tries. Request a new code.");
-  }
-
-  const expected = await hashOtp(e164, code);
-  const ok = await hashesMatch(expected, row.code_hash);
-  if (!ok) {
-    await sql.query(`update phone_otps set attempts = attempts + 1 where id = $1`, [row.id]);
-    const left = MAX_ATTEMPTS - row.attempts - 1;
-    throw new Error(
-      left > 0
-        ? `That code doesn't match. ${left} ${left === 1 ? "try" : "tries"} left.`
-        : "Too many tries. Request a new code.",
-    );
-  }
-
-  await sql.query(`delete from phone_otps where phone_e164 = $1`, [e164]);
-}
-
-async function finishPhoneLogin(
-  e164: string,
-  code: string,
-  request: Request,
-): Promise<{ e164: string; token: string; isNew: boolean; cookies: string[] }> {
-  await consumePhoneOtp(e164, code);
-  const session = await createPhoneSession(e164, request);
-  return {
-    e164,
-    token: session.token,
-    isNew: session.isNew,
-    cookies: session.cookies,
-  };
-}
-
-export async function completePhoneLogin(
-  input: VerifyInput,
-  request: Request,
-): Promise<{ e164: string; token: string; isNew: boolean; cookies: string[] }> {
-  const data = cleanVerify(input);
-  return finishPhoneLogin(data.e164, data.code, request);
+  return { token, isNew };
 }
 
 export const verifyPhoneCode = createServerFn({ method: "POST" })
   .validator((input: VerifyInput) => cleanVerify(input))
   .handler(async ({ data }) => {
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const request = getRequest();
-    if (!request) throw new Error("Could not start a session.");
-    const session = await finishPhoneLogin(data.e164, data.code, request);
+    const sql = await getSql();
+    const rows = await sql.query<OtpRow>(
+      `select id, code_hash, attempts, expires_at, created_at
+       from phone_otps
+       where phone_e164 = $1
+       order by created_at desc
+       limit 1`,
+      [data.e164],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("Request a new code first.");
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+      await sql.query(`delete from phone_otps where id = $1`, [row.id]);
+      throw new Error("That code expired. Request a new one.");
+    }
+    if (row.attempts >= MAX_ATTEMPTS) {
+      await sql.query(`delete from phone_otps where id = $1`, [row.id]);
+      throw new Error("Too many tries. Request a new code.");
+    }
+
+    const expected = await hashOtp(data.e164, data.code);
+    const ok = await hashesMatch(expected, row.code_hash);
+    if (!ok) {
+      await sql.query(`update phone_otps set attempts = attempts + 1 where id = $1`, [row.id]);
+      const left = MAX_ATTEMPTS - row.attempts - 1;
+      throw new Error(
+        left > 0 ? `That code doesn't match. ${left} ${left === 1 ? "try" : "tries"} left.` : "Too many tries. Request a new code.",
+      );
+    }
+
+    await sql.query(`delete from phone_otps where phone_e164 = $1`, [data.e164]);
+
+    const session = await createPhoneSession(data.e164);
     return {
-      e164: session.e164,
+      e164: data.e164,
       token: session.token,
       isNew: session.isNew,
     };

@@ -10,7 +10,6 @@ import { listDiscover } from "@/lib/server/profiles";
 import { toggleLike } from "@/lib/server/social";
 import {
   DISCOVER_TABS,
-  ETHNICITIES,
   LOOKING_FOR,
   MILE_STOPS,
   ROLES,
@@ -26,14 +25,13 @@ function Discover() {
   const [miles, setMiles] = useState(100);
   const [lookingFor, setLookingFor] = useState("");
   const [role, setRole] = useState("");
-  const [ethnicity, setEthnicity] = useState("");
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const profiles = useQuery({
-    queryKey: ["discover", tab, miles, lookingFor, role, ethnicity, q],
-    queryFn: () => listDiscover({ data: { tab, miles, lookingFor, role, ethnicity, q } }),
+    queryKey: ["discover", tab, miles, lookingFor, role, q],
+    queryFn: () => listDiscover({ data: { tab, miles, lookingFor, role, q } }),
     placeholderData: keepPreviousData,
   });
 
@@ -41,7 +39,7 @@ function Discover() {
     mutationFn: (p: Profile) => toggleLike({ data: p.userId }),
     onMutate: async (p) => {
       await queryClient.cancelQueries({ queryKey: ["discover"] });
-      const key = ["discover", tab, miles, lookingFor, role, ethnicity, q] as const;
+      const key = ["discover", tab, miles, lookingFor, role, q] as const;
       const prev = queryClient.getQueryData<Profile[]>(key);
       if (prev) {
         queryClient.setQueryData<Profile[]>(
@@ -69,15 +67,8 @@ function Discover() {
   const milesLabel = miles >= 500 ? "Any distance" : `Within ${miles} mi`;
   const activeTab = DISCOVER_TABS.find((t) => t.id === tab) ?? DISCOVER_TABS[0]!;
   const filterBits = useMemo(
-    () =>
-      [
-        activeTab.label,
-        lookingFor && `looking for ${lookingFor.toLowerCase()}`,
-        role,
-        ethnicity,
-        milesLabel,
-      ].filter(Boolean),
-    [activeTab.label, lookingFor, role, ethnicity, milesLabel],
+    () => [activeTab.label, lookingFor && `looking for ${lookingFor.toLowerCase()}`, role, milesLabel].filter(Boolean),
+    [activeTab.label, lookingFor, role, milesLabel],
   );
   const rows = profiles.data ?? [];
 
@@ -85,7 +76,7 @@ function Discover() {
     <div>
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
-          <p className="text-xs tracking-[0.28em] text-accent uppercase">Strut</p>
+          <p className="text-xs tracking-[0.28em] text-accent uppercase">BNWO · Discover</p>
           <h1 className="font-display text-5xl leading-[0.9]">Discover</h1>
         </div>
         <button
@@ -144,7 +135,7 @@ function Discover() {
         </div>
       </div>
 
-      {lookingFor || role || ethnicity ? (
+      {lookingFor || role ? (
         <p className="mb-3 text-xs text-subtle">{filterBits.join(" · ")}</p>
       ) : null}
 
@@ -264,32 +255,6 @@ function Discover() {
                   )}
                 >
                   {r}
-                </button>
-              ))}
-            </div>
-            <p className="mt-5 mb-2 text-xs font-medium tracking-wide text-muted uppercase">Ethnicity</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setEthnicity("")}
-                className={cn(
-                  "h-10 rounded-full px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
-                  !ethnicity ? "bg-fg text-bg" : "bg-elevated text-muted",
-                )}
-              >
-                Any
-              </button>
-              {ETHNICITIES.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setEthnicity(ethnicity === item ? "" : item)}
-                  className={cn(
-                    "h-10 rounded-full px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
-                    ethnicity === item ? "bg-fg text-bg" : "bg-elevated text-muted",
-                  )}
-                >
-                  {item}
                 </button>
               ))}
             </div>

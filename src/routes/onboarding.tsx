@@ -8,23 +8,13 @@ import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { RedirectToSignIn } from "@/lib/auth/gates";
+import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
-import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
-import { ETHNICITIES, IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
+import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
-
-function defaultPronouns(ids: string[]): string[] {
-  const id = ids[0];
-  if (!id) return [];
-  if (id === "Bull" || id === "Man" || id === "Cuckold" || id === "Admirer") return ["he/him"];
-  if (id === "Femboy") return ["he/they"];
-  if (id === "Couple" || id === "Group") return ["they/them"];
-  if (id === "Sissy" || id === "Crossdresser") return ["she/they"];
-  return ["she/her"];
-}
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
 
@@ -63,10 +53,9 @@ function Onboarding() {
   const [age, setAge] = useState("24");
   const [hideAge, setHideAge] = useState(false);
   const [location, setLocation] = useState("");
-  const [identities, setIdentities] = useState<string[]>([]);
-  const [pronouns, setPronouns] = useState<string[]>([]);
+  const [identities, setIdentities] = useState<string[]>(["T-Girl"]);
+  const [pronouns, setPronouns] = useState<string[]>(["she/her"]);
   const [role, setRole] = useState("Switch");
-  const [ethnicity, setEthnicity] = useState("");
   const [lookingFor, setLookingFor] = useState<string[]>(["Dates"]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
@@ -76,94 +65,39 @@ function Onboarding() {
 
   useEffect(() => {
     if (hydrated || me.isPending) return;
-    const draft = readOnboardingDraft();
-    const name = me.data?.displayName || user?.displayName || draft?.displayName || "";
+    const name = me.data?.displayName || user?.displayName || "";
     if (name) {
       setDisplayName(name);
-      setHandle(slugifyHandle(me.data?.handle || draft?.handle || name));
+      setHandle(slugifyHandle(me.data?.handle || name));
     }
     if (me.data) {
-      setAge(me.data.age ? String(me.data.age) : draft?.age || "24");
+      setAge(me.data.age ? String(me.data.age) : "24");
       setHideAge(me.data.hideAge);
-      setLocation(me.data.location ?? draft?.location ?? "");
-      setIdentities(me.data.identities.length ? me.data.identities : draft?.identities ?? []);
-      setPronouns(me.data.pronouns.length ? me.data.pronouns : draft?.pronouns ?? []);
-      setRole(me.data.role ?? draft?.role ?? "Switch");
-      setEthnicity(me.data.ethnicity ?? draft?.ethnicity ?? "");
-      setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : draft?.lookingFor ?? ["Dates"]);
-      setPhotos(me.data.photos.length ? me.data.photos : draft?.photos ?? []);
-      setBio(me.data.bio || draft?.bio || "");
-      setInterests(me.data.interests.length ? me.data.interests : draft?.interests ?? []);
-      setHeightCm(me.data.heightCm ? String(me.data.heightCm) : draft?.heightCm ?? "");
-    } else if (draft) {
-      setAge(draft.age);
-      setHideAge(draft.hideAge);
-      setLocation(draft.location);
-      setIdentities(draft.identities);
-      setPronouns(draft.pronouns);
-      setRole(draft.role);
-      setEthnicity(draft.ethnicity);
-      setLookingFor(draft.lookingFor.length ? draft.lookingFor : ["Dates"]);
-      setPhotos(draft.photos);
-      setBio(draft.bio);
-      setInterests(draft.interests);
-      setHeightCm(draft.heightCm);
-      setStep(draft.step);
+      setLocation(me.data.location ?? "");
+      setIdentities(me.data.identities.length ? me.data.identities : ["T-Girl"]);
+      setPronouns(me.data.pronouns.length ? me.data.pronouns : ["she/her"]);
+      setRole(me.data.role ?? "Switch");
+      setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : ["Dates"]);
+      setPhotos(me.data.photos.length ? me.data.photos : []);
+      setBio(me.data.bio);
+      setInterests(me.data.interests);
+      setHeightCm(me.data.heightCm ? String(me.data.heightCm) : "");
     }
     setHydrated(true);
   }, [hydrated, me.data, me.isPending, user]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    writeOnboardingDraft({
-      step,
-      displayName,
-      handle,
-      age,
-      hideAge,
-      location,
-      identities,
-      pronouns,
-      role,
-      ethnicity,
-      lookingFor,
-      photos,
-      bio,
-      interests,
-      heightCm,
-    });
-  }, [
-    hydrated,
-    step,
-    displayName,
-    handle,
-    age,
-    hideAge,
-    location,
-    identities,
-    pronouns,
-    role,
-    ethnicity,
-    lookingFor,
-    photos,
-    bio,
-    interests,
-    heightCm,
-  ]);
 
   const save = useMutation({
     mutationFn: () =>
       saveMyProfile({
         data: {
           displayName,
-          handle: handle.length >= 3 ? handle : slugifyHandle(displayName),
+          handle,
           age: Number(age) || 18,
           hideAge,
           location,
           identities,
           pronouns,
           role,
-          ethnicity: ethnicity || null,
           lookingFor,
           photos,
           bio,
@@ -173,31 +107,13 @@ function Onboarding() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      clearOnboardingDraft();
-      toast.success("You're on Strut.");
+      toast.success("You're in the order.");
       navigate({ to: "/discover" });
     },
     onError: (err: Error) => {
-      writeOnboardingDraft({
-        step,
-        displayName,
-        handle,
-        age,
-        hideAge,
-        location,
-        identities,
-        pronouns,
-        role,
-        ethnicity,
-        lookingFor,
-        photos,
-        bio,
-        interests,
-        heightCm,
-      });
       if (err.message === "Unauthorized") {
         toast.error("Session dropped. Sign in again and we'll pick this up.");
-        navigate({ to: "/login" });
+        void signOut("/login");
         return;
       }
       toast.error(err.message);
@@ -221,9 +137,7 @@ function Onboarding() {
             <button
               key={label}
               type="button"
-              onClick={() => {
-                if (i <= step) setStep(i);
-              }}
+              onClick={() => setStep(i)}
               className="flex-1 transition-transform duration-150 ease-out active:scale-[0.96]"
             >
               <span
@@ -240,7 +154,7 @@ function Onboarding() {
         <div className="mt-8 animate-fade-up" key={step}>
           {step === 0 && (
             <div className="space-y-4">
-              <h1 className="font-display text-5xl leading-[0.92]">About you</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">Name yourself.</h1>
               <Field label="Display name">
                 <Input
                   value={displayName}
@@ -307,16 +221,13 @@ function Onboarding() {
 
           {step === 1 && (
             <div className="space-y-6">
-              <h1 className="font-display text-5xl leading-[0.92]">Identity</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">What are you to the order?</h1>
               <MultiChips
                 label="Identity"
-                hint="Sissy, T-girl, bull, hotwife, cuck, couple — pick what fits."
+                hint="Sissy, whiteboi, king, wife, cuck, T-girl, couple — or type your own."
                 options={identityTags.data ?? [...IDENTITIES]}
                 value={identities}
-                onChange={(next) => {
-                  setIdentities(next);
-                  if (pronouns.length === 0 && next[0]) setPronouns(defaultPronouns(next));
-                }}
+                onChange={setIdentities}
                 kind="identity"
               />
               <MultiChips
@@ -328,16 +239,6 @@ function Onboarding() {
                 max={6}
               />
               <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
-              <div>
-                <SingleChips
-                  label="Ethnicity"
-                  options={[...ETHNICITIES]}
-                  value={ethnicity}
-                  onChange={setEthnicity}
-                  allowEmpty
-                />
-                <p className="mt-2 text-xs text-subtle">Optional. Tap again to clear.</p>
-              </div>
               <MultiChips
                 label="Looking for"
                 hint="Pick as many as you want."
@@ -352,7 +253,7 @@ function Onboarding() {
 
           {step === 2 && (
             <div className="space-y-5">
-              <h1 className="font-display text-5xl leading-[0.92]">Put a face to it.</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">Show him.</h1>
               <p className="text-sm text-muted">
                 Your photos. Not someone else's. Main look sits large — drag the rest into order.
               </p>
@@ -362,18 +263,18 @@ function Onboarding() {
 
           {step === 3 && (
             <div className="space-y-5">
-              <h1 className="font-display text-5xl leading-[0.92]">Say it in a line.</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">Say it. No guessing.</h1>
               <Field label="Bio">
                 <Textarea
                   value={bio}
                   maxLength={500}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="Who you are when the lights go down."
+                  placeholder="King, sissy, wife, cuck — what you want done to you, or who you do it to."
                 />
               </Field>
               <MultiChips
                 label="Interests"
-                hint="Add your own — BNWO, Cuckold, BBC…"
+                hint="BNWO, QOS, BBC, Cuckold, Breeding, Feminization…"
                 options={interestTags.data ?? [...INTERESTS]}
                 value={interests}
                 onChange={setInterests}
@@ -394,13 +295,9 @@ function Onboarding() {
             <Button
               className="flex-1"
               onClick={() => {
-                if (step === 0) {
-                  const nextHandle = handle.length >= 3 ? handle : slugifyHandle(displayName);
-                  if (displayName.trim().length < 2 || nextHandle.length < 3) {
-                    toast.error("Name and a handle, please.");
-                    return;
-                  }
-                  if (nextHandle !== handle) setHandle(nextHandle);
+                if (step === 0 && (displayName.trim().length < 2 || handle.length < 3)) {
+                  toast.error("Name and a handle, please.");
+                  return;
                 }
                 if (step === 1 && identities.length === 0) {
                   toast.error("Pick at least one identity.");
@@ -416,31 +313,8 @@ function Onboarding() {
               Continue
             </Button>
           ) : (
-            <Button
-              className="flex-1"
-              disabled={save.isPending}
-              onClick={() => {
-                const nextHandle = handle.length >= 3 ? handle : slugifyHandle(displayName);
-                if (displayName.trim().length < 2 || nextHandle.length < 3) {
-                  toast.error("Name and a handle, please.");
-                  setStep(0);
-                  return;
-                }
-                if (identities.length === 0) {
-                  toast.error("Pick at least one identity.");
-                  setStep(1);
-                  return;
-                }
-                if (photos.length === 0) {
-                  toast.error("Add at least one photo of you.");
-                  setStep(2);
-                  return;
-                }
-                if (nextHandle !== handle) setHandle(nextHandle);
-                save.mutate();
-              }}
-            >
-              {save.isPending ? "Saving…" : "Enter Strut"}
+            <Button className="flex-1" disabled={save.isPending} onClick={() => save.mutate()}>
+              {save.isPending ? "Saving…" : "Enter the order"}
             </Button>
           )}
         </div>

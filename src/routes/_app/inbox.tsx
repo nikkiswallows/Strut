@@ -16,7 +16,7 @@ function Inbox() {
       <div className={nested ? "hidden lg:block" : ""}>
         <div className="px-4 pt-4 lg:px-0 lg:pt-0">
           <h1 className="font-display text-4xl">Inbox</h1>
-          <p className="mt-1 text-sm text-muted">Saved chats. They write back.</p>
+          <p className="mt-1 text-sm text-muted">Private. They write back. Serve in the DMs.</p>
         </div>
         <div className="mt-5 divide-y divide-border rounded-xl border border-border bg-surface">
           {(inbox.data ?? []).length === 0 && !inbox.isPending ? (

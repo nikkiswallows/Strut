@@ -2,8 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/geo";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
-import { DISCOVER_TABS, ETHNICITIES, ROLES, type DiscoverTab } from "@/lib/types";
-import { FEATURED_HANDLES } from "@/lib/seed-data";
+import { DISCOVER_TABS, identityLine, ROLES, type DiscoverTab } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
 import { ensureSeed } from "./seed";
@@ -70,7 +69,6 @@ export type DiscoverInput = {
   miles?: number;
   lookingFor?: string;
   role?: string;
-  ethnicity?: string;
   q?: string;
 };
 
@@ -81,7 +79,6 @@ export const listDiscover = createServerFn({ method: "POST" })
     miles: clampMiles(input?.miles),
     lookingFor: input?.lookingFor ?? "",
     role: input?.role ?? "",
-    ethnicity: input?.ethnicity ?? "",
     q: input?.q ?? "",
   }))
   .handler(async ({ context, data }) => {
@@ -97,11 +94,6 @@ export const listDiscover = createServerFn({ method: "POST" })
     const role =
       data.role && (ROLES as readonly string[]).includes(data.role as (typeof ROLES)[number])
         ? data.role
-        : null;
-    const ethnicity =
-      data.ethnicity &&
-      (ETHNICITIES as readonly string[]).includes(data.ethnicity as (typeof ETHNICITIES)[number])
-        ? data.ethnicity
         : null;
     const q = data.q.trim() ? `%${data.q.trim().toLowerCase()}%` : null;
 
@@ -146,16 +138,19 @@ export const listDiscover = createServerFn({ method: "POST" })
       .filter((profile) => {
         if (profile.userId === context.userId) return false;
         if (match.size) {
-          const hit = (profile.identities ?? []).some((id) => match.has(id.toLowerCase()));
+          const labels = [...(profile.identities ?? []), identityLine(profile)]
+            .join(" ")
+            .toLowerCase();
+          const hit = [...match].some((token) => labels.includes(token));
           if (!hit) return false;
+          if (tab.id === "women") {
+            if (labels.includes("trans") || labels.includes("t-girl")) return false;
+          }
         }
         if (lookingFor) {
           const want = lookingFor.toLowerCase();
           const hit = (profile.lookingFor ?? []).some((item) => item.toLowerCase() === want);
           if (!hit) return false;
-        }
-        if (ethnicity && (profile.ethnicity ?? "").toLowerCase() !== ethnicity.toLowerCase()) {
-          return false;
         }
         if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
         return true;
@@ -167,16 +162,13 @@ export const listDiscover = createServerFn({ method: "POST" })
 export const listFeatured = createServerFn({ method: "GET" }).handler(async () => {
   await ensureSeed();
   const sql = await getSql();
-  const handles = [...FEATURED_HANDLES];
   const rows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS} from profiles
-     where is_seed = true and onboarded = true and handle = any($1::text[])`,
-    [handles],
+     where is_seed = true and onboarded = true
+     order by id
+     limit 24`,
   );
-  const rank = new Map<string, number>(handles.map((h, i) => [h, i]));
-  return rows
-    .map(mapProfile)
-    .sort((a, b) => (rank.get(a.handle) ?? 99) - (rank.get(b.handle) ?? 99));
+  return rows.map(mapProfile);
 });
 
 export type ProfileInput = {
@@ -187,7 +179,6 @@ export type ProfileInput = {
   identities: string[];
   pronouns: string[];
   role?: string | null;
-  ethnicity?: string | null;
   bio: string;
   location: string | null;
   lookingFor?: string[] | string | null;
@@ -212,7 +203,6 @@ function cleanProfile(input: ProfileInput) {
       ? null
       : Math.max(18, Math.min(99, Number(input.age)));
   const identities = unique(input.identities).slice(0, 8);
-  if (identities.length === 0) throw new Error("Pick at least one identity.");
   const pronouns = unique(input.pronouns).slice(0, 6);
   const interests = unique(input.interests).slice(0, 16);
   const location = input.location?.trim().slice(0, 80) || null;
@@ -222,14 +212,6 @@ function cleanProfile(input: ProfileInput) {
     roleRaw && (ROLES as readonly string[]).includes(roleRaw as (typeof ROLES)[number])
       ? roleRaw
       : null;
-  const ethnicityRaw = input.ethnicity?.trim() || null;
-  const ethnicity =
-    ethnicityRaw &&
-    (ETHNICITIES as readonly string[]).includes(ethnicityRaw as (typeof ETHNICITIES)[number])
-      ? ethnicityRaw
-      : null;
-  const photos = input.photos.filter(Boolean).slice(0, 8);
-  if (photos.length === 0) throw new Error("Add at least one photo of you.");
   return {
     handle,
     displayName,
@@ -240,11 +222,10 @@ function cleanProfile(input: ProfileInput) {
     identity: identities[0] ?? null,
     pronounText: pronouns[0] ?? null,
     role,
-    ethnicity,
     bio: input.bio.trim().slice(0, 500),
     location,
     lookingFor: asLookingList(input.lookingFor),
-    photos,
+    photos: input.photos.filter(Boolean).slice(0, 8),
     interests,
     heightCm:
       input.heightCm == null || Number.isNaN(Number(input.heightCm))
@@ -270,10 +251,10 @@ export const saveMyProfile = createServerFn({ method: "POST" })
       `insert into profiles (
          user_id, handle, display_name, age, identity, pronouns, bio, location,
          looking_for, looking_for_list, photos, interests, height_cm, onboarded, last_active,
-         identities, pronoun_list, hide_age, lat, lng, role, ethnicity
+         identities, pronoun_list, hide_age, lat, lng, role
        ) values (
          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,true,now(),
-         $14::jsonb,$15::jsonb,$16::boolean,$17,$18,$19,$20
+         $14::jsonb,$15::jsonb,$16::boolean,$17,$18,$19
        )
        on conflict (user_id) do update set
          handle = excluded.handle,
@@ -294,7 +275,6 @@ export const saveMyProfile = createServerFn({ method: "POST" })
          lat = excluded.lat,
          lng = excluded.lng,
          role = excluded.role,
-         ethnicity = excluded.ethnicity,
          onboarded = true,
          last_active = now()
        returning ${PROFILE_COLS}`,
@@ -318,7 +298,6 @@ export const saveMyProfile = createServerFn({ method: "POST" })
         data.lat,
         data.lng,
         data.role,
-        data.ethnicity,
       ],
     );
     return mapProfile(rows[0]!);
