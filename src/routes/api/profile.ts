@@ -36,10 +36,14 @@ export const Route = createFileRoute("/api/profile")({
           const profile = await writeProfileForUser(session.userId, profileInput);
           const headers = sessionHeaders(session.token);
           headers.set("content-type", "application/json");
-          return new Response(JSON.stringify({ ...profile, token: session.token }), {
-            status: 200,
-            headers,
-          });
+          return new Response(
+            JSON.stringify({
+              ...profile,
+              token: session.token,
+              userId: session.userId,
+            }),
+            { status: 200, headers },
+          );
         } catch (err) {
           const message = err instanceof Error ? err.message : "Could not save profile.";
           return Response.json({ error: message }, { status: 400 });

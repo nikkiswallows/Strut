@@ -3,6 +3,7 @@ import { createAuthClient } from "better-auth/react";
 import { runPreSignInSignOut, runSignOut } from "../../../scripts/sign-out-plan.mjs";
 import { GROK_PROVIDERS } from "./providers";
 import { restoreSessionBearer, storeSessionBearer } from "@/lib/session-bearer";
+import { clearLocalSession, tokenFromAnywhere } from "@/lib/local-session";
 
 if (typeof window !== "undefined") restoreSessionBearer();
 
@@ -57,15 +58,7 @@ const BEARER_KEY = "grok-auth.bearer-token";
 
 /** The stored preview bearer token, or null. */
 export function getBearerToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return (
-      window.sessionStorage.getItem(BEARER_KEY) ||
-      window.localStorage.getItem(BEARER_KEY)
-    );
-  } catch {
-    return null;
-  }
+  return tokenFromAnywhere();
 }
 
 function setBearerToken(token: string | null): void {
@@ -244,7 +237,10 @@ export async function signOut(redirectTo = "/"): Promise<void> {
       const { error } = await authClient.signOut();
       if (error) throw new Error(error.message ?? "Sign-out failed");
     },
-    clearToken: () => setBearerToken(null),
+    clearToken: () => {
+      setBearerToken(null);
+      clearLocalSession();
+    },
     redirect: () => {
       window.location.href = redirectTo;
     },

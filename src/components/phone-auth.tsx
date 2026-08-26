@@ -15,6 +15,7 @@ import {
 } from "@/lib/phone";
 import { sendPhoneCode } from "@/lib/server/phone";
 import { captureAuthToken } from "@/lib/session-bearer";
+import { writeLocalSession } from "@/lib/local-session";
 import { cn } from "@/lib/utils";
 
 const BEARER_KEY = "grok-auth.bearer-token";
@@ -140,6 +141,7 @@ export function PhoneAuth({
       });
       const payload = (await res.json().catch(() => null)) as {
         token?: string;
+        userId?: string;
         isNew?: boolean;
         error?: string;
       } | null;
@@ -147,6 +149,9 @@ export function PhoneAuth({
         throw new Error(payload?.error || "Could not verify that code.");
       }
       captureAuthToken(payload, res);
+      if (payload?.token && payload.userId) {
+        writeLocalSession({ token: payload.token, userId: payload.userId, name: null });
+      }
       if (payload?.token) attachSession(payload.token);
       try {
         await authClient.getSession();

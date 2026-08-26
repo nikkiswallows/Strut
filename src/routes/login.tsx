@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { captureAuthToken } from "@/lib/session-bearer";
+import { writeLocalSession } from "@/lib/local-session";
 import { HERO_STREET } from "@/lib/seed-data";
 
 type Search = { mode?: "join" | "in" };
@@ -57,6 +58,7 @@ function Login() {
       });
       const payload = (await res.json().catch(() => null)) as {
         token?: string;
+        userId?: string;
         isNew?: boolean;
         error?: string;
       } | null;
@@ -64,6 +66,13 @@ function Login() {
         throw new Error(payload?.error || "Could not sign in.");
       }
       captureAuthToken(payload, res);
+      if (payload?.token && payload.userId) {
+        writeLocalSession({
+          token: payload.token,
+          userId: payload.userId,
+          name: name.trim() || email.split("@")[0] || null,
+        });
+      }
       try {
         await authClient.getSession();
       } catch {

@@ -18,6 +18,7 @@ export const Route = createFileRoute("/api/session/ensure")({
               token: session.token,
               userId: session.userId,
               created: session.created,
+              name: body.displayName ?? null,
             }),
             { status: 200, headers },
           );

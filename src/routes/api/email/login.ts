@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
-import { migrateProfile, sessionCookie } from "@/lib/server/device-session.server";
+import {
+  durableSessionFromAuthToken,
+  migrateProfile,
+  sessionCookie,
+} from "@/lib/server/device-session.server";
 import { completeEmailLogin } from "@/lib/server/phone-login.server";
 
 export const Route = createFileRoute("/api/email/login")({
@@ -25,10 +29,8 @@ export const Route = createFileRoute("/api/email/login")({
             },
             request,
           );
-          if (priorUser) {
-            const nextUser = await userIdFromRequest(request, result.token).catch(() => null);
-            if (nextUser) await migrateProfile(priorUser, nextUser);
-          }
+          const durable = await durableSessionFromAuthToken(request, result.token);
+          if (priorUser) await migrateProfile(priorUser, durable.userId);
           const headers = new Headers({
             "content-type": "application/json",
             "cache-control": "no-store",
@@ -36,12 +38,14 @@ export const Route = createFileRoute("/api/email/login")({
           for (const cookie of result.cookies) {
             headers.append("set-cookie", cookie);
           }
-          if (result.token) {
-            headers.set("set-auth-token", result.token);
-            headers.append("set-cookie", sessionCookie(result.token));
-          }
+          headers.set("set-auth-token", durable.token);
+          headers.append("set-cookie", sessionCookie(durable.token));
           return new Response(
-            JSON.stringify({ token: result.token, isNew: result.isNew }),
+            JSON.stringify({
+              token: durable.token,
+              userId: durable.userId,
+              isNew: result.isNew,
+            }),
             { status: 200, headers },
           );
         } catch (err) {

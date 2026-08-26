@@ -1,6 +1,7 @@
 import { getBearerToken } from "@/lib/auth/client";
-import { storeSessionBearer } from "@/lib/session-bearer";
+import { writeLocalSession } from "@/lib/local-session";
 import type { ProfileInput } from "@/lib/server/profiles";
+import { storeSessionBearer } from "@/lib/session-bearer";
 
 export async function ensureLocalSession(displayName?: string): Promise<string | null> {
   const existing = getBearerToken();
@@ -16,7 +17,19 @@ export async function ensureLocalSession(displayName?: string): Promise<string |
       },
       body: JSON.stringify({ sessionToken: existing, displayName }),
     });
-    const payload = (await res.json().catch(() => null)) as { token?: string } | null;
+    const payload = (await res.json().catch(() => null)) as {
+      token?: string;
+      userId?: string;
+      name?: string | null;
+    } | null;
+    if (payload?.token && payload.userId) {
+      writeLocalSession({
+        token: payload.token,
+        userId: payload.userId,
+        name: payload.name ?? displayName ?? null,
+      });
+      return payload.token;
+    }
     if (payload?.token) {
       storeSessionBearer(payload.token);
       return payload.token;
@@ -35,7 +48,8 @@ function authHeaders(token: string | null): HeadersInit {
 }
 
 export async function fetchMyProfile() {
-  const token = getBearerToken() || (await ensureLocalSession());
+  const token = getBearerToken();
+  if (!token) return null;
   const res = await fetch("/api/profile", {
     credentials: "same-origin",
     cache: "no-store",
@@ -46,8 +60,15 @@ export async function fetchMyProfile() {
   return res.json();
 }
 
+type ProfileResponse = {
+  error?: string;
+  token?: string;
+  userId?: string;
+  displayName?: string;
+};
+
 export async function postProfile(input: ProfileInput) {
-  const token = getBearerToken() || (await ensureLocalSession(input.displayName));
+  const token = getBearerToken();
   const res = await fetch("/api/profile", {
     method: "POST",
     credentials: "same-origin",
@@ -57,18 +78,21 @@ export async function postProfile(input: ProfileInput) {
     },
     body: JSON.stringify({ ...input, sessionToken: token }),
   });
-  const payload = (await res.json().catch(() => null)) as
-    | { error?: string; token?: string }
-    | Record<string, unknown>
-    | null;
+  const payload = (await res.json().catch(() => null)) as ProfileResponse | null;
   if (!res.ok) {
     throw new Error(
-      (payload && "error" in payload && typeof payload.error === "string" && payload.error) ||
+      (payload && typeof payload.error === "string" && payload.error) ||
         "Could not save your profile.",
     );
   }
-  if (payload && typeof payload === "object" && "token" in payload && payload.token) {
-    storeSessionBearer(String(payload.token));
+  if (payload?.token && payload.userId) {
+    writeLocalSession({
+      token: payload.token,
+      userId: payload.userId,
+      name: payload.displayName ?? input.displayName ?? null,
+    });
+  } else if (payload?.token) {
+    storeSessionBearer(payload.token);
   }
   return payload;
 }

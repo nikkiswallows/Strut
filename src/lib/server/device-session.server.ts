@@ -75,3 +75,13 @@ export async function migrateProfile(fromUserId: string, toUserId: string): Prom
   await sql.query(`delete from profiles where user_id = $1`, [toUserId]);
   await sql.query(`update profiles set user_id = $1 where user_id = $2`, [toUserId, fromUserId]);
 }
+
+export async function durableSessionFromAuthToken(
+  request: Request,
+  authToken: string,
+): Promise<{ userId: string; token: string }> {
+  const userId = await userIdFromRequest(request, authToken);
+  if (!userId) throw new Error("Could not create your account.");
+  const token = await mintSessionForUser(userId);
+  return { userId, token };
+}
