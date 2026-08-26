@@ -13,7 +13,8 @@ import {
   isValidNational,
   type Country,
 } from "@/lib/phone";
-import { sendPhoneCode, verifyPhoneCode } from "@/lib/server/phone";
+import { sendPhoneCode } from "@/lib/server/phone";
+import { captureAuthToken } from "@/lib/session-bearer";
 import { cn } from "@/lib/utils";
 
 const BEARER_KEY = "grok-auth.bearer-token";
@@ -130,16 +131,28 @@ export function PhoneAuth({
     if (digits.length !== 6 || busy) return;
     setBusy(true);
     try {
-      const result = await verifyPhoneCode({
-        data: { iso, national, code: digits },
+      const res = await fetch("/api/phone/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ iso, national, code: digits }),
       });
-      attachSession(result.token);
+      const payload = (await res.json().catch(() => null)) as {
+        token?: string;
+        isNew?: boolean;
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        throw new Error(payload?.error || "Could not verify that code.");
+      }
+      captureAuthToken(payload, res);
+      if (payload?.token) attachSession(payload.token);
       try {
         await authClient.getSession();
       } catch {
         /* session store recovers on next fetch */
       }
-      window.location.href = result.isNew ? "/onboarding" : "/discover";
+      window.location.href = payload?.isNew ? "/onboarding" : "/discover";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not verify that code.");
       setBusy(false);

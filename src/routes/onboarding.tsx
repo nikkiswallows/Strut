@@ -8,9 +8,9 @@ import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
+import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
 import { ETHNICITIES, IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
@@ -76,27 +76,80 @@ function Onboarding() {
 
   useEffect(() => {
     if (hydrated || me.isPending) return;
-    const name = me.data?.displayName || user?.displayName || "";
+    const draft = readOnboardingDraft();
+    const name = me.data?.displayName || user?.displayName || draft?.displayName || "";
     if (name) {
       setDisplayName(name);
-      setHandle(slugifyHandle(me.data?.handle || name));
+      setHandle(slugifyHandle(me.data?.handle || draft?.handle || name));
     }
     if (me.data) {
-      setAge(me.data.age ? String(me.data.age) : "24");
+      setAge(me.data.age ? String(me.data.age) : draft?.age || "24");
       setHideAge(me.data.hideAge);
-      setLocation(me.data.location ?? "");
-      setIdentities(me.data.identities.length ? me.data.identities : []);
-      setPronouns(me.data.pronouns.length ? me.data.pronouns : []);
-      setRole(me.data.role ?? "Switch");
-      setEthnicity(me.data.ethnicity ?? "");
-      setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : ["Dates"]);
-      setPhotos(me.data.photos.length ? me.data.photos : []);
-      setBio(me.data.bio);
-      setInterests(me.data.interests);
-      setHeightCm(me.data.heightCm ? String(me.data.heightCm) : "");
+      setLocation(me.data.location ?? draft?.location ?? "");
+      setIdentities(me.data.identities.length ? me.data.identities : draft?.identities ?? []);
+      setPronouns(me.data.pronouns.length ? me.data.pronouns : draft?.pronouns ?? []);
+      setRole(me.data.role ?? draft?.role ?? "Switch");
+      setEthnicity(me.data.ethnicity ?? draft?.ethnicity ?? "");
+      setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : draft?.lookingFor ?? ["Dates"]);
+      setPhotos(me.data.photos.length ? me.data.photos : draft?.photos ?? []);
+      setBio(me.data.bio || draft?.bio || "");
+      setInterests(me.data.interests.length ? me.data.interests : draft?.interests ?? []);
+      setHeightCm(me.data.heightCm ? String(me.data.heightCm) : draft?.heightCm ?? "");
+    } else if (draft) {
+      setAge(draft.age);
+      setHideAge(draft.hideAge);
+      setLocation(draft.location);
+      setIdentities(draft.identities);
+      setPronouns(draft.pronouns);
+      setRole(draft.role);
+      setEthnicity(draft.ethnicity);
+      setLookingFor(draft.lookingFor.length ? draft.lookingFor : ["Dates"]);
+      setPhotos(draft.photos);
+      setBio(draft.bio);
+      setInterests(draft.interests);
+      setHeightCm(draft.heightCm);
+      setStep(draft.step);
     }
     setHydrated(true);
   }, [hydrated, me.data, me.isPending, user]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    writeOnboardingDraft({
+      step,
+      displayName,
+      handle,
+      age,
+      hideAge,
+      location,
+      identities,
+      pronouns,
+      role,
+      ethnicity,
+      lookingFor,
+      photos,
+      bio,
+      interests,
+      heightCm,
+    });
+  }, [
+    hydrated,
+    step,
+    displayName,
+    handle,
+    age,
+    hideAge,
+    location,
+    identities,
+    pronouns,
+    role,
+    ethnicity,
+    lookingFor,
+    photos,
+    bio,
+    interests,
+    heightCm,
+  ]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -120,13 +173,31 @@ function Onboarding() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
+      clearOnboardingDraft();
       toast.success("You're on Strut.");
       navigate({ to: "/discover" });
     },
     onError: (err: Error) => {
+      writeOnboardingDraft({
+        step,
+        displayName,
+        handle,
+        age,
+        hideAge,
+        location,
+        identities,
+        pronouns,
+        role,
+        ethnicity,
+        lookingFor,
+        photos,
+        bio,
+        interests,
+        heightCm,
+      });
       if (err.message === "Unauthorized") {
         toast.error("Session dropped. Sign in again and we'll pick this up.");
-        void signOut("/login");
+        navigate({ to: "/login" });
         return;
       }
       toast.error(err.message);
