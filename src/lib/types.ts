@@ -1,23 +1,21 @@
 export const IDENTITIES = [
   "Trans woman",
-  "Tgirl",
+  "T-Girl",
   "Sissy",
   "Crossdresser",
   "Femboy",
   "Non-binary femme",
   "Genderfluid",
   "Questioning",
+  "Woman",
+  "Man",
+  "Couple",
+  "Group",
 ] as const;
 
-export const LOOKING_FOR = [
-  "Dating",
-  "Relationship",
-  "Friends",
-  "Chat",
-  "Nightlife",
-] as const;
+export const LOOKING_FOR = ["Friends", "Dates", "Relationship", "Now", "Chat"] as const;
 
-export const PRONOUNS = ["she/her", "they/them", "she/they", "he/him", "any"] as const;
+export const PRONOUNS = ["she/her", "they/them", "she/they", "he/him", "he/they", "any"] as const;
 
 export const INTERESTS = [
   "Fashion",
@@ -36,7 +34,24 @@ export const INTERESTS = [
   "Art",
   "Karaoke",
   "Vintage",
+  "Lingerie",
+  "BNWO",
+  "Cuckold",
+  "BBC",
 ] as const;
+
+export const DISCOVER_TABS = [
+  { id: "nearby", label: "Nearby", match: [] as string[] },
+  { id: "tgirls", label: "T-Girls", match: ["T-Girl", "Trans woman"] },
+  { id: "sissies", label: "Sissies", match: ["Sissy", "Crossdresser", "Femboy"] },
+  { id: "women", label: "Women", match: ["Woman"] },
+  { id: "men", label: "Men", match: ["Man"] },
+  { id: "couples", label: "Couples", match: ["Couple", "Group"] },
+] as const;
+
+export const MILE_STOPS = [5, 10, 25, 50, 100, 250, 500] as const;
+
+export type DiscoverTab = (typeof DISCOVER_TABS)[number]["id"];
 
 export type Identity = (typeof IDENTITIES)[number];
 export type LookingFor = (typeof LOOKING_FOR)[number];
@@ -47,14 +62,17 @@ export type Profile = {
   handle: string;
   displayName: string;
   age: number | null;
-  identity: string | null;
-  pronouns: string | null;
+  hideAge: boolean;
+  identities: string[];
+  pronouns: string[];
   bio: string;
   location: string | null;
   lookingFor: string | null;
   photos: string[];
   interests: string[];
   heightCm: number | null;
+  lat: number | null;
+  lng: number | null;
   isSeed: boolean;
   lastActive: string;
   onboarded: boolean;
@@ -64,7 +82,20 @@ export type Profile = {
   matched?: boolean;
   following?: boolean;
   likeCount?: number;
+  distanceMiles?: number | null;
 };
+
+export function shownAge(profile: Pick<Profile, "age" | "hideAge">): number | null {
+  return profile.hideAge ? null : profile.age;
+}
+
+export function identityLine(profile: Pick<Profile, "identities">): string {
+  return profile.identities.filter(Boolean).join(" · ");
+}
+
+export function pronounLine(profile: Pick<Profile, "pronouns">): string {
+  return profile.pronouns.filter(Boolean).join(" · ");
+}
 
 export type FeedPost = {
   id: number;

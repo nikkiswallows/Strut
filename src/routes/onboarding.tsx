@@ -2,17 +2,19 @@ import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { MultiChips, SingleChips } from "@/components/chips";
 import { Logo } from "@/components/logo";
-import { Photo } from "@/components/photo";
+import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
 import { STARTER_LOOKS } from "@/lib/seed-data";
+import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
 import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS } from "@/lib/types";
-import { cn, fileToJpegDataUrl, slugifyHandle } from "@/lib/utils";
+import { cn, slugifyHandle } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
 
@@ -24,15 +26,31 @@ function Onboarding() {
     queryFn: () => getMyProfile(),
     enabled: Boolean(user),
   });
+  const identityTags = useQuery({
+    queryKey: ["tags", "identity"],
+    queryFn: () => listTags({ data: "identity" }),
+    enabled: Boolean(user),
+  });
+  const pronounTags = useQuery({
+    queryKey: ["tags", "pronoun"],
+    queryFn: () => listTags({ data: "pronoun" }),
+    enabled: Boolean(user),
+  });
+  const interestTags = useQuery({
+    queryKey: ["tags", "interest"],
+    queryFn: () => listTags({ data: "interest" }),
+    enabled: Boolean(user),
+  });
 
   const [step, setStep] = useState(0);
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
   const [age, setAge] = useState("24");
+  const [hideAge, setHideAge] = useState(false);
   const [location, setLocation] = useState("Costa Mesa, CA");
-  const [identity, setIdentity] = useState("Trans woman");
-  const [pronouns, setPronouns] = useState("she/her");
-  const [lookingFor, setLookingFor] = useState("Dating");
+  const [identities, setIdentities] = useState<string[]>(["T-Girl"]);
+  const [pronouns, setPronouns] = useState<string[]>(["she/her"]);
+  const [lookingFor, setLookingFor] = useState("Dates");
   const [photos, setPhotos] = useState<string[]>(STARTER_LOOKS);
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>(["Fashion", "Nights out"]);
@@ -47,10 +65,11 @@ function Onboarding() {
     }
     if (me.data) {
       setAge(me.data.age ? String(me.data.age) : "24");
+      setHideAge(me.data.hideAge);
       setLocation(me.data.location ?? "Costa Mesa, CA");
-      setIdentity(me.data.identity ?? "Trans woman");
-      setPronouns(me.data.pronouns ?? "she/her");
-      setLookingFor(me.data.lookingFor ?? "Dating");
+      setIdentities(me.data.identities.length ? me.data.identities : ["T-Girl"]);
+      setPronouns(me.data.pronouns.length ? me.data.pronouns : ["she/her"]);
+      setLookingFor(me.data.lookingFor ?? "Dates");
       setPhotos(me.data.photos.length ? me.data.photos : STARTER_LOOKS);
       setBio(me.data.bio);
       setInterests(me.data.interests.length ? me.data.interests : ["Fashion", "Nights out"]);
@@ -65,8 +84,9 @@ function Onboarding() {
           displayName,
           handle,
           age: Number(age) || 18,
+          hideAge,
           location,
-          identity,
+          identities,
           pronouns,
           lookingFor,
           photos,
@@ -91,28 +111,23 @@ function Onboarding() {
 
   const steps = ["You", "Identity", "Looks", "Voice"];
 
-  async function onFiles(list: FileList | null) {
-    if (!list) return;
-    const next = [...photos];
-    for (const file of Array.from(list).slice(0, 8 - next.length)) {
-      try {
-        next.push(await fileToJpegDataUrl(file));
-      } catch {
-        toast.error("Could not read that photo.");
-      }
-    }
-    setPhotos(next.slice(0, 8));
-  }
-
   return (
     <div className="min-h-dvh bg-bg px-5 py-8">
       <div className="mx-auto max-w-lg">
-        <Logo />
+        <Logo markClassName="size-10" />
         <div className="mt-8 flex gap-2">
           {steps.map((label, i) => (
-            <button key={label} type="button" onClick={() => setStep(i)} className="flex-1">
+            <button
+              key={label}
+              type="button"
+              onClick={() => setStep(i)}
+              className="flex-1 transition-transform duration-150 ease-out active:scale-[0.96]"
+            >
               <span
-                className={cn("block h-1 rounded-full", i <= step ? "bg-accent" : "bg-elevated")}
+                className={cn(
+                  "block h-1 rounded-full transition-colors duration-200",
+                  i <= step ? "bg-accent" : "bg-elevated",
+                )}
               />
               <span className="mt-2 block text-[10px] tracking-wide text-subtle uppercase">
                 {label}
@@ -121,10 +136,10 @@ function Onboarding() {
           ))}
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 animate-fade-up" key={step}>
           {step === 0 && (
             <div className="space-y-4">
-              <h1 className="font-display text-4xl">First, who are we meeting?</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">About you</h1>
               <Field label="Display name">
                 <Input
                   value={displayName}
@@ -135,13 +150,15 @@ function Onboarding() {
                     }
                   }}
                   placeholder="Nikki"
+                  autoComplete="name"
                 />
               </Field>
-              <Field label="Handle" hint="Letters, numbers, underscore.">
+              <Field label="Handle" hint="Letters, numbers, periods, underscore.">
                 <Input
                   value={handle}
                   onChange={(e) => setHandle(slugifyHandle(e.target.value))}
-                  placeholder="nikki"
+                  placeholder="nikki.s"
+                  autoComplete="username"
                 />
               </Field>
               <div className="grid grid-cols-2 gap-3">
@@ -152,6 +169,7 @@ function Onboarding() {
                     max={99}
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
+                    inputMode="numeric"
                   />
                 </Field>
                 <Field label="City">
@@ -162,15 +180,39 @@ function Onboarding() {
                   />
                 </Field>
               </div>
+              <button
+                type="button"
+                onClick={() => setHideAge((v) => !v)}
+                className={cn(
+                  "h-11 w-full rounded-lg px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
+                  hideAge ? "bg-fg text-bg" : "bg-elevated text-muted",
+                )}
+              >
+                {hideAge ? "Age hidden on your profile" : "Do not show my age"}
+              </button>
             </div>
           )}
 
           {step === 1 && (
-            <div className="space-y-5">
-              <h1 className="font-display text-4xl">How do you show up?</h1>
-              <ChipGroup label="Identity" options={[...IDENTITIES]} value={identity} onChange={setIdentity} />
-              <ChipGroup label="Pronouns" options={[...PRONOUNS]} value={pronouns} onChange={setPronouns} />
-              <ChipGroup
+            <div className="space-y-6">
+              <h1 className="font-display text-5xl leading-[0.92]">Identity</h1>
+              <MultiChips
+                label="Identity"
+                hint="Pick as many as you like."
+                options={identityTags.data ?? [...IDENTITIES]}
+                value={identities}
+                onChange={setIdentities}
+                kind="identity"
+              />
+              <MultiChips
+                label="Pronouns"
+                options={pronounTags.data ?? [...PRONOUNS]}
+                value={pronouns}
+                onChange={setPronouns}
+                kind="pronoun"
+                max={6}
+              />
+              <SingleChips
                 label="Looking for"
                 options={[...LOOKING_FOR]}
                 value={lookingFor}
@@ -181,37 +223,11 @@ function Onboarding() {
 
           {step === 2 && (
             <div className="space-y-5">
-              <h1 className="font-display text-4xl">Put a face to it.</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">Put a face to it.</h1>
               <p className="text-sm text-muted">
-                Your looks are already in. Tap to drop one, or add more of your own.
+                Your main look sits large. Drag the rest into the order you want.
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((src, i) => (
-                  <button
-                    key={`${i}-${src.slice(0, 24)}`}
-                    type="button"
-                    className="relative aspect-[3/4] overflow-hidden rounded-lg"
-                    onClick={() => setPhotos(photos.filter((_, idx) => idx !== i))}
-                  >
-                    <Photo src={src} alt="" className="size-full" />
-                    <span className="absolute top-1.5 right-1.5 rounded-full bg-bg/70 px-2 py-0.5 text-[10px]">
-                      Remove
-                    </span>
-                  </button>
-                ))}
-                {photos.length < 8 ? (
-                  <label className="grid aspect-[3/4] cursor-pointer place-items-center rounded-lg border border-dashed border-border text-xs text-muted">
-                    Add photo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => void onFiles(e.target.files)}
-                    />
-                  </label>
-                ) : null}
-              </div>
+              <PhotoEditor photos={photos} onChange={setPhotos} />
               <Button variant="outline" className="w-full" onClick={() => setPhotos(STARTER_LOOKS)}>
                 Reset to saved looks
               </Button>
@@ -220,7 +236,7 @@ function Onboarding() {
 
           {step === 3 && (
             <div className="space-y-5">
-              <h1 className="font-display text-4xl">Say it in a line.</h1>
+              <h1 className="font-display text-5xl leading-[0.92]">Say it in a line.</h1>
               <Field label="Bio">
                 <Textarea
                   value={bio}
@@ -229,33 +245,15 @@ function Onboarding() {
                   placeholder="Who you are when the lights go down."
                 />
               </Field>
-              <div>
-                <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">
-                  Interests
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {INTERESTS.map((tag) => {
-                    const on = interests.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() =>
-                          setInterests(
-                            on ? interests.filter((t) => t !== tag) : [...interests, tag].slice(0, 8),
-                          )
-                        }
-                        className={cn(
-                          "h-9 rounded-full px-3.5 text-sm",
-                          on ? "bg-fg text-bg" : "bg-elevated text-muted",
-                        )}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <MultiChips
+                label="Interests"
+                hint="Add your own — BNWO, Cuckold, BBC…"
+                options={interestTags.data ?? [...INTERESTS]}
+                value={interests}
+                onChange={setInterests}
+                kind="interest"
+                max={16}
+              />
             </div>
           )}
         </div>
@@ -274,6 +272,10 @@ function Onboarding() {
                   toast.error("Name and a handle, please.");
                   return;
                 }
+                if (step === 1 && identities.length === 0) {
+                  toast.error("Pick at least one identity.");
+                  return;
+                }
                 if (step === 2 && photos.length === 0) {
                   toast.error("Add at least one photo.");
                   return;
@@ -289,39 +291,6 @@ function Onboarding() {
             </Button>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ChipGroup({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">{label}</p>
-      <div className="flex flex-wrap gap-2">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onChange(opt)}
-            className={cn(
-              "h-9 rounded-full px-3.5 text-sm",
-              value === opt ? "bg-fg text-bg" : "bg-elevated text-muted",
-            )}
-          >
-            {opt}
-          </button>
-        ))}
       </div>
     </div>
   );

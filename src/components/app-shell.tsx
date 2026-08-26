@@ -41,7 +41,7 @@ export function AppShell() {
   if (isPending) {
     return (
       <div className="grid min-h-dvh place-items-center bg-bg">
-        <Mark className="size-10 animate-pulse" />
+        <Mark className="size-14 animate-pulse" />
       </div>
     );
   }
@@ -49,7 +49,7 @@ export function AppShell() {
   if (me.isPending) {
     return (
       <div className="grid min-h-dvh place-items-center bg-bg">
-        <Mark className="size-10 animate-pulse" />
+        <Mark className="size-14 animate-pulse" />
       </div>
     );
   }
@@ -61,9 +61,9 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-56 flex-col border-r border-border px-4 py-6 lg:flex">
-        <Link to="/discover" className="mb-8 px-2">
-          <Logo />
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-border px-4 py-7 lg:flex">
+        <Link to="/discover" className="mb-10 px-2 transition-transform duration-150 ease-out active:scale-[0.96]">
+          <Logo markClassName="size-10" wordClassName="text-3xl" />
         </Link>
         <nav className="flex flex-1 flex-col gap-1">
           {NAV.map((item) => {
@@ -75,14 +75,14 @@ export function AppShell() {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors duration-150",
+                  "flex h-12 items-center gap-3 rounded-lg px-3 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
                   active
                     ? "bg-elevated text-fg"
                     : "text-muted hover:bg-elevated/60 hover:text-fg",
                 )}
               >
                 <span className="relative">
-                  <Icon className="size-5" />
+                  <Icon className={cn("size-5", active && "text-accent")} />
                   {item.to === "/inbox" && unread > 0 ? (
                     <span className="absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full bg-accent text-[9px] font-semibold text-accent-fg">
                       {unread > 9 ? "9+" : unread}
@@ -96,7 +96,7 @@ export function AppShell() {
         </nav>
         <Link
           to="/me"
-          className="mt-auto flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-elevated"
+          className="mt-auto flex items-center gap-3 rounded-lg px-2 py-2 transition-[transform,background-color] duration-150 ease-out hover:bg-elevated active:scale-[0.96]"
         >
           <Avatar
             src={me.data?.photos[0]}
@@ -113,12 +113,12 @@ export function AppShell() {
         </Link>
       </aside>
 
-      <div className="lg:pl-56">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg/90 px-4 py-3 backdrop-blur-md lg:hidden">
-          <Link to="/discover">
-            <Logo markClassName="size-6" className="text-[1.15rem]" />
+      <div className="lg:pl-64">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-bg/90 px-4 py-3 backdrop-blur-md lg:hidden">
+          <Link to="/discover" className="transition-transform duration-150 ease-out active:scale-[0.96]">
+            <Logo markClassName="size-8" wordClassName="text-[1.65rem]" />
           </Link>
-          <Link to="/me">
+          <Link to="/me" className="transition-transform duration-150 ease-out active:scale-[0.96]">
             <Avatar
               src={me.data?.photos[0]}
               name={me.data?.displayName ?? "You"}
@@ -141,7 +141,7 @@ export function AppShell() {
               key={item.to}
               to={item.to}
               className={cn(
-                "relative flex h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] tracking-wide uppercase",
+                "relative flex h-12 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] tracking-wide uppercase transition-[transform,color] duration-150 ease-out active:scale-[0.96]",
                 active ? "text-fg" : "text-subtle",
               )}
             >

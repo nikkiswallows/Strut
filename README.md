@@ -1,8 +1,8 @@
 # Strut
 
-Dating for tgirls, sissies, and trans women. Walk in. Be seen.
+Dating for T-Girls, sissies, and trans women. Walk in. Be seen.
 
-Strut is a dating app — Discover grid, feed, likes, matches, and private chat. No paywalls in v1.
+Strut is a dating app — Discover nearby, feed, likes, matches, and private chat. No paywalls in v1.
 
 ## Sign in
 

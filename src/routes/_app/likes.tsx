@@ -45,7 +45,7 @@ function Likes() {
             type="button"
             onClick={() => setTab(key)}
             className={cn(
-              "flex-1 rounded-full py-2 text-sm",
+              "flex-1 rounded-full py-2 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
               tab === key ? "bg-fg text-bg" : "text-muted",
             )}
           >

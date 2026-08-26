@@ -13,19 +13,41 @@ export function Mark({ className }: { className?: string }) {
   );
 }
 
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "font-display font-medium tracking-[0.28em] uppercase leading-none",
+        className,
+      )}
+    >
+      Strut
+    </span>
+  );
+}
+
 export function Logo({
   className,
   markClassName,
+  wordClassName,
 }: {
   className?: string;
   markClassName?: string;
+  wordClassName?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-2 text-fg", className)}>
-      <Mark className={cn("size-7", markClassName)} />
-      <span className="font-display text-[1.35rem] font-medium tracking-[0.22em] uppercase leading-none">
-        Strut
-      </span>
+    <span className={cn("inline-flex items-center gap-2.5 text-fg", className)}>
+      <Mark className={cn("size-9", markClassName)} />
+      <Wordmark className={cn("text-[1.85rem]", wordClassName)} />
     </span>
+  );
+}
+
+export function BrandLockup({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex flex-col items-start gap-3", className)}>
+      <Logo markClassName="size-12" wordClassName="text-5xl tracking-[0.32em]" />
+      <p className="text-xs tracking-[0.32em] text-accent uppercase">Walk in. Be seen.</p>
+    </div>
   );
 }

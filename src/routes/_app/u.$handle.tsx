@@ -1,14 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Heart, MessageCircle, UserPlus } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
-import { Photo } from "@/components/photo";
+import { PhotoViewer } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
+import { formatMiles } from "@/lib/geo";
 import { queryClient } from "@/lib/query-client";
 import { openConversation } from "@/lib/server/messages";
 import { getMyProfile, getProfileForViewer } from "@/lib/server/profiles";
 import { toggleFollow, toggleLike } from "@/lib/server/social";
+import { identityLine, pronounLine, shownAge } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/u/$handle")({ component: ProfilePage });
@@ -16,7 +17,6 @@ export const Route = createFileRoute("/_app/u/$handle")({ component: ProfilePage
 function ProfilePage() {
   const { handle } = Route.useParams();
   const navigate = useNavigate();
-  const [photoIndex, setPhotoIndex] = useState(0);
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMyProfile() });
   const profile = useQuery({
     queryKey: ["profile", handle],
@@ -51,61 +51,36 @@ function ProfilePage() {
   }
 
   const mine = me.data?.userId === p.userId;
-  const photos = p.photos.length ? p.photos : [null];
-  const current = photos[Math.min(photoIndex, photos.length - 1)];
+  const age = shownAge(p);
+  const ident = identityLine(p);
+  const pronouns = pronounLine(p);
+  const distance = formatMiles(p.distanceMiles);
 
   return (
-    <div className="mx-auto max-w-lg">
-      <div className="relative overflow-hidden rounded-xl bg-surface">
-        <div className="relative aspect-[3/4]">
-          <Photo
-            src={current}
-            alt={p.displayName}
-            name={p.displayName}
-            className="absolute inset-0 size-full object-cover"
-          />
-        </div>
-        {photos.length > 1 ? (
-          <>
-            <div className="absolute inset-x-3 top-3 z-10 flex gap-1">
-              {photos.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setPhotoIndex(i)}
-                  className={cn("h-0.5 flex-1 rounded-full", i === photoIndex ? "bg-fg" : "bg-fg/30")}
-                />
-              ))}
-            </div>
-            <div className="absolute inset-0 z-[1] flex">
-              <button
-                type="button"
-                className="flex-1"
-                onClick={() => setPhotoIndex(Math.max(0, photoIndex - 1))}
-                aria-label="Previous photo"
-              />
-              <button
-                type="button"
-                className="flex-1"
-                onClick={() => setPhotoIndex(Math.min(photos.length - 1, photoIndex + 1))}
-                aria-label="Next photo"
-              />
-            </div>
-          </>
-        ) : null}
-      </div>
+    <div className="mx-auto max-w-lg animate-fade-up">
+      <PhotoViewer photos={p.photos} name={p.displayName} />
+      {p.photos.length > 1 ? (
+        <p className="mt-2 text-center text-[11px] tracking-wide text-subtle uppercase">
+          Tap left or right to flip looks
+        </p>
+      ) : null}
 
       <div className="relative z-10 mt-5">
-        <h1 className="font-display text-4xl leading-tight">
+        <h1 className="font-display text-5xl leading-[0.92]">
           {p.displayName}
-          {p.age ? <span className="ml-2 font-sans text-2xl text-muted">{p.age}</span> : null}
+          {age ? <span className="ml-2 font-sans text-2xl text-muted">{age}</span> : null}
         </h1>
         <p className="mt-1 text-sm text-muted">
           @{p.handle}
-          {p.identity ? ` · ${p.identity}` : ""}
-          {p.pronouns ? ` · ${p.pronouns}` : ""}
+          {ident ? ` · ${ident}` : ""}
+          {pronouns ? ` · ${pronouns}` : ""}
         </p>
-        {p.location ? <p className="mt-1 text-sm text-muted">{p.location}</p> : null}
+        {p.location ? (
+          <p className="mt-1 text-sm text-muted">
+            {p.location}
+            {distance ? ` · ${distance}` : ""}
+          </p>
+        ) : null}
         {p.lookingFor ? (
           <p className="mt-3 inline-flex rounded-full bg-elevated px-3 py-1 text-xs text-muted">
             Looking for {p.lookingFor.toLowerCase()}

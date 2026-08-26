@@ -21,7 +21,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "Strut — dating for tgirls, sissies, and trans women. Walk in. Be seen.",
+        content: "Strut — dating for T-Girls, sissies, and trans women. Walk in. Be seen.",
       },
       { name: "theme-color", content: "#0c0b0c" },
       { name: "apple-mobile-web-app-capable", content: "yes" },

@@ -1,31 +1,48 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Photo } from "@/components/photo";
+import { MultiChips, SingleChips } from "@/components/chips";
+import { PhotoEditor } from "@/components/photo-editor";
+import { PhotoStrip } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { formatMiles } from "@/lib/geo";
 import { queryClient } from "@/lib/query-client";
 import { STARTER_LOOKS } from "@/lib/seed-data";
+import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
-import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS } from "@/lib/types";
-import { cn, fileToJpegDataUrl, slugifyHandle } from "@/lib/utils";
+import { IDENTITIES, identityLine, INTERESTS, LOOKING_FOR, pronounLine, PRONOUNS, shownAge } from "@/lib/types";
+import { cn, slugifyHandle } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/me")({ component: Me });
 
 function Me() {
   const user = useCurrentUser();
   const me = useQuery({ queryKey: ["me"], queryFn: () => getMyProfile() });
+  const identityTags = useQuery({
+    queryKey: ["tags", "identity"],
+    queryFn: () => listTags({ data: "identity" }),
+  });
+  const pronounTags = useQuery({
+    queryKey: ["tags", "pronoun"],
+    queryFn: () => listTags({ data: "pronoun" }),
+  });
+  const interestTags = useQuery({
+    queryKey: ["tags", "interest"],
+    queryFn: () => listTags({ data: "interest" }),
+  });
   const p = me.data;
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
   const [age, setAge] = useState("");
+  const [hideAge, setHideAge] = useState(false);
   const [location, setLocation] = useState("");
-  const [identity, setIdentity] = useState("");
-  const [pronouns, setPronouns] = useState("");
+  const [identities, setIdentities] = useState<string[]>([]);
+  const [pronouns, setPronouns] = useState<string[]>([]);
   const [lookingFor, setLookingFor] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
@@ -36,9 +53,10 @@ function Me() {
     setDisplayName(p.displayName);
     setHandle(p.handle);
     setAge(p.age ? String(p.age) : "");
+    setHideAge(p.hideAge);
     setLocation(p.location ?? "");
-    setIdentity(p.identity ?? "");
-    setPronouns(p.pronouns ?? "");
+    setIdentities(p.identities);
+    setPronouns(p.pronouns);
     setLookingFor(p.lookingFor ?? "");
     setPhotos(p.photos);
     setBio(p.bio);
@@ -52,8 +70,9 @@ function Me() {
           displayName,
           handle,
           age: age ? Number(age) : null,
+          hideAge,
           location,
-          identity,
+          identities,
           pronouns,
           lookingFor,
           photos,
@@ -70,55 +89,51 @@ function Me() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  async function onFiles(list: FileList | null) {
-    if (!list) return;
-    const next = [...photos];
-    for (const file of Array.from(list).slice(0, 8 - next.length)) {
-      next.push(await fileToJpegDataUrl(file));
-    }
-    setPhotos(next.slice(0, 8));
-  }
-
   if (me.isPending || !p) {
     return <div className="h-96 animate-pulse rounded-xl bg-surface" />;
   }
+
+  const ageShown = shownAge(p);
 
   return (
     <div className="mx-auto max-w-lg">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl">You</h1>
+          <p className="text-xs tracking-[0.28em] text-accent uppercase">Profile</p>
+          <h1 className="font-display text-5xl leading-[0.92]">You</h1>
           <p className="text-sm text-muted">{user?.primaryEmail}</p>
         </div>
         <UserButton />
       </div>
 
       {!editing ? (
-        <>
-          <Link to="/u/$handle" params={{ handle: p.handle }} className="mt-6 block">
-            <div className="grid grid-cols-3 gap-1 overflow-hidden rounded-xl">
-              {(p.photos.length ? p.photos : [null]).slice(0, 3).map((src, i) => (
-                <div key={i} className="relative aspect-[3/4]">
-                  <Photo
-                    src={src}
-                    alt=""
-                    name={p.displayName}
-                    className="absolute inset-0 size-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          </Link>
-          <h2 className="mt-5 font-display text-3xl">
+        <div className="mt-6 animate-fade-up">
+          <PhotoStrip photos={p.photos} name={p.displayName} />
+          {p.photos.length > 1 ? (
+            <p className="mt-2 text-center text-[11px] tracking-wide text-subtle uppercase">
+              Scroll your looks
+            </p>
+          ) : null}
+          <h2 className="mt-5 font-display text-4xl">
             {p.displayName}
-            {p.age ? <span className="ml-2 font-sans text-xl text-muted">{p.age}</span> : null}
+            {ageShown ? <span className="ml-2 font-sans text-xl text-muted">{ageShown}</span> : null}
+            {p.hideAge ? (
+              <span className="ml-2 align-middle font-sans text-xs tracking-wide text-subtle uppercase">
+                Age hidden
+              </span>
+            ) : null}
           </h2>
           <p className="text-sm text-muted">
             @{p.handle}
-            {p.identity ? ` · ${p.identity}` : ""}
-            {p.pronouns ? ` · ${p.pronouns}` : ""}
+            {identityLine(p) ? ` · ${identityLine(p)}` : ""}
+            {pronounLine(p) ? ` · ${pronounLine(p)}` : ""}
           </p>
-          {p.location ? <p className="mt-1 text-sm text-muted">{p.location}</p> : null}
+          {p.location ? (
+            <p className="mt-1 text-sm text-muted">
+              {p.location}
+              {p.distanceMiles != null ? ` · ${formatMiles(p.distanceMiles)}` : ""}
+            </p>
+          ) : null}
           {p.lookingFor ? (
             <p className="mt-3 inline-flex rounded-full bg-elevated px-3 py-1 text-xs text-muted">
               Looking for {p.lookingFor.toLowerCase()}
@@ -137,10 +152,10 @@ function Me() {
           <Button className="mt-6 w-full" onClick={() => setEditing(true)}>
             Edit profile
           </Button>
-        </>
+        </div>
       ) : (
         <form
-          className="mt-6 space-y-4"
+          className="mt-6 space-y-4 animate-fade-up"
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate();
@@ -149,7 +164,7 @@ function Me() {
           <Field label="Name">
             <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
           </Field>
-          <Field label="Handle">
+          <Field label="Handle" hint="Letters, numbers, periods, underscore.">
             <Input value={handle} onChange={(e) => setHandle(slugifyHandle(e.target.value))} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -160,9 +175,32 @@ function Me() {
               <Input value={location} onChange={(e) => setLocation(e.target.value)} />
             </Field>
           </div>
-          <ChipSelect label="Identity" options={[...IDENTITIES]} value={identity} onChange={setIdentity} />
-          <ChipSelect label="Pronouns" options={[...PRONOUNS]} value={pronouns} onChange={setPronouns} />
-          <ChipSelect
+          <button
+            type="button"
+            onClick={() => setHideAge((v) => !v)}
+            className={cn(
+              "h-11 w-full rounded-lg px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
+              hideAge ? "bg-fg text-bg" : "bg-elevated text-muted",
+            )}
+          >
+            {hideAge ? "Age hidden on your profile" : "Do not show my age"}
+          </button>
+          <MultiChips
+            label="Identity"
+            options={identityTags.data ?? [...IDENTITIES]}
+            value={identities}
+            onChange={setIdentities}
+            kind="identity"
+          />
+          <MultiChips
+            label="Pronouns"
+            options={pronounTags.data ?? [...PRONOUNS]}
+            value={pronouns}
+            onChange={setPronouns}
+            kind="pronoun"
+            max={6}
+          />
+          <SingleChips
             label="Looking for"
             options={[...LOOKING_FOR]}
             value={lookingFor}
@@ -171,53 +209,18 @@ function Me() {
           <Field label="Bio">
             <Textarea value={bio} maxLength={500} onChange={(e) => setBio(e.target.value)} />
           </Field>
-          <div className="grid grid-cols-3 gap-2">
-            {photos.map((src, i) => (
-              <button
-                key={i}
-                type="button"
-                className="relative aspect-[3/4] overflow-hidden rounded-lg"
-                onClick={() => setPhotos(photos.filter((_, idx) => idx !== i))}
-              >
-                <Photo src={src} alt="" className="absolute inset-0 size-full object-cover" />
-              </button>
-            ))}
-            {photos.length < 8 ? (
-              <label className="grid aspect-[3/4] cursor-pointer place-items-center rounded-lg border border-dashed border-border text-xs text-muted">
-                Add
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => void onFiles(e.target.files)}
-                />
-              </label>
-            ) : null}
-          </div>
+          <PhotoEditor photos={photos} onChange={setPhotos} />
           <Button type="button" variant="outline" className="w-full" onClick={() => setPhotos(STARTER_LOOKS)}>
             Use my saved looks
           </Button>
-          <div className="flex flex-wrap gap-2">
-            {INTERESTS.map((tag) => {
-              const on = interests.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() =>
-                    setInterests(on ? interests.filter((t) => t !== tag) : [...interests, tag].slice(0, 8))
-                  }
-                  className={cn(
-                    "h-9 rounded-full px-3.5 text-sm",
-                    on ? "bg-fg text-bg" : "bg-elevated text-muted",
-                  )}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
+          <MultiChips
+            label="Interests"
+            options={interestTags.data ?? [...INTERESTS]}
+            value={interests}
+            onChange={setInterests}
+            kind="interest"
+            max={16}
+          />
           <div className="flex gap-2">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setEditing(false)}>
               Cancel
@@ -228,39 +231,6 @@ function Me() {
           </div>
         </form>
       )}
-    </div>
-  );
-}
-
-function ChipSelect({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">{label}</p>
-      <div className="flex flex-wrap gap-2">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onChange(opt)}
-            className={cn(
-              "h-9 rounded-full px-3.5 text-sm",
-              value === opt ? "bg-fg text-bg" : "bg-elevated text-muted",
-            )}
-          >
-            {opt}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

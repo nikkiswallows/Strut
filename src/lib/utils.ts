@@ -5,6 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function unique(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const v = value.trim();
+    if (!v || seen.has(v.toLowerCase())) continue;
+    seen.add(v.toLowerCase());
+    out.push(v);
+  }
+  return out;
+}
+
 export function parseJson<T>(value: unknown, fallback: T): T {
   if (value == null) return fallback;
   if (typeof value === "string") {
@@ -40,8 +52,21 @@ export function initials(name: string): string {
 export function slugifyHandle(value: string): string {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "")
-    .slice(0, 20);
+    .replace(/[^a-z0-9._]/g, "")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^[._]+/, "")
+    .replace(/[._]+$/, "")
+    .slice(0, 24);
+}
+
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) {
+    return list;
+  }
+  const next = list.slice();
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item!);
+  return next;
 }
 
 export async function fileToJpegDataUrl(file: File, maxSize = 1200): Promise<string> {

@@ -79,7 +79,7 @@ function Login() {
 
         <div className="flex flex-col px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-12">
           <Link to="/" className="mb-10 w-fit lg:mb-12">
-            <Logo />
+            <Logo markClassName="size-11" wordClassName="text-4xl" />
           </Link>
 
           <div className="mx-auto flex w-full max-w-sm flex-1 flex-col">

@@ -1,6 +1,14 @@
 import { parseJson } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
 
+export const PROFILE_COLS = `id, user_id, handle, display_name, age, identity, pronouns, bio,
+  location, looking_for, photos, interests, height_cm, is_seed,
+  last_active, onboarded, created_at, identities, pronoun_list, hide_age, lat, lng`;
+
+export const PROFILE_COLS_P = `p.id, p.user_id, p.handle, p.display_name, p.age, p.identity, p.pronouns, p.bio,
+  p.location, p.looking_for, p.photos, p.interests, p.height_cm, p.is_seed,
+  p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.lat, p.lng`;
+
 export type ProfileRow = {
   id: number;
   user_id: string;
@@ -19,6 +27,11 @@ export type ProfileRow = {
   last_active: string;
   onboarded: boolean;
   created_at: string;
+  identities?: unknown;
+  pronoun_list?: unknown;
+  hide_age?: boolean | number | string | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
   liked_by_me?: boolean | number | string | null;
   likes_me?: boolean | number | string | null;
   following?: boolean | number | string | null;
@@ -29,6 +42,16 @@ function flag(value: unknown): boolean {
   return value === true || value === 1 || value === "t" || value === "true";
 }
 
+function asList(value: unknown, fallback: string | null): string[] {
+  const parsed = parseJson<unknown>(value, []);
+  if (Array.isArray(parsed) && parsed.length) {
+    return parsed.map(String).filter(Boolean);
+  }
+  if (typeof parsed === "string" && parsed.trim()) return [parsed.trim()];
+  if (fallback?.trim()) return [fallback.trim()];
+  return [];
+}
+
 export function mapProfile(row: ProfileRow): Profile {
   return {
     id: Number(row.id),
@@ -36,14 +59,17 @@ export function mapProfile(row: ProfileRow): Profile {
     handle: row.handle,
     displayName: row.display_name,
     age: row.age == null ? null : Number(row.age),
-    identity: row.identity,
-    pronouns: row.pronouns,
+    hideAge: flag(row.hide_age),
+    identities: asList(row.identities, row.identity),
+    pronouns: asList(row.pronoun_list, row.pronouns),
     bio: row.bio ?? "",
     location: row.location,
     lookingFor: row.looking_for,
     photos: parseJson<string[]>(row.photos, []),
     interests: parseJson<string[]>(row.interests, []),
     heightCm: row.height_cm == null ? null : Number(row.height_cm),
+    lat: row.lat == null || row.lat === "" ? null : Number(row.lat),
+    lng: row.lng == null || row.lng === "" ? null : Number(row.lng),
     isSeed: flag(row.is_seed),
     lastActive: String(row.last_active),
     onboarded: flag(row.onboarded),

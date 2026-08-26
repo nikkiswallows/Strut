@@ -3,13 +3,9 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { SEED_PROFILES } from "@/lib/seed-data";
 import type { FeedPost, LikeBundle } from "@/lib/types";
-import { mapProfile, type ProfileRow } from "./map";
+import { PROFILE_COLS_P, mapProfile, type ProfileRow } from "./map";
 import { parseJson } from "@/lib/utils";
 import { ensureSeed } from "./seed";
-
-const COLS = `p.id, p.user_id, p.handle, p.display_name, p.age, p.identity, p.pronouns, p.bio,
-  p.location, p.looking_for, p.photos, p.interests, p.height_cm, p.is_seed,
-  p.last_active, p.onboarded, p.created_at`;
 
 export const toggleLike = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
@@ -76,7 +72,7 @@ export const listLikes = createServerFn({ method: "GET" })
     await ensureSeed();
     const sql = await getSql();
     const incoming = await sql.query<ProfileRow>(
-      `select ${COLS},
+      `select ${PROFILE_COLS_P},
               true as likes_me,
               exists(select 1 from likes l where l.from_user_id = $1 and l.to_user_id = p.user_id) as liked_by_me
        from likes lk
@@ -86,7 +82,7 @@ export const listLikes = createServerFn({ method: "GET" })
       [context.userId],
     );
     const outgoing = await sql.query<ProfileRow>(
-      `select ${COLS},
+      `select ${PROFILE_COLS_P},
               true as liked_by_me,
               exists(select 1 from likes l where l.from_user_id = p.user_id and l.to_user_id = $1) as likes_me
        from likes lk
