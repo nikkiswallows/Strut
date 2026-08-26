@@ -3,7 +3,7 @@ import { getSql } from "@/lib/db";
 import { SEED_POSTS, SEED_PROFILES, type SeedProfile } from "@/lib/seed-data";
 import { unique } from "@/lib/utils";
 
-const SEED_VERSION = 7;
+const SEED_VERSION = 8;
 
 const globalRef = globalThis as typeof globalThis & {
   __strutSeedPromise__?: Promise<void>;
@@ -123,6 +123,11 @@ async function runSeed() {
     ["seed-dana", "seed-cole"],
     ["seed-luna", "seed-mira"],
     ["seed-house", "seed-aria"],
+    ["seed-set", "seed-blair"],
+    ["seed-blair", "seed-set"],
+    ["seed-set", "seed-wren"],
+    ["seed-set", "seed-wests"],
+    ["seed-sloane", "seed-set"],
   ];
   for (const [from, to] of pairs) {
     await sql`
