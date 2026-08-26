@@ -12,8 +12,8 @@ const RESEND_MS = 45 * 1000;
 const MAX_SENDS = 4;
 const MAX_ATTEMPTS = 5;
 
-type SendInput = { iso: string; national: string };
-type VerifyInput = { iso: string; national: string; code: string };
+export type SendInput = { iso: string; national: string };
+export type VerifyInput = { iso: string; national: string; code: string };
 
 function cleanSend(input: SendInput): { iso: string; e164: string } {
   const iso = input.iso?.trim().toUpperCase() ?? "";
@@ -26,7 +26,7 @@ function cleanSend(input: SendInput): { iso: string; e164: string } {
   return { iso, e164: toE164(iso, national) };
 }
 
-function cleanVerify(input: VerifyInput): { iso: string; e164: string; code: string } {
+export function cleanVerify(input: VerifyInput): { iso: string; e164: string; code: string } {
   const { iso, e164 } = cleanSend(input);
   const code = (input.code ?? "").replace(/\D/g, "");
   if (code.length !== 6) throw new Error("Enter the 6-digit code.");
@@ -46,11 +46,11 @@ async function hashOtp(e164: string, code: string): Promise<string> {
   return createHmac("sha256", pepper()).update(`otp:${e164}:${code}`).digest("hex");
 }
 
-function phoneEmail(e164: string): string {
+export function phoneEmail(e164: string): string {
   return `${e164.replace(/\D/g, "")}@phone.strut.app`;
 }
 
-async function phonePassword(e164: string): Promise<string> {
+export async function phonePassword(e164: string): Promise<string> {
   const { createHmac } = await import("node:crypto");
   return createHmac("sha256", pepper()).update(`strut.phone.v1:${e164}`).digest("base64url");
 }
@@ -157,113 +157,38 @@ export const sendPhoneCode = createServerFn({ method: "POST" })
     };
   });
 
-async function createPhoneSession(e164: string): Promise<{ token: string; isNew: boolean }> {
-  const { getRequest } = await import("@tanstack/react-start/server");
-  const { auth } = await import("@/lib/auth/server");
-  const request = getRequest();
-  if (!request) throw new Error("Could not start a session.");
-  const headers = request.headers;
-  const email = phoneEmail(e164);
-  const password = await phonePassword(e164);
-  const name = `Member ${e164.slice(-4)}`;
-
+export async function consumePhoneOtp(e164: string, code: string): Promise<void> {
   const sql = await getSql();
-  const existing = await sql.query<{ user_id: string }>(
-    `select user_id from phone_identities where phone_e164 = $1`,
+  const rows = await sql.query<OtpRow>(
+    `select id, code_hash, attempts, expires_at, created_at
+     from phone_otps
+     where phone_e164 = $1
+     order by created_at desc
+     limit 1`,
     [e164],
   );
-
-  const signIn = async () => {
-    const res = await auth.api.signInEmail({
-      body: { email, password, rememberMe: true },
-      headers,
-    });
-    if (!res?.token) throw new Error("Could not sign in.");
-    return res.token;
-  };
-
-  const signUp = async () => {
-    const res = await auth.api.signUpEmail({
-      body: { email, password, name },
-      headers,
-    });
-    if (res?.token) return res.token;
-    return signIn();
-  };
-
-  if (existing[0]) {
-    const token = await signIn();
-    return { token, isNew: false };
+  const row = rows[0];
+  if (!row) throw new Error("Request a new code first.");
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    await sql.query(`delete from phone_otps where id = $1`, [row.id]);
+    throw new Error("That code expired. Request a new one.");
+  }
+  if (row.attempts >= MAX_ATTEMPTS) {
+    await sql.query(`delete from phone_otps where id = $1`, [row.id]);
+    throw new Error("Too many tries. Request a new code.");
   }
 
-  let token: string;
-  let isNew = true;
-  try {
-    token = await signUp();
-  } catch {
-    token = await signIn();
-    isNew = false;
-  }
-
-  const session = await auth.api.getSession({
-    headers: (() => {
-      const next = new Headers(headers);
-      next.set("Authorization", `Bearer ${token}`);
-      return next;
-    })(),
-  });
-  const userId = session?.user?.id;
-  if (!userId) throw new Error("Could not create your account.");
-
-  await sql.query(
-    `insert into phone_identities (phone_e164, user_id)
-     values ($1, $2)
-     on conflict (phone_e164) do nothing`,
-    [e164, userId],
-  );
-
-  return { token, isNew };
-}
-
-export const verifyPhoneCode = createServerFn({ method: "POST" })
-  .validator((input: VerifyInput) => cleanVerify(input))
-  .handler(async ({ data }) => {
-    const sql = await getSql();
-    const rows = await sql.query<OtpRow>(
-      `select id, code_hash, attempts, expires_at, created_at
-       from phone_otps
-       where phone_e164 = $1
-       order by created_at desc
-       limit 1`,
-      [data.e164],
+  const expected = await hashOtp(e164, code);
+  const ok = await hashesMatch(expected, row.code_hash);
+  if (!ok) {
+    await sql.query(`update phone_otps set attempts = attempts + 1 where id = $1`, [row.id]);
+    const left = MAX_ATTEMPTS - row.attempts - 1;
+    throw new Error(
+      left > 0
+        ? `That code doesn't match. ${left} ${left === 1 ? "try" : "tries"} left.`
+        : "Too many tries. Request a new code.",
     );
-    const row = rows[0];
-    if (!row) throw new Error("Request a new code first.");
-    if (new Date(row.expires_at).getTime() < Date.now()) {
-      await sql.query(`delete from phone_otps where id = $1`, [row.id]);
-      throw new Error("That code expired. Request a new one.");
-    }
-    if (row.attempts >= MAX_ATTEMPTS) {
-      await sql.query(`delete from phone_otps where id = $1`, [row.id]);
-      throw new Error("Too many tries. Request a new code.");
-    }
+  }
 
-    const expected = await hashOtp(data.e164, data.code);
-    const ok = await hashesMatch(expected, row.code_hash);
-    if (!ok) {
-      await sql.query(`update phone_otps set attempts = attempts + 1 where id = $1`, [row.id]);
-      const left = MAX_ATTEMPTS - row.attempts - 1;
-      throw new Error(
-        left > 0 ? `That code doesn't match. ${left} ${left === 1 ? "try" : "tries"} left.` : "Too many tries. Request a new code.",
-      );
-    }
-
-    await sql.query(`delete from phone_otps where phone_e164 = $1`, [data.e164]);
-
-    const session = await createPhoneSession(data.e164);
-    return {
-      e164: data.e164,
-      token: session.token,
-      isNew: session.isNew,
-    };
-  });
+  await sql.query(`delete from phone_otps where phone_e164 = $1`, [e164]);
+}

@@ -9,11 +9,13 @@ import {
   collectRoutePathsFromTree,
   installPreviewHostBridge,
 } from "@/lib/preview-host-bridge";
+import { restoreSessionBearer } from "@/lib/session-bearer";
 
 export function PreviewHostBridge() {
   const router = useRouter();
 
   useEffect(() => {
+    restoreSessionBearer();
     return installPreviewHostBridge({
       navigate: (path) => {
         router.history.push(path);

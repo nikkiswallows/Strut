@@ -10,7 +10,6 @@ export type OnboardingDraft = {
   identities: string[];
   pronouns: string[];
   role: string;
-  ethnicity: string;
   lookingFor: string[];
   photos: string[];
   bio: string;
@@ -35,7 +34,6 @@ export function readOnboardingDraft(): OnboardingDraft | null {
       identities: Array.isArray(parsed.identities) ? parsed.identities : [],
       pronouns: Array.isArray(parsed.pronouns) ? parsed.pronouns : [],
       role: parsed.role ?? "Switch",
-      ethnicity: parsed.ethnicity ?? "",
       lookingFor: Array.isArray(parsed.lookingFor) ? parsed.lookingFor : ["Dates"],
       photos: Array.isArray(parsed.photos) ? parsed.photos : [],
       bio: parsed.bio ?? "",

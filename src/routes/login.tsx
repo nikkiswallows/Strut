@@ -73,9 +73,14 @@ function Login() {
       } catch {
         /* session store recovers on next fetch */
       }
-      window.location.href = join ? "/onboarding" : "/discover";
+      window.location.replace(join ? "/onboarding" : "/discover");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong.");
+      const raw = err instanceof Error ? err.message : "Something went wrong.";
+      toast.error(
+        /invalid origin/i.test(raw)
+          ? "This page couldn't verify the sign-in. Refresh and try email or phone again."
+          : raw,
+      );
       setBusy(false);
     }
   }
@@ -174,11 +179,23 @@ function Login() {
                     key={p.providerId}
                     variant="outline"
                     className="h-12 w-full"
-                    onClick={() => signIn(p.providerId, { callbackURL: "/discover" })}
+                    onClick={() => {
+                      void signIn(p.providerId, { callbackURL: "/discover" }).catch((err) => {
+                        toast.error(
+                          err instanceof Error
+                            ? err.message
+                            : "Could not start that sign-in. Use email or phone.",
+                        );
+                      });
+                    }}
                   >
                     Continue with {p.label}
                   </Button>
                 ))}
+                <p className="pt-1 text-center text-[11px] leading-relaxed text-subtle">
+                  If Google or X show "invalid redirect", stay here and use email or
+                  phone. That session stays on this site.
+                </p>
                 <Button
                   variant="ghost"
                   className="h-12 w-full"

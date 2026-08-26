@@ -8,8 +8,8 @@ import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { queryClient } from "@/lib/query-client";
 import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
@@ -65,33 +65,83 @@ function Onboarding() {
 
   useEffect(() => {
     if (hydrated || me.isPending) return;
-    const name = me.data?.displayName || user?.displayName || "";
+    const draft = readOnboardingDraft();
+    const name = me.data?.displayName || user?.displayName || draft?.displayName || "";
     if (name) {
       setDisplayName(name);
-      setHandle(slugifyHandle(me.data?.handle || name));
+      setHandle(slugifyHandle(me.data?.handle || draft?.handle || name));
     }
     if (me.data) {
-      setAge(me.data.age ? String(me.data.age) : "24");
+      setAge(me.data.age ? String(me.data.age) : draft?.age || "24");
       setHideAge(me.data.hideAge);
-      setLocation(me.data.location ?? "");
-      setIdentities(me.data.identities.length ? me.data.identities : ["T-Girl"]);
-      setPronouns(me.data.pronouns.length ? me.data.pronouns : ["she/her"]);
-      setRole(me.data.role ?? "Switch");
-      setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : ["Dates"]);
-      setPhotos(me.data.photos.length ? me.data.photos : []);
-      setBio(me.data.bio);
-      setInterests(me.data.interests);
-      setHeightCm(me.data.heightCm ? String(me.data.heightCm) : "");
+      setLocation(me.data.location ?? draft?.location ?? "");
+      setIdentities(me.data.identities.length ? me.data.identities : draft?.identities?.length ? draft.identities : ["T-Girl"]);
+      setPronouns(me.data.pronouns.length ? me.data.pronouns : draft?.pronouns?.length ? draft.pronouns : ["she/her"]);
+      setRole(me.data.role ?? draft?.role ?? "Switch");
+      setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : draft?.lookingFor?.length ? draft.lookingFor : ["Dates"]);
+      setPhotos(me.data.photos.length ? me.data.photos : draft?.photos ?? []);
+      setBio(me.data.bio || draft?.bio || "");
+      setInterests(me.data.interests.length ? me.data.interests : draft?.interests ?? []);
+      setHeightCm(me.data.heightCm ? String(me.data.heightCm) : draft?.heightCm ?? "");
+    } else if (draft) {
+      setAge(draft.age);
+      setHideAge(draft.hideAge);
+      setLocation(draft.location);
+      setIdentities(draft.identities.length ? draft.identities : ["T-Girl"]);
+      setPronouns(draft.pronouns.length ? draft.pronouns : ["she/her"]);
+      setRole(draft.role);
+      setLookingFor(draft.lookingFor.length ? draft.lookingFor : ["Dates"]);
+      setPhotos(draft.photos);
+      setBio(draft.bio);
+      setInterests(draft.interests);
+      setHeightCm(draft.heightCm);
+      setStep(draft.step);
     }
     setHydrated(true);
   }, [hydrated, me.data, me.isPending, user]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    writeOnboardingDraft({
+      step,
+      displayName,
+      handle,
+      age,
+      hideAge,
+      location,
+      identities,
+      pronouns,
+      role,
+      lookingFor,
+      photos,
+      bio,
+      interests,
+      heightCm,
+    });
+  }, [
+    hydrated,
+    step,
+    displayName,
+    handle,
+    age,
+    hideAge,
+    location,
+    identities,
+    pronouns,
+    role,
+    lookingFor,
+    photos,
+    bio,
+    interests,
+    heightCm,
+  ]);
 
   const save = useMutation({
     mutationFn: () =>
       saveMyProfile({
         data: {
           displayName,
-          handle,
+          handle: handle.length >= 3 ? handle : slugifyHandle(displayName),
           age: Number(age) || 18,
           hideAge,
           location,
@@ -107,13 +157,30 @@ function Onboarding() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
+      clearOnboardingDraft();
       toast.success("You're in the order.");
       navigate({ to: "/discover" });
     },
     onError: (err: Error) => {
+      writeOnboardingDraft({
+        step,
+        displayName,
+        handle,
+        age,
+        hideAge,
+        location,
+        identities,
+        pronouns,
+        role,
+        lookingFor,
+        photos,
+        bio,
+        interests,
+        heightCm,
+      });
       if (err.message === "Unauthorized") {
-        toast.error("Session dropped. Sign in again and we'll pick this up.");
-        void signOut("/login");
+        toast.error("Sign in again — your profile draft is saved on this phone.");
+        window.location.replace("/login");
         return;
       }
       toast.error(err.message);

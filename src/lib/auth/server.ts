@@ -33,7 +33,7 @@ import { betterAuth } from "better-auth";
 import { bearer, genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { Pool } from "pg";
 import { ensureDbReady, getPglite } from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
@@ -70,6 +70,17 @@ const env = (key: string): string | undefined => {
   return value ? value : undefined;
 };
 
+function sessionSecret(): string {
+  const injected = env("BETTER_AUTH_SECRET");
+  if (injected) return injected;
+  // Serverless cold starts must not mint a new secret or every session dies.
+  const db = env("DATABASE_URL");
+  if (db) {
+    return createHash("sha256").update(`strut.better-auth.v1:${db}`).digest("hex");
+  }
+  return previewAuthSecret();
+}
+
 // Explicit off-switch. The deployer sets `VITE_AUTH_ENABLED=true` when it
 // provisions auth; set it to "false" to force auth off everywhere (dev user).
 const authDisabled = env("VITE_AUTH_ENABLED") === "false";
@@ -91,7 +102,50 @@ export const authConfigured =
 // it derives the origin per-request from the (proxied) host, validated against the
 // preview allowlist, which makes the OAuth `redirect_uri` the concrete preview URL
 // the broker's preview client accepts.
-const explicitBaseURL = env("BETTER_AUTH_URL");
+function originOf(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    return new URL(value.includes("://") ? value : `https://${value}`).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function deployedHostOrigins(): string[] {
+  const out: string[] = [];
+  const vercelUrl = env("VERCEL_URL");
+  if (vercelUrl) {
+    const origin = originOf(vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`);
+    if (origin) out.push(origin);
+  }
+  const vercelProd = env("VERCEL_PROJECT_PRODUCTION_URL");
+  if (vercelProd) {
+    const origin = originOf(vercelProd.includes("://") ? vercelProd : `https://${vercelProd}`);
+    if (origin) out.push(origin);
+  }
+  return out;
+}
+
+function hostOf(origin: string): string {
+  try {
+    return new URL(origin).host.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isAppHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/:\d+$/, "");
+  if (!h) return false;
+  if (h === "localhost" || h === "127.0.0.1" || h === "[::1]") return true;
+  if (h.endsWith(".vercel.app") || h === "vercel.app") return true;
+  if (h.endsWith(".grok-sandbox.com")) return true;
+  const explicitHost = explicitBaseURL ? hostOf(explicitBaseURL) : "";
+  if (explicitHost && h === explicitHost) return true;
+  return deployedHostOrigins().some((origin) => hostOf(origin) === h);
+}
+
+const explicitBaseURL = env("BETTER_AUTH_URL")?.replace(/\/+$/, "") || undefined;
 // Explicit `string[]` (not a readonly tuple) — Better Auth's DynamicBaseURLConfig
 // requires a mutable `allowedHosts: string[]`.
 const previewAllowedHosts: string[] = [...PREVIEW_ALLOWED_HOSTS];
@@ -103,27 +157,67 @@ const LOCAL_DEV_ORIGINS: string[] = [
   "http://127.0.0.1:8080",
   "http://[::1]:8080",
 ];
-const baseURL = explicitBaseURL ?? {
-  // Include loopback hosts so dynamic baseURL resolves for local email/password
-  // (not only the preview wildcard).
-  allowedHosts: [...previewAllowedHosts, "localhost", "127.0.0.1", "[::1]"],
-  // `auto` → trust both http:// and https:// expansions of allowedHosts
-  // (preview is https; local dev is http).
+const DEPLOY_ORIGIN_PATTERNS: string[] = [
+  "https://*.vercel.app",
+  "*.vercel.app",
+  "https://strut-zeta.vercel.app",
+];
+const allowedHosts: string[] = [
+  ...previewAllowedHosts,
+  "localhost",
+  "127.0.0.1",
+  "[::1]",
+  "*.vercel.app",
+  ...deployedHostOrigins().map((origin) => hostOf(origin)).filter(Boolean),
+  ...(explicitBaseURL ? [hostOf(explicitBaseURL)] : []),
+].filter((value, index, all) => Boolean(value) && all.indexOf(value) === index);
+
+// Always derive the origin from the request so Vercel aliases, preview URLs,
+// and BETTER_AUTH_URL cannot disagree. OAuth redirect_uri follows this host.
+const baseURL = {
+  allowedHosts,
   protocol: "auto" as const,
-  fallback: "http://localhost:8080",
+  fallback: explicitBaseURL || "http://localhost:8080",
 };
 
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
-const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
-  : [
-      // Host wildcards (matched against Origin's host)
-      ...previewAllowedHosts,
-      // Full-origin wildcards (matched against Origin)
-      ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
-      ...LOCAL_DEV_ORIGINS,
-    ];
+// Always include this request's own host: BETTER_AUTH_URL may be a grok.me
+// URL while people open the Vercel alias.
+const staticTrustedOrigins: string[] = [
+  ...(explicitBaseURL ? [originOf(explicitBaseURL) ?? explicitBaseURL] : []),
+  ...previewAllowedHosts,
+  ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
+  ...LOCAL_DEV_ORIGINS,
+  ...DEPLOY_ORIGIN_PATTERNS,
+  ...deployedHostOrigins(),
+].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
+
+const trustedOrigins = async (request?: Request): Promise<string[]> => {
+  const origins = [...staticTrustedOrigins];
+  const add = (value: string | undefined) => {
+    if (!value || origins.includes(value)) return;
+    origins.push(value);
+  };
+  if (!request) return origins;
+  try {
+    const url = new URL(request.url);
+    add(url.origin);
+    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+    const forwardedProto =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+      (url.protocol === "http:" ? "http" : "https");
+    if (forwardedHost) add(`${forwardedProto}://${forwardedHost}`);
+    for (const raw of [request.headers.get("origin"), request.headers.get("referer")]) {
+      if (!raw || raw === "null") continue;
+      const parsed = originOf(raw);
+      if (parsed && isAppHost(hostOf(parsed))) add(parsed);
+    }
+  } catch {
+    /* ignore malformed request URLs */
+  }
+  return origins;
+};
 
 const databaseUrl = env("DATABASE_URL");
 
@@ -176,7 +270,9 @@ export const auth = betterAuth({
   baseURL,
   // Deployed apps inject BETTER_AUTH_SECRET. Preview: process-stable secret on
   // globalThis so HMR doesn't invalidate PGLite-backed sessions (see above).
-  secret: env("BETTER_AUTH_SECRET") ?? previewAuthSecret(),
+  // Vercel without an injected secret: derive from DATABASE_URL so every
+  // serverless isolate signs with the same key.
+  secret: sessionSecret(),
   database,
 
   // CSRF / origin check for credentialed auth POSTs (email sign-up/sign-in, …).

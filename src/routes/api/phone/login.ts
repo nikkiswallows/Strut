@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { completePhoneLogin } from "@/lib/server/phone";
+import { completePhoneLogin } from "@/lib/server/phone-login.server";
 
 export const Route = createFileRoute("/api/phone/login")({
   server: {
