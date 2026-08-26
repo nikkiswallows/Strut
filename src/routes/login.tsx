@@ -42,43 +42,37 @@ function Login() {
     if (!authEnabled) return;
     setBusy(true);
     try {
-      if (join) {
-        const { data, error } = await authClient.signUp.email({
+      const res = await fetch("/api/email/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
           email,
           password,
-          name: name.trim() || email.split("@")[0]!,
-          fetchOptions: {
-            onSuccess(ctx) {
-              captureAuthToken(undefined, ctx.response);
-            },
-          },
-        });
-        if (error) throw new Error(error.message ?? "Could not create account.");
-        captureAuthToken(data);
-      } else {
-        const { data, error } = await authClient.signIn.email({
-          email,
-          password,
-          fetchOptions: {
-            onSuccess(ctx) {
-              captureAuthToken(undefined, ctx.response);
-            },
-          },
-        });
-        if (error) throw new Error(error.message ?? "Could not sign in.");
-        captureAuthToken(data);
+          name: name.trim() || email.split("@")[0],
+          join,
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        token?: string;
+        isNew?: boolean;
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        throw new Error(payload?.error || "Could not sign in.");
       }
+      captureAuthToken(payload, res);
       try {
         await authClient.getSession();
       } catch {
         /* session store recovers on next fetch */
       }
-      window.location.replace(join ? "/onboarding" : "/discover");
+      window.location.replace(payload?.isNew || join ? "/onboarding" : "/discover");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Something went wrong.";
       toast.error(
         /invalid origin/i.test(raw)
-          ? "This page couldn't verify the sign-in. Refresh and try email or phone again."
+          ? "This page couldn't verify the sign-in. Refresh and try again."
           : raw,
       );
       setBusy(false);

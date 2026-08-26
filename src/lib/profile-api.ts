@@ -6,6 +6,22 @@ async function hydrateToken(): Promise<string | null> {
   const existing = getBearerToken();
   if (existing) return existing;
   try {
+    const sessionRes = await fetch("/api/auth/get-session", {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    const session = (await sessionRes.json().catch(() => null)) as {
+      session?: { token?: string };
+    } | null;
+    if (session?.session?.token) {
+      storeSessionBearer(session.session.token);
+      return session.session.token;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
     const res = await fetch("/api/session/token", {
       credentials: "same-origin",
       cache: "no-store",
@@ -21,20 +37,19 @@ async function hydrateToken(): Promise<string | null> {
   return getBearerToken();
 }
 
-function authHeaders(): HeadersInit {
-  const token = getBearerToken();
+function authHeaders(token: string | null): HeadersInit {
   return {
     accept: "application/json",
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...(token ? { authorization: `Bearer ${token}`, "x-strut-session": token } : {}),
   };
 }
 
 export async function fetchMyProfile() {
-  await hydrateToken();
+  const token = await hydrateToken();
   const res = await fetch("/api/profile", {
     credentials: "same-origin",
     cache: "no-store",
-    headers: authHeaders(),
+    headers: authHeaders(token),
   });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error("Could not load your profile.");
@@ -42,15 +57,15 @@ export async function fetchMyProfile() {
 }
 
 export async function postProfile(input: ProfileInput) {
-  await hydrateToken();
+  const token = await hydrateToken();
   const res = await fetch("/api/profile", {
     method: "POST",
     credentials: "same-origin",
     headers: {
       "content-type": "application/json",
-      ...authHeaders(),
+      ...authHeaders(token),
     },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, sessionToken: token }),
   });
   const payload = (await res.json().catch(() => null)) as
     | { error?: string }

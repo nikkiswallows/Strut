@@ -59,12 +59,16 @@ export async function getSessionUser(
 ): Promise<VerifiedUser | null> {
   if (!authConfigured && !gateIdentityEnabled()) return null;
   const request = getRequest();
+  if (!request && !bearerToken) return null;
+  const { userIdFromRequest } = await import("./session-from-request.server");
   const headers = new Headers(request?.headers ?? undefined);
   if (bearerToken) headers.set("Authorization", `Bearer ${bearerToken}`);
-  if (!headers.has("cookie") && !headers.has("authorization")) return null;
-  const session = await auth.api.getSession({ headers });
-  if (!session?.user) return null;
-  return { id: session.user.id, email: session.user.email ?? null };
+  const synthetic = new Request(request?.url ?? "https://strut.local/session", {
+    headers,
+  });
+  const id = await userIdFromRequest(synthetic, bearerToken);
+  if (!id) return null;
+  return { id, email: null };
 }
 
 /**

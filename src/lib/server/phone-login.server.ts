@@ -1,4 +1,6 @@
 import { getSql } from "@/lib/db";
+import { publicOrigin } from "@/lib/auth/public-origin.server";
+import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 import {
   cleanVerify,
   consumePhoneOtp,
@@ -52,15 +54,7 @@ async function betterAuthEmail(
   opts: { email: string; password: string; name: string; signUp: boolean },
 ): Promise<{ token: string; cookies: string[] }> {
   const { auth } = await import("@/lib/auth/server");
-  const origin =
-    request.headers.get("origin") ||
-    (() => {
-      try {
-        return new URL(request.url).origin;
-      } catch {
-        return "http://localhost:8080";
-      }
-    })();
+  const origin = publicOrigin(request);
   const path = opts.signUp ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email";
   const body = opts.signUp
     ? JSON.stringify({ email: opts.email, password: opts.password, name: opts.name, rememberMe: true })
@@ -123,15 +117,19 @@ async function createPhoneSession(
     }
   }
 
-  const { auth } = await import("@/lib/auth/server");
-  const session = await auth.api.getSession({
-    headers: (() => {
-      const next = new Headers(request.headers);
-      next.set("Authorization", `Bearer ${token}`);
-      return next;
-    })(),
-  });
-  const userId = session?.user?.id;
+  const headers = new Headers(request.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  for (const cookie of cookies) {
+    const match = cookie.match(/^([^;=]+)=([^;]+)/);
+    if (match) {
+      const existingCookie = headers.get("cookie") ?? "";
+      headers.set(
+        "cookie",
+        existingCookie ? `${existingCookie}; ${match[1]}=${match[2]}` : `${match[1]}=${match[2]}`,
+      );
+    }
+  }
+  const userId = await userIdFromRequest(new Request(request.url, { headers }), token);
   if (!userId) throw new Error("Could not create your account.");
 
   await sql.query(
@@ -158,4 +156,31 @@ export async function completePhoneLogin(
     isNew: session.isNew,
     cookies: session.cookies,
   };
+}
+
+export async function completeEmailLogin(
+  input: { email: string; password: string; name?: string; join: boolean },
+  request: Request,
+): Promise<{ token: string; isNew: boolean; cookies: string[] }> {
+  const email = input.email.trim().toLowerCase();
+  const password = input.password;
+  const name = input.name?.trim() || email.split("@")[0] || "Member";
+  if (!email.includes("@")) throw new Error("Enter a valid email.");
+  if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+
+  if (input.join) {
+    try {
+      const signed = await betterAuthEmail(request, { email, password, name, signUp: true });
+      return { ...signed, isNew: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (/already|exists|registered/i.test(message)) {
+        const signed = await betterAuthEmail(request, { email, password, name, signUp: false });
+        return { ...signed, isNew: false };
+      }
+      throw err;
+    }
+  }
+  const signed = await betterAuthEmail(request, { email, password, name, signUp: false });
+  return { ...signed, isNew: false };
 }

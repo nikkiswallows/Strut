@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { auth } from "@/lib/auth/server";
+import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 import { getSql } from "@/lib/db";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "@/lib/server/map";
 import { writeProfileForUser, type ProfileInput } from "@/lib/server/profiles";
 import { ensureSeed } from "@/lib/server/seed";
 
-async function userIdFrom(request: Request): Promise<string | null> {
-  const session = await auth.api.getSession({ headers: request.headers });
-  return session?.user?.id ?? null;
+type ProfileBody = ProfileInput & { sessionToken?: string | null };
+
+async function userIdFrom(request: Request, extra?: string | null): Promise<string | null> {
+  return userIdFromRequest(request, extra);
 }
 
 export const Route = createFileRoute("/api/profile")({
@@ -28,12 +29,13 @@ export const Route = createFileRoute("/api/profile")({
       },
       POST: async ({ request }) => {
         try {
-          const userId = await userIdFrom(request);
+          const input = (await request.json()) as ProfileBody;
+          const userId = await userIdFrom(request, input.sessionToken);
           if (!userId) {
             return Response.json({ error: "Unauthorized" }, { status: 401 });
           }
-          const input = (await request.json()) as ProfileInput;
-          const profile = await writeProfileForUser(userId, input);
+          const { sessionToken: _ignored, ...profileInput } = input;
+          const profile = await writeProfileForUser(userId, profileInput);
           return Response.json(profile, {
             headers: { "cache-control": "no-store" },
           });

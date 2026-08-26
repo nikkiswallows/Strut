@@ -4,7 +4,7 @@ import { Compass, Heart, MessageCircle, Newspaper, UserRound } from "lucide-reac
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { getMyProfile } from "@/lib/server/profiles";
+import { fetchMyProfile } from "@/lib/profile-api";
 import { listConversations } from "@/lib/server/messages";
 import { cn } from "@/lib/utils";
 import { Logo, Mark } from "./logo";
@@ -25,7 +25,7 @@ export function AppShell() {
 
   const me = useQuery({
     queryKey: ["me"],
-    queryFn: () => getMyProfile(),
+    queryFn: () => fetchMyProfile(),
     enabled: Boolean(user),
   });
   const inbox = useQuery({

@@ -39,10 +39,12 @@ export function clearSessionBearer(): void {
 }
 
 export function captureAuthToken(data: unknown, response?: Response | null): void {
-  const fromBody =
-    data && typeof data === "object" && "token" in data
-      ? String((data as AuthPayload).token ?? "")
+  const obj = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+  const nested =
+    obj?.session && typeof obj.session === "object"
+      ? String((obj.session as { token?: string }).token ?? "")
       : "";
+  const fromBody = String(obj?.token ?? "") || nested;
   const fromHeader = response?.headers.get("set-auth-token") ?? "";
   storeSessionBearer(fromBody || fromHeader || null);
 }
