@@ -116,6 +116,9 @@ function ProfilePage() {
           {p.role ? (
             <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-fg">{p.role}</span>
           ) : null}
+          {p.ethnicity ? (
+            <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">{p.ethnicity}</span>
+          ) : null}
           {p.identities.map((id) => (
             <span key={id} className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
               {id}

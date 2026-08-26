@@ -22,9 +22,9 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Strut — dating for T-girls, sissies, trans women, and the people who want them. Walk in. Be seen.",
+          "Strut — 18+ dating for BNWO, cuckold, T-girls, sissies, trans women, and the people who want them. Walk in. Be seen.",
       },
-      { name: "theme-color", content: "#0b090c" },
+      { name: "theme-color", content: "#090808" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "mobile-web-app-capable", content: "yes" },
@@ -35,7 +35,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Outfit:wght@300;400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500;600;700&display=swap",
       },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
@@ -60,9 +60,9 @@ function RootDocument() {
               position="top-center"
               toastOptions={{
                 style: {
-                  background: "#1f1a1e",
-                  color: "#f4ecee",
-                  border: "1px solid #2c2529",
+                  background: "#1c1916",
+                  color: "#f4eee6",
+                  border: "1px solid #2a2520",
                 },
               }}
             />

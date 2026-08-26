@@ -5,7 +5,7 @@ export function Mark({ className }: { className?: string }) {
     <svg viewBox="0 0 32 32" className={cn("text-accent", className)} fill="none" aria-hidden>
       <rect width="32" height="32" rx="8" fill="currentColor" />
       <path
-        d="M10.2 11.6c0-2.4 2.1-4.1 5.4-4.1 3.1 0 5.2 1.5 5.6 3.7h-2.6c-.3-1-.9-1.6-3-1.6-1.7 0-2.6.7-2.6 1.7 0 .9.7 1.4 2.8 1.8l1.6.3c3.3.7 5.2 2.1 5.2 4.7 0 2.8-2.4 4.6-6.1 4.6-3.6 0-5.9-1.8-6.3-4.3h2.7c.3 1.2 1.3 2.1 3.6 2.1 2 0 3.3-.8 3.3-2.1 0-1.1-.8-1.6-3.1-2.1l-1.6-.3c-3.1-.7-4.9-2.1-4.9-4.7Z"
+        d="M16 6.2c.4 0 6.6 7.2 6.6 11.4 0 2.4-1.7 4-3.8 4.2 1.1 1.6 1.8 3.2 2.4 4.2h-10.4c.6-1 1.3-2.6 2.4-4.2C10.1 21.6 8.4 20 8.4 17.6 8.4 13.4 15.6 6.2 16 6.2Z"
         fill="currentColor"
         className="text-accent-fg"
       />
@@ -15,7 +15,7 @@ export function Mark({ className }: { className?: string }) {
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("font-display font-medium tracking-[0.22em] uppercase leading-none", className)}>
+    <span className={cn("font-display font-medium tracking-[0.28em] uppercase leading-none", className)}>
       Strut
     </span>
   );

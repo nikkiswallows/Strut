@@ -9,6 +9,10 @@ export const IDENTITIES = [
   "Questioning",
   "Woman",
   "Man",
+  "Bull",
+  "Cuckold",
+  "Hotwife",
+  "Queen of Spades",
   "Admirer",
   "Couple",
   "Group",
@@ -20,7 +24,22 @@ export const PRONOUNS = ["she/her", "they/them", "she/they", "he/him", "he/they"
 
 export const ROLES = ["Top", "Bottom", "Switch", "Side"] as const;
 
+export const ETHNICITIES = [
+  "Black",
+  "White",
+  "Latino",
+  "Asian",
+  "Middle Eastern",
+  "Mixed",
+  "Other",
+] as const;
+
 export const INTERESTS = [
+  "BNWO",
+  "Cuckold",
+  "Interracial",
+  "BBC",
+  "Hotwife",
   "Fashion",
   "Heels",
   "Makeup",
@@ -38,21 +57,17 @@ export const INTERESTS = [
   "Karaoke",
   "Vintage",
   "Lingerie",
-  "BNWO",
-  "Cuckold",
-  "BBC",
   "Daddies",
-  "Hotwife",
 ] as const;
 
 export const DISCOVER_TABS = [
   { id: "nearby", label: "Nearby", match: [] as string[] },
-  { id: "trans", label: "Trans", match: ["T-Girl", "Trans woman"] },
-  { id: "sissies", label: "Sissies", match: ["Sissy"] },
-  { id: "crossdressers", label: "CDs", match: ["Crossdresser"] },
-  { id: "femboys", label: "Femboys", match: ["Femboy"] },
+  { id: "sissies", label: "Sissies", match: ["Sissy", "Crossdresser", "Femboy"] },
+  { id: "tgirls", label: "T-Girls", match: ["T-Girl", "Trans woman"] },
+  { id: "bulls", label: "Bulls", match: ["Bull"] },
   { id: "men", label: "Men", match: ["Man", "Admirer"] },
-  { id: "women", label: "Women", match: ["Woman"] },
+  { id: "women", label: "Women", match: ["Woman", "Hotwife", "Queen of Spades"] },
+  { id: "cucks", label: "Cucks", match: ["Cuckold"] },
   { id: "couples", label: "Couples", match: ["Couple"] },
   { id: "groups", label: "Groups", match: ["Group"] },
 ] as const;
@@ -63,6 +78,7 @@ export type DiscoverTab = (typeof DISCOVER_TABS)[number]["id"];
 export type Identity = (typeof IDENTITIES)[number];
 export type LookingFor = (typeof LOOKING_FOR)[number];
 export type Role = (typeof ROLES)[number];
+export type Ethnicity = (typeof ETHNICITIES)[number];
 
 export type Profile = {
   id: number;
@@ -74,6 +90,7 @@ export type Profile = {
   identities: string[];
   pronouns: string[];
   role: string | null;
+  ethnicity: string | null;
   bio: string;
   location: string | null;
   lookingFor: string[];
@@ -108,6 +125,10 @@ export function pronounLine(profile: Pick<Profile, "pronouns">): string {
 
 export function roleLine(profile: Pick<Profile, "role">): string | null {
   return profile.role?.trim() || null;
+}
+
+export function ethnicityLine(profile: Pick<Profile, "ethnicity">): string | null {
+  return profile.ethnicity?.trim() || null;
 }
 
 export function lookingLine(profile: Pick<Profile, "lookingFor">): string | null {

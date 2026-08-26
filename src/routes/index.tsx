@@ -45,8 +45,8 @@ function Home() {
             Be seen.
           </h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
-            Strut is for T-girls, sissies, trans women — and the men, women, and
-            couples who actually want them. Dates, nights, and attention that lands.
+            Strut is dating for BNWO, cuckold, T-girls, sissies, trans women — and
+            the men, women, couples, and groups who actually want them.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link to="/login" search={{ mode: "join" }}>
@@ -68,7 +68,7 @@ function Home() {
         <div className="mx-auto max-w-6xl px-5">
           <div className="mb-6">
             <p className="text-xs tracking-[0.28em] text-subtle uppercase">Already in the room</p>
-            <h2 className="mt-1 font-display text-5xl">T-girls, sissies, admirers, couples.</h2>
+            <h2 className="mt-1 font-display text-5xl">Bulls, sissies, wives, cucks, T-girls.</h2>
           </div>
           <div className="hide-scrollbar -mx-5 flex gap-3 overflow-x-auto px-5 pb-2">
             {(featured.data ?? []).map((p) => {
@@ -91,7 +91,7 @@ function Home() {
                     <div className="absolute inset-x-0 bottom-0 p-3">
                       <p className="font-display text-lg leading-tight">{p.displayName}</p>
                       <p className="text-[11px] text-muted">
-                        {[p.identities[0], age, p.role].filter(Boolean).join(" · ")}
+                        {[p.identities[0], p.ethnicity, age, p.role].filter(Boolean).join(" · ")}
                       </p>
                     </div>
                   </div>
@@ -115,7 +115,7 @@ function Home() {
               {[
                 {
                   title: "Discover",
-                  body: "People near you — T-girls, sissies, men, women, couples — with top, bottom, or switch on the profile.",
+                  body: "People near you — sissies, T-girls, bulls, wives, cucks, couples, groups — with top, bottom, or switch on the card.",
                 },
                 {
                   title: "Like & match",

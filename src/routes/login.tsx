@@ -28,7 +28,7 @@ function Login() {
   const { mode } = Route.useSearch();
   const { user, isPending } = useCurrentUserState();
   const [join, setJoin] = useState(mode === "join");
-  const [method, setMethod] = useState<"phone" | "email">("phone");
+  const [method, setMethod] = useState<"phone" | "email">("email");
   const [phonePhase, setPhonePhase] = useState<"number" | "code">("number");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -174,7 +174,7 @@ function Login() {
                     key={p.providerId}
                     variant="outline"
                     className="h-12 w-full"
-                    onClick={() => signIn(p.providerId, { callbackURL: "/discover" })}
+                    onClick={() => signIn(p.providerId, { callbackURL: "/onboarding" })}
                   >
                     Continue with {p.label}
                   </Button>

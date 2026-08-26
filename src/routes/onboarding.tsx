@@ -13,8 +13,18 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
 import { listTags } from "@/lib/server/catalog";
 import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
-import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
+import { ETHNICITIES, IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
+
+function defaultPronouns(ids: string[]): string[] {
+  const id = ids[0];
+  if (!id) return [];
+  if (id === "Bull" || id === "Man" || id === "Cuckold" || id === "Admirer") return ["he/him"];
+  if (id === "Femboy") return ["he/they"];
+  if (id === "Couple" || id === "Group") return ["they/them"];
+  if (id === "Sissy" || id === "Crossdresser") return ["she/they"];
+  return ["she/her"];
+}
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
 
@@ -53,9 +63,10 @@ function Onboarding() {
   const [age, setAge] = useState("24");
   const [hideAge, setHideAge] = useState(false);
   const [location, setLocation] = useState("");
-  const [identities, setIdentities] = useState<string[]>(["T-Girl"]);
-  const [pronouns, setPronouns] = useState<string[]>(["she/her"]);
+  const [identities, setIdentities] = useState<string[]>([]);
+  const [pronouns, setPronouns] = useState<string[]>([]);
   const [role, setRole] = useState("Switch");
+  const [ethnicity, setEthnicity] = useState("");
   const [lookingFor, setLookingFor] = useState<string[]>(["Dates"]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
@@ -74,9 +85,10 @@ function Onboarding() {
       setAge(me.data.age ? String(me.data.age) : "24");
       setHideAge(me.data.hideAge);
       setLocation(me.data.location ?? "");
-      setIdentities(me.data.identities.length ? me.data.identities : ["T-Girl"]);
-      setPronouns(me.data.pronouns.length ? me.data.pronouns : ["she/her"]);
+      setIdentities(me.data.identities.length ? me.data.identities : []);
+      setPronouns(me.data.pronouns.length ? me.data.pronouns : []);
       setRole(me.data.role ?? "Switch");
+      setEthnicity(me.data.ethnicity ?? "");
       setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : ["Dates"]);
       setPhotos(me.data.photos.length ? me.data.photos : []);
       setBio(me.data.bio);
@@ -91,13 +103,14 @@ function Onboarding() {
       saveMyProfile({
         data: {
           displayName,
-          handle,
+          handle: handle.length >= 3 ? handle : slugifyHandle(displayName),
           age: Number(age) || 18,
           hideAge,
           location,
           identities,
           pronouns,
           role,
+          ethnicity: ethnicity || null,
           lookingFor,
           photos,
           bio,
@@ -137,7 +150,9 @@ function Onboarding() {
             <button
               key={label}
               type="button"
-              onClick={() => setStep(i)}
+              onClick={() => {
+                if (i <= step) setStep(i);
+              }}
               className="flex-1 transition-transform duration-150 ease-out active:scale-[0.96]"
             >
               <span
@@ -224,10 +239,13 @@ function Onboarding() {
               <h1 className="font-display text-5xl leading-[0.92]">Identity</h1>
               <MultiChips
                 label="Identity"
-                hint="Trans, sissy, man, woman, couple, group — or type your own."
+                hint="Sissy, T-girl, bull, hotwife, cuck, couple — pick what fits."
                 options={identityTags.data ?? [...IDENTITIES]}
                 value={identities}
-                onChange={setIdentities}
+                onChange={(next) => {
+                  setIdentities(next);
+                  if (pronouns.length === 0 && next[0]) setPronouns(defaultPronouns(next));
+                }}
                 kind="identity"
               />
               <MultiChips
@@ -239,6 +257,16 @@ function Onboarding() {
                 max={6}
               />
               <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
+              <div>
+                <SingleChips
+                  label="Ethnicity"
+                  options={[...ETHNICITIES]}
+                  value={ethnicity}
+                  onChange={setEthnicity}
+                  allowEmpty
+                />
+                <p className="mt-2 text-xs text-subtle">Optional. Tap again to clear.</p>
+              </div>
               <MultiChips
                 label="Looking for"
                 hint="Pick as many as you want."
@@ -295,9 +323,13 @@ function Onboarding() {
             <Button
               className="flex-1"
               onClick={() => {
-                if (step === 0 && (displayName.trim().length < 2 || handle.length < 3)) {
-                  toast.error("Name and a handle, please.");
-                  return;
+                if (step === 0) {
+                  const nextHandle = handle.length >= 3 ? handle : slugifyHandle(displayName);
+                  if (displayName.trim().length < 2 || nextHandle.length < 3) {
+                    toast.error("Name and a handle, please.");
+                    return;
+                  }
+                  if (nextHandle !== handle) setHandle(nextHandle);
                 }
                 if (step === 1 && identities.length === 0) {
                   toast.error("Pick at least one identity.");
@@ -313,7 +345,30 @@ function Onboarding() {
               Continue
             </Button>
           ) : (
-            <Button className="flex-1" disabled={save.isPending} onClick={() => save.mutate()}>
+            <Button
+              className="flex-1"
+              disabled={save.isPending}
+              onClick={() => {
+                const nextHandle = handle.length >= 3 ? handle : slugifyHandle(displayName);
+                if (displayName.trim().length < 2 || nextHandle.length < 3) {
+                  toast.error("Name and a handle, please.");
+                  setStep(0);
+                  return;
+                }
+                if (identities.length === 0) {
+                  toast.error("Pick at least one identity.");
+                  setStep(1);
+                  return;
+                }
+                if (photos.length === 0) {
+                  toast.error("Add at least one photo of you.");
+                  setStep(2);
+                  return;
+                }
+                if (nextHandle !== handle) setHandle(nextHandle);
+                save.mutate();
+              }}
+            >
               {save.isPending ? "Saving…" : "Enter Strut"}
             </Button>
           )}

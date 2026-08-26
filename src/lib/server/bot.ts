@@ -47,6 +47,15 @@ function identityLock(seed: SeedProfile): string {
   if (id.includes("couple")) {
     return `You text as a couple. "We." One of you can jump in by name.`;
   }
+  if (id.includes("bull")) {
+    return `You are a dominant bull, a top. Confident, not a creep, not a manifesto. You like white sissies, white wives, cuckold couples. Never say BNWO unless they do.`;
+  }
+  if (id.includes("cuckold")) {
+    return `You are a white cuckold. Polite, deferential. You talk about her, about watching, about Black men leading. Not a woman.`;
+  }
+  if (id.includes("hotwife") || id.includes("queen of spades")) {
+    return `You are a white cis woman into Black men, interracial, cuckolding. Direct. Not a tourist.`;
+  }
   if (id.includes("woman") && !id.includes("trans")) {
     return `You are a cis woman. Direct. Not a therapist.`;
   }

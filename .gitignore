@@ -17,6 +17,7 @@ dist/
 .grok/references/
 .grok/og-pending
 .node_modules.lock
+.data/
 
 # QA + source uploads (app photos live in public/)
 screenshots/

@@ -99,7 +99,12 @@ export function ProfileCard({
             ) : null}
           </p>
           <p className="mt-0.5 truncate text-xs text-muted">
-            {[ident, profile.role, distance ?? profile.location?.split(",")[0] ?? "Nearby"]
+            {[
+              profile.identities[0] || ident,
+              profile.ethnicity,
+              profile.role,
+              distance ?? profile.location?.split(",")[0] ?? "Nearby",
+            ]
               .filter(Boolean)
               .join(" · ")}
           </p>

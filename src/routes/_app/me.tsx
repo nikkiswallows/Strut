@@ -18,6 +18,7 @@ import {
   INTERESTS,
   LOOKING_FOR,
   lookingLine,
+  ETHNICITIES,
   pronounLine,
   PRONOUNS,
   ROLES,
@@ -56,6 +57,7 @@ function Me() {
   const [identities, setIdentities] = useState<string[]>([]);
   const [pronouns, setPronouns] = useState<string[]>([]);
   const [role, setRole] = useState("");
+  const [ethnicity, setEthnicity] = useState("");
   const [lookingFor, setLookingFor] = useState<string[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
   const [bio, setBio] = useState("");
@@ -72,6 +74,7 @@ function Me() {
     setIdentities(p.identities);
     setPronouns(p.pronouns);
     setRole(p.role ?? "");
+    setEthnicity(p.ethnicity ?? "");
     setLookingFor(p.lookingFor);
     setPhotos(p.photos);
     setBio(p.bio);
@@ -91,6 +94,7 @@ function Me() {
           identities,
           pronouns,
           role,
+          ethnicity: ethnicity || null,
           lookingFor,
           photos,
           bio,
@@ -152,6 +156,9 @@ function Me() {
                 {p.role}
               </span>
             ) : null}
+            {p.ethnicity ? (
+              <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">{p.ethnicity}</span>
+            ) : null}
             {lookingLine(p) ? (
               <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
                 {lookingLine(p)}
@@ -183,6 +190,10 @@ function Me() {
             e.preventDefault();
             if (photos.length === 0) {
               toast.error("Add at least one photo of you.");
+              return;
+            }
+            if (identities.length === 0) {
+              toast.error("Pick at least one identity.");
               return;
             }
             save.mutate();
@@ -237,6 +248,13 @@ function Me() {
             max={6}
           />
           <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
+          <SingleChips
+            label="Ethnicity"
+            options={[...ETHNICITIES]}
+            value={ethnicity}
+            onChange={setEthnicity}
+            allowEmpty
+          />
           <MultiChips
             label="Looking for"
             hint="Pick as many as you want."

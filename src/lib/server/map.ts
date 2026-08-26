@@ -3,11 +3,11 @@ import { asPhotoList, type Profile } from "@/lib/types";
 
 export const PROFILE_COLS = `id, user_id, handle, display_name, age, identity, pronouns, bio,
   location, looking_for, looking_for_list, photos, interests, height_cm, is_seed,
-  last_active, onboarded, created_at, identities, pronoun_list, hide_age, lat, lng, role`;
+  last_active, onboarded, created_at, identities, pronoun_list, hide_age, lat, lng, role, ethnicity`;
 
 export const PROFILE_COLS_P = `p.id, p.user_id, p.handle, p.display_name, p.age, p.identity, p.pronouns, p.bio,
   p.location, p.looking_for, p.looking_for_list, p.photos, p.interests, p.height_cm, p.is_seed,
-  p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.lat, p.lng, p.role`;
+  p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.lat, p.lng, p.role, p.ethnicity`;
 
 export type ProfileRow = {
   id: number;
@@ -34,6 +34,7 @@ export type ProfileRow = {
   lat?: number | string | null;
   lng?: number | string | null;
   role?: string | null;
+  ethnicity?: string | null;
   liked_by_me?: boolean | number | string | null;
   likes_me?: boolean | number | string | null;
   following?: boolean | number | string | null;
@@ -65,6 +66,7 @@ export function mapProfile(row: ProfileRow): Profile {
     identities: asList(row.identities, row.identity),
     pronouns: asList(row.pronoun_list, row.pronouns),
     role: row.role?.trim() || null,
+    ethnicity: row.ethnicity?.trim() || null,
     bio: row.bio ?? "",
     location: row.location,
     lookingFor: asList(row.looking_for_list, row.looking_for),
