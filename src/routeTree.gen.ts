@@ -25,6 +25,7 @@ import { Route as AppUHandleRouteImport } from './routes/_app/u.$handle'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiEmailLoginRouteImport } from './routes/api/email/login'
 import { Route as ApiPhoneLoginRouteImport } from './routes/api/phone/login'
+import { Route as ApiSessionEnsureRouteImport } from './routes/api/session/ensure'
 import { Route as ApiSessionTokenRouteImport } from './routes/api/session/token'
 
 const IndexRoute = IndexRouteImport.update({
@@ -106,6 +107,11 @@ const ApiPhoneLoginRoute = ApiPhoneLoginRouteImport.update({
   path: '/api/phone/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionEnsureRoute = ApiSessionEnsureRouteImport.update({
+  id: '/api/session/ensure',
+  path: '/api/session/ensure',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSessionTokenRoute = ApiSessionTokenRouteImport.update({
   id: '/api/session/token',
   path: '/api/session/token',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/email/login': typeof ApiEmailLoginRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
+  '/api/session/ensure': typeof ApiSessionEnsureRoute
   '/api/session/token': typeof ApiSessionTokenRoute
   '/inbox/': typeof AppInboxIndexRoute
 }
@@ -144,6 +151,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/email/login': typeof ApiEmailLoginRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
+  '/api/session/ensure': typeof ApiSessionEnsureRoute
   '/api/session/token': typeof ApiSessionTokenRoute
   '/inbox': typeof AppInboxIndexRoute
 }
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/email/login': typeof ApiEmailLoginRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
+  '/api/session/ensure': typeof ApiSessionEnsureRoute
   '/api/session/token': typeof ApiSessionTokenRoute
   '/_app/inbox/': typeof AppInboxIndexRoute
 }
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/email/login'
     | '/api/phone/login'
+    | '/api/session/ensure'
     | '/api/session/token'
     | '/inbox/'
   fileRoutesByTo: FileRoutesByTo
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/email/login'
     | '/api/phone/login'
+    | '/api/session/ensure'
     | '/api/session/token'
     | '/inbox'
   id:
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/email/login'
     | '/api/phone/login'
+    | '/api/session/ensure'
     | '/api/session/token'
     | '/_app/inbox/'
   fileRoutesById: FileRoutesById
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiEmailLoginRoute: typeof ApiEmailLoginRoute
   ApiPhoneLoginRoute: typeof ApiPhoneLoginRoute
+  ApiSessionEnsureRoute: typeof ApiSessionEnsureRoute
   ApiSessionTokenRoute: typeof ApiSessionTokenRoute
 }
 
@@ -350,6 +363,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPhoneLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session/ensure': {
+      id: '/api/session/ensure'
+      path: '/api/session/ensure'
+      fullPath: '/api/session/ensure'
+      preLoaderRoute: typeof ApiSessionEnsureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/session/token': {
       id: '/api/session/token'
       path: '/api/session/token'
@@ -403,6 +423,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiEmailLoginRoute: ApiEmailLoginRoute,
   ApiPhoneLoginRoute: ApiPhoneLoginRoute,
+  ApiSessionEnsureRoute: ApiSessionEnsureRoute,
   ApiSessionTokenRoute: ApiSessionTokenRoute,
 }
 export const routeTree = rootRouteImport

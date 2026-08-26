@@ -7,7 +7,6 @@ import { Logo } from "@/components/logo";
 import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
-import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { queryClient } from "@/lib/query-client";
@@ -185,18 +184,13 @@ function Onboarding() {
         interests,
         heightCm,
       });
-      toast.error(
-        err.message === "Unauthorized"
-          ? "Still signing you in. Stay on this page and tap Enter the order again."
-          : err.message,
-      );
+      toast.error(err.message || "Could not save your profile.");
     },
   });
 
-  if (isPending || me.isPending) {
+  if (isPending || (user && me.isPending)) {
     return <div className="min-h-dvh bg-bg" />;
   }
-  if (!user) return <RedirectToSignIn />;
   if (me.data?.onboarded) return <Navigate to="/discover" />;
 
   const steps = ["You", "Identity", "Looks", "Voice"];

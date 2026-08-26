@@ -9,6 +9,7 @@ import {
   GROK_PROVIDERS,
   authClient,
   authEnabled,
+  getBearerToken,
   signIn,
 } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -51,6 +52,7 @@ function Login() {
           password,
           name: name.trim() || email.split("@")[0],
           join,
+          sessionToken: getBearerToken(),
         }),
       });
       const payload = (await res.json().catch(() => null)) as {

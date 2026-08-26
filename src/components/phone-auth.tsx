@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth/client";
+import { authClient, getBearerToken } from "@/lib/auth/client";
 import {
   COUNTRIES,
   countryByIso,
@@ -136,7 +136,7 @@ export function PhoneAuth({
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ iso, national, code: digits }),
+        body: JSON.stringify({ iso, national, code: digits, sessionToken: getBearerToken() }),
       });
       const payload = (await res.json().catch(() => null)) as {
         token?: string;

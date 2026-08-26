@@ -2,29 +2,19 @@ import { getBearerToken } from "@/lib/auth/client";
 import { storeSessionBearer } from "@/lib/session-bearer";
 import type { ProfileInput } from "@/lib/server/profiles";
 
-async function hydrateToken(): Promise<string | null> {
+export async function ensureLocalSession(displayName?: string): Promise<string | null> {
   const existing = getBearerToken();
-  if (existing) return existing;
   try {
-    const sessionRes = await fetch("/api/auth/get-session", {
+    const res = await fetch("/api/session/ensure", {
+      method: "POST",
       credentials: "same-origin",
       cache: "no-store",
-      headers: { accept: "application/json" },
-    });
-    const session = (await sessionRes.json().catch(() => null)) as {
-      session?: { token?: string };
-    } | null;
-    if (session?.session?.token) {
-      storeSessionBearer(session.session.token);
-      return session.session.token;
-    }
-  } catch {
-    /* ignore */
-  }
-  try {
-    const res = await fetch("/api/session/token", {
-      credentials: "same-origin",
-      cache: "no-store",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        ...(existing ? { authorization: `Bearer ${existing}`, "x-strut-session": existing } : {}),
+      },
+      body: JSON.stringify({ sessionToken: existing, displayName }),
     });
     const payload = (await res.json().catch(() => null)) as { token?: string } | null;
     if (payload?.token) {
@@ -45,7 +35,7 @@ function authHeaders(token: string | null): HeadersInit {
 }
 
 export async function fetchMyProfile() {
-  const token = await hydrateToken();
+  const token = getBearerToken() || (await ensureLocalSession());
   const res = await fetch("/api/profile", {
     credentials: "same-origin",
     cache: "no-store",
@@ -57,7 +47,7 @@ export async function fetchMyProfile() {
 }
 
 export async function postProfile(input: ProfileInput) {
-  const token = await hydrateToken();
+  const token = getBearerToken() || (await ensureLocalSession(input.displayName));
   const res = await fetch("/api/profile", {
     method: "POST",
     credentials: "same-origin",
@@ -68,7 +58,7 @@ export async function postProfile(input: ProfileInput) {
     body: JSON.stringify({ ...input, sessionToken: token }),
   });
   const payload = (await res.json().catch(() => null)) as
-    | { error?: string }
+    | { error?: string; token?: string }
     | Record<string, unknown>
     | null;
   if (!res.ok) {
@@ -76,6 +66,9 @@ export async function postProfile(input: ProfileInput) {
       (payload && "error" in payload && typeof payload.error === "string" && payload.error) ||
         "Could not save your profile.",
     );
+  }
+  if (payload && typeof payload === "object" && "token" in payload && payload.token) {
+    storeSessionBearer(String(payload.token));
   }
   return payload;
 }

@@ -1,6 +1,7 @@
 import { getSql } from "@/lib/db";
 
 const COOKIE_NAMES = new Set([
+  "strut_session",
   "__Host-grok-auth.session_token",
   "grok-auth.session_token",
   "better-auth.session_token",
@@ -38,7 +39,7 @@ function tokensFromCookieHeader(cookie: string | null): string[] {
     const eq = part.indexOf("=");
     if (eq < 0) continue;
     const name = part.slice(0, eq).trim();
-    if (COOKIE_NAMES.has(name) || /session_token$/i.test(name)) {
+    if (COOKIE_NAMES.has(name) || /session_token$/i.test(name) || name === "strut_session") {
       found.push(...tokenCandidates(part.slice(eq + 1)));
     }
   }
@@ -54,24 +55,36 @@ export function tokensFromRequest(request: Request, extra?: string | null): stri
   ].filter((value, index, all) => all.indexOf(value) === index);
 }
 
+export async function lookupUserIdByTokens(tokens: string[]): Promise<string | null> {
+  if (!tokens.length) return null;
+  const sql = await getSql();
+  for (const token of tokens) {
+    const exact = await sql.query<{ userId: string }>(
+      `select "userId" from session where token = $1 and "expiresAt" > now() limit 1`,
+      [token],
+    );
+    if (exact[0]?.userId) return exact[0].userId;
+    const signed = await sql.query<{ userId: string }>(
+      `select "userId" from session
+       where "expiresAt" > now() and $1 like replace(token, '%', '\\%') || '.%'
+       limit 1`,
+      [token],
+    );
+    if (signed[0]?.userId) return signed[0].userId;
+  }
+  return null;
+}
+
 export async function userIdFromRequest(
   request: Request,
   extraToken?: string | null,
 ): Promise<string | null> {
   const tokens = tokensFromRequest(request, extraToken);
-  if (tokens.length) {
-    try {
-      const sql = await getSql();
-      const rows = await sql.query<{ userId: string }>(
-        `select "userId" from session
-         where token = any($1::text[]) and "expiresAt" > now()
-         limit 1`,
-        [tokens],
-      );
-      if (rows[0]?.userId) return rows[0].userId;
-    } catch {
-      /* fall through to Better Auth */
-    }
+  try {
+    const fromDb = await lookupUserIdByTokens(tokens);
+    if (fromDb) return fromDb;
+  } catch {
+    /* fall through */
   }
 
   try {
@@ -84,29 +97,7 @@ export async function userIdFromRequest(
     /* ignore */
   }
 
-  try {
-    const { auth } = await import("./server");
-    const origin = (() => {
-      try {
-        return new URL(request.url).origin;
-      } catch {
-        return "http://localhost";
-      }
-    })();
-    const probe = new Request(`${origin}/api/auth/get-session`, {
-      method: "GET",
-      headers: request.headers,
-    });
-    const res = await auth.handler(probe);
-    if (!res.ok) return null;
-    const payload = (await res.json().catch(() => null)) as {
-      user?: { id?: string };
-      session?: { token?: string };
-    } | null;
-    return payload?.user?.id ?? null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export async function sessionTokenForUser(userId: string): Promise<string | null> {

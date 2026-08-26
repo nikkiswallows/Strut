@@ -1,12 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { completePhoneLogin } from "@/lib/server/phone-login.server";
+import { migrateProfile, sessionCookie } from "@/lib/server/device-session.server";
+import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 
 export const Route = createFileRoute("/api/phone/login")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const body = (await request.json()) as { iso?: string; national?: string; code?: string };
+          const body = (await request.json()) as {
+            iso?: string;
+            national?: string;
+            code?: string;
+            sessionToken?: string;
+          };
+          const priorUser = await userIdFromRequest(request, body.sessionToken);
           const result = await completePhoneLogin(
             {
               iso: body.iso ?? "",
@@ -15,6 +23,13 @@ export const Route = createFileRoute("/api/phone/login")({
             },
             request,
           );
+          if (priorUser) {
+            const nextUser = await userIdFromRequest(
+              request,
+              result.token,
+            ).catch(() => null);
+            if (nextUser) await migrateProfile(priorUser, nextUser);
+          }
           const headers = new Headers({
             "content-type": "application/json",
             "cache-control": "no-store",
@@ -22,7 +37,10 @@ export const Route = createFileRoute("/api/phone/login")({
           for (const cookie of result.cookies) {
             headers.append("set-cookie", cookie);
           }
-          if (result.token) headers.set("set-auth-token", result.token);
+          if (result.token) {
+            headers.set("set-auth-token", result.token);
+            headers.append("set-cookie", sessionCookie(result.token));
+          }
           return new Response(
             JSON.stringify({
               e164: result.e164,

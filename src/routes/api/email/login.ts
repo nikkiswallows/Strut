@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
+import { migrateProfile, sessionCookie } from "@/lib/server/device-session.server";
 import { completeEmailLogin } from "@/lib/server/phone-login.server";
 
 export const Route = createFileRoute("/api/email/login")({
@@ -11,7 +13,9 @@ export const Route = createFileRoute("/api/email/login")({
             password?: string;
             name?: string;
             join?: boolean;
+            sessionToken?: string;
           };
+          const priorUser = await userIdFromRequest(request, body.sessionToken);
           const result = await completeEmailLogin(
             {
               email: body.email ?? "",
@@ -21,6 +25,10 @@ export const Route = createFileRoute("/api/email/login")({
             },
             request,
           );
+          if (priorUser) {
+            const nextUser = await userIdFromRequest(request, result.token).catch(() => null);
+            if (nextUser) await migrateProfile(priorUser, nextUser);
+          }
           const headers = new Headers({
             "content-type": "application/json",
             "cache-control": "no-store",
@@ -28,7 +36,10 @@ export const Route = createFileRoute("/api/email/login")({
           for (const cookie of result.cookies) {
             headers.append("set-cookie", cookie);
           }
-          if (result.token) headers.set("set-auth-token", result.token);
+          if (result.token) {
+            headers.set("set-auth-token", result.token);
+            headers.append("set-cookie", sessionCookie(result.token));
+          }
           return new Response(
             JSON.stringify({ token: result.token, isNew: result.isNew }),
             { status: 200, headers },
