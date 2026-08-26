@@ -20,7 +20,7 @@ export type OnboardingDraft = {
 export function readOnboardingDraft(): OnboardingDraft | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.sessionStorage.getItem(KEY) || window.localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<OnboardingDraft>;
     if (!parsed || typeof parsed !== "object") return null;
@@ -35,7 +35,7 @@ export function readOnboardingDraft(): OnboardingDraft | null {
       pronouns: Array.isArray(parsed.pronouns) ? parsed.pronouns : [],
       role: parsed.role ?? "Switch",
       lookingFor: Array.isArray(parsed.lookingFor) ? parsed.lookingFor : ["Dates"],
-      photos: Array.isArray(parsed.photos) ? parsed.photos : [],
+      photos: [],
       bio: parsed.bio ?? "",
       interests: Array.isArray(parsed.interests) ? parsed.interests : [],
       heightCm: parsed.heightCm ?? "",
@@ -47,14 +47,16 @@ export function readOnboardingDraft(): OnboardingDraft | null {
 
 export function writeOnboardingDraft(draft: OnboardingDraft): void {
   if (typeof window === "undefined") return;
+  const slim = { ...draft, photos: [] as string[] };
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(draft));
+    window.sessionStorage.setItem(KEY, JSON.stringify(slim));
   } catch {
-    try {
-      window.localStorage.setItem(KEY, JSON.stringify({ ...draft, photos: [] }));
-    } catch {
-      /* quota */
-    }
+    /* ignore */
+  }
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(slim));
+  } catch {
+    /* photos used to blow the quota — never store them here */
   }
 }
 
@@ -62,6 +64,11 @@ export function clearOnboardingDraft(): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.sessionStorage.removeItem(KEY);
   } catch {
     /* ignore */
   }

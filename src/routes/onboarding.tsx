@@ -12,6 +12,7 @@ import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from 
 import { queryClient } from "@/lib/query-client";
 import { listTags } from "@/lib/server/catalog";
 import { fetchMyProfile, postProfile } from "@/lib/profile-api";
+import { readLocalSession } from "@/lib/local-session";
 import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
 
@@ -161,8 +162,8 @@ function Onboarding() {
       }
       return saved;
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    onSuccess: async (saved) => {
+      queryClient.setQueryData(["me"], saved);
       clearOnboardingDraft();
       toast.success("You're in the order.");
       navigate({ to: "/discover" });
@@ -188,10 +189,10 @@ function Onboarding() {
     },
   });
 
-  if (isPending || (user && me.isPending)) {
+  if (isPending || (user && me.isPending && !readLocalSession()?.onboarded)) {
     return <div className="min-h-dvh bg-bg" />;
   }
-  if (me.data?.onboarded) return <Navigate to="/discover" />;
+  if (me.data?.onboarded || readLocalSession()?.onboarded) return <Navigate to="/discover" />;
 
   const steps = ["You", "Identity", "Looks", "Voice"];
 

@@ -1,5 +1,5 @@
 import { getBearerToken } from "@/lib/auth/client";
-import { writeLocalSession } from "@/lib/local-session";
+import { markOnboarded, writeLocalSession } from "@/lib/local-session";
 import type { ProfileInput } from "@/lib/server/profiles";
 import { storeSessionBearer } from "@/lib/session-bearer";
 
@@ -57,7 +57,9 @@ export async function fetchMyProfile() {
   });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error("Could not load your profile.");
-  return res.json();
+  const profile = await res.json();
+  if (profile?.onboarded) markOnboarded();
+  return profile;
 }
 
 type ProfileResponse = {
@@ -65,6 +67,7 @@ type ProfileResponse = {
   token?: string;
   userId?: string;
   displayName?: string;
+  onboarded?: boolean;
 };
 
 export async function postProfile(input: ProfileInput) {
@@ -90,9 +93,13 @@ export async function postProfile(input: ProfileInput) {
       token: payload.token,
       userId: payload.userId,
       name: payload.displayName ?? input.displayName ?? null,
+      onboarded: true,
     });
   } else if (payload?.token) {
     storeSessionBearer(payload.token);
+    markOnboarded();
+  } else {
+    markOnboarded();
   }
   return payload;
 }

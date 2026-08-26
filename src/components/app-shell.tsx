@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Compass, Heart, MessageCircle, Newspaper, UserRound } from "lucide-react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { readLocalSession } from "@/lib/local-session";
 import { fetchMyProfile } from "@/lib/profile-api";
 import { listConversations } from "@/lib/server/messages";
 import { cn } from "@/lib/utils";
@@ -42,14 +43,15 @@ export function AppShell() {
     );
   }
   if (!user) return <RedirectToSignIn />;
-  if (me.isPending) {
+  const locallyOnboarded = Boolean(readLocalSession()?.onboarded);
+  if (me.isPending && !locallyOnboarded && !me.data) {
     return (
       <div className="grid min-h-dvh place-items-center bg-bg">
         <Mark className="size-14 animate-pulse" />
       </div>
     );
   }
-  if (me.isError || !me.data?.onboarded) {
+  if (!locallyOnboarded && !me.data?.onboarded) {
     return <Navigate to="/onboarding" />;
   }
 

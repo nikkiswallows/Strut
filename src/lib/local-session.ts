@@ -1,14 +1,19 @@
 /** First-party session that does not depend on Better Auth cookies. */
 
 export const LOCAL_SESSION_KEY = "strut.session.v1";
+const SID_KEY = "strut.sid";
 const COOKIE = "strut_at";
 const EVENT = "strut-session";
+const DRAFT_KEY = "strut.onboarding.draft.v1";
 
 export type LocalSession = {
   token: string;
   userId: string;
   name: string | null;
+  onboarded?: boolean;
 };
+
+let memory: LocalSession | null = null;
 
 function emit(): void {
   if (typeof window === "undefined") return;
@@ -30,23 +35,90 @@ function readCookie(): string | null {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
-function put(storage: Storage, value: LocalSession | null): void {
+function parseSession(raw: string | null): LocalSession | null {
+  if (!raw) return null;
   try {
-    if (value) storage.setItem(LOCAL_SESSION_KEY, JSON.stringify(value));
-    else storage.removeItem(LOCAL_SESSION_KEY);
+    if (raw.includes("\t") && !raw.startsWith("{")) {
+      const [token, userId, flag] = raw.split("\t");
+      if (token && userId) {
+        return { token, userId, name: null, onboarded: flag === "1" };
+      }
+      return null;
+    }
+    const parsed = JSON.parse(raw) as LocalSession;
+    if (parsed?.token && parsed?.userId && parsed.userId !== "pending") return parsed;
   } catch {
-    /* storage blocked */
+    /* ignore */
+  }
+  return null;
+}
+
+function compact(session: LocalSession): string {
+  return `${session.token}\t${session.userId}\t${session.onboarded ? "1" : "0"}`;
+}
+
+function freeQuota(): void {
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
+function persist(session: LocalSession): void {
+  const json = JSON.stringify(session);
+  const sid = compact(session);
+  const write = (storage: Storage) => {
+    storage.setItem(SID_KEY, sid);
+    storage.setItem(LOCAL_SESSION_KEY, json);
+    storage.setItem("grok-auth.bearer-token", session.token);
+  };
+  try {
+    write(window.localStorage);
+  } catch {
+    freeQuota();
+    try {
+      write(window.localStorage);
+    } catch {
+      try {
+        window.localStorage.setItem(SID_KEY, sid);
+      } catch {
+        /* give up on localStorage */
+      }
+    }
+  }
+  try {
+    write(window.sessionStorage);
+  } catch {
+    try {
+      window.sessionStorage.setItem(SID_KEY, sid);
+    } catch {
+      /* ignore */
+    }
+  }
+  setCookie(session.token);
+}
+
 export function readLocalSession(): LocalSession | null {
+  if (memory) return memory;
   if (typeof window === "undefined") return null;
   for (const storage of [window.localStorage, window.sessionStorage]) {
     try {
-      const raw = storage.getItem(LOCAL_SESSION_KEY);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw) as LocalSession;
-      if (parsed?.token && parsed?.userId && parsed.userId !== "pending") return parsed;
+      const fromSid = parseSession(storage.getItem(SID_KEY));
+      if (fromSid) {
+        memory = fromSid;
+        return fromSid;
+      }
+      const fromJson = parseSession(storage.getItem(LOCAL_SESSION_KEY));
+      if (fromJson) {
+        memory = fromJson;
+        return fromJson;
+      }
     } catch {
       /* ignore */
     }
@@ -55,36 +127,47 @@ export function readLocalSession(): LocalSession | null {
 }
 
 export function writeLocalSession(session: LocalSession): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined") {
+    memory = {
+      token: session.token.trim(),
+      userId: session.userId.trim(),
+      name: session.name ?? null,
+      onboarded: session.onboarded,
+    };
+    return;
+  }
+  const prev = memory ?? readLocalSession();
   const next: LocalSession = {
     token: session.token.trim(),
     userId: session.userId.trim(),
-    name: session.name ?? null,
+    name: session.name ?? prev?.name ?? null,
+    onboarded: session.onboarded ?? prev?.onboarded ?? false,
   };
   if (!next.token || !next.userId) return;
-  put(window.localStorage, next);
-  put(window.sessionStorage, next);
-  setCookie(next.token);
-  try {
-    window.localStorage.setItem("grok-auth.bearer-token", next.token);
-    window.sessionStorage.setItem("grok-auth.bearer-token", next.token);
-  } catch {
-    /* ignore */
-  }
+  memory = next;
+  persist(next);
   emit();
 }
 
+export function markOnboarded(): void {
+  const session = readLocalSession();
+  if (!session) return;
+  writeLocalSession({ ...session, onboarded: true });
+}
+
 export function clearLocalSession(): void {
+  memory = null;
   if (typeof window === "undefined") return;
-  put(window.localStorage, null);
-  put(window.sessionStorage, null);
-  setCookie(null);
-  try {
-    window.localStorage.removeItem("grok-auth.bearer-token");
-    window.sessionStorage.removeItem("grok-auth.bearer-token");
-  } catch {
-    /* ignore */
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      storage.removeItem(LOCAL_SESSION_KEY);
+      storage.removeItem(SID_KEY);
+      storage.removeItem("grok-auth.bearer-token");
+    } catch {
+      /* ignore */
+    }
   }
+  setCookie(null);
   emit();
 }
 
