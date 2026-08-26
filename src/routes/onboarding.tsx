@@ -12,7 +12,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { queryClient } from "@/lib/query-client";
 import { listTags } from "@/lib/server/catalog";
-import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
+import { fetchMyProfile, postProfile } from "@/lib/profile-api";
 import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
 
@@ -23,7 +23,7 @@ function Onboarding() {
   const navigate = useNavigate();
   const me = useQuery({
     queryKey: ["me"],
-    queryFn: () => getMyProfile(),
+    queryFn: () => fetchMyProfile(),
     enabled: Boolean(user),
   });
   const identityTags = useQuery({
@@ -137,24 +137,31 @@ function Onboarding() {
   ]);
 
   const save = useMutation({
-    mutationFn: () =>
-      saveMyProfile({
-        data: {
-          displayName,
-          handle: handle.length >= 3 ? handle : slugifyHandle(displayName),
-          age: Number(age) || 18,
-          hideAge,
-          location,
-          identities,
-          pronouns,
-          role,
-          lookingFor,
-          photos,
-          bio,
-          interests,
-          heightCm: heightCm ? Number(heightCm) : null,
-        },
-      }),
+    mutationFn: async () => {
+      const base = {
+        displayName,
+        handle: handle.length >= 3 ? handle : slugifyHandle(displayName),
+        age: Number(age) || 18,
+        hideAge,
+        location,
+        identities,
+        pronouns,
+        role,
+        lookingFor,
+        bio,
+        interests,
+        heightCm: heightCm ? Number(heightCm) : null,
+      };
+      const saved = await postProfile({ ...base, photos: [] });
+      if (photos.length) {
+        try {
+          return await postProfile({ ...base, photos });
+        } catch {
+          return saved;
+        }
+      }
+      return saved;
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       clearOnboardingDraft();
@@ -178,12 +185,11 @@ function Onboarding() {
         interests,
         heightCm,
       });
-      if (err.message === "Unauthorized") {
-        toast.error("Sign in again — your profile draft is saved on this phone.");
-        window.location.replace("/login");
-        return;
-      }
-      toast.error(err.message);
+      toast.error(
+        err.message === "Unauthorized"
+          ? "Still signing you in. Stay on this page and tap Enter the order again."
+          : err.message,
+      );
     },
   });
 

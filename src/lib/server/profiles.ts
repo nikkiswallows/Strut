@@ -236,72 +236,75 @@ function cleanProfile(input: ProfileInput) {
   };
 }
 
+export async function writeProfileForUser(userId: string, input: ProfileInput) {
+  const data = cleanProfile(input);
+  await ensureSeed();
+  const sql = await getSql();
+  const taken = await sql.query<{ user_id: string }>(
+    `select user_id from profiles where handle = $1 and user_id <> $2`,
+    [data.handle, userId],
+  );
+  if (taken[0]) throw new Error("That handle is taken.");
+  const rows = await sql.query<ProfileRow>(
+    `insert into profiles (
+       user_id, handle, display_name, age, identity, pronouns, bio, location,
+       looking_for, looking_for_list, photos, interests, height_cm, onboarded, last_active,
+       identities, pronoun_list, hide_age, lat, lng, role
+     ) values (
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,true,now(),
+       $14::jsonb,$15::jsonb,$16::boolean,$17,$18,$19
+     )
+     on conflict (user_id) do update set
+       handle = excluded.handle,
+       display_name = excluded.display_name,
+       age = excluded.age,
+       identity = excluded.identity,
+       pronouns = excluded.pronouns,
+       bio = excluded.bio,
+       location = excluded.location,
+       looking_for = excluded.looking_for,
+       looking_for_list = excluded.looking_for_list,
+       photos = excluded.photos,
+       interests = excluded.interests,
+       height_cm = excluded.height_cm,
+       identities = excluded.identities,
+       pronoun_list = excluded.pronoun_list,
+       hide_age = excluded.hide_age,
+       lat = excluded.lat,
+       lng = excluded.lng,
+       role = excluded.role,
+       onboarded = true,
+       last_active = now()
+     returning ${PROFILE_COLS}`,
+    [
+      userId,
+      data.handle,
+      data.displayName,
+      data.age,
+      data.identity,
+      data.pronounText,
+      data.bio,
+      data.location,
+      data.lookingFor[0] ?? null,
+      JSON.stringify(data.lookingFor),
+      JSON.stringify(data.photos),
+      JSON.stringify(data.interests),
+      data.heightCm,
+      JSON.stringify(data.identities),
+      JSON.stringify(data.pronouns),
+      data.hideAge,
+      data.lat,
+      data.lng,
+      data.role,
+    ],
+  );
+  return mapProfile(rows[0]!);
+}
+
 export const saveMyProfile = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: ProfileInput) => cleanProfile(input))
-  .handler(async ({ context, data }) => {
-    await ensureSeed();
-    const sql = await getSql();
-    const taken = await sql.query<{ user_id: string }>(
-      `select user_id from profiles where handle = $1 and user_id <> $2`,
-      [data.handle, context.userId],
-    );
-    if (taken[0]) throw new Error("That handle is taken.");
-    const rows = await sql.query<ProfileRow>(
-      `insert into profiles (
-         user_id, handle, display_name, age, identity, pronouns, bio, location,
-         looking_for, looking_for_list, photos, interests, height_cm, onboarded, last_active,
-         identities, pronoun_list, hide_age, lat, lng, role
-       ) values (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,true,now(),
-         $14::jsonb,$15::jsonb,$16::boolean,$17,$18,$19
-       )
-       on conflict (user_id) do update set
-         handle = excluded.handle,
-         display_name = excluded.display_name,
-         age = excluded.age,
-         identity = excluded.identity,
-         pronouns = excluded.pronouns,
-         bio = excluded.bio,
-         location = excluded.location,
-         looking_for = excluded.looking_for,
-         looking_for_list = excluded.looking_for_list,
-         photos = excluded.photos,
-         interests = excluded.interests,
-         height_cm = excluded.height_cm,
-         identities = excluded.identities,
-         pronoun_list = excluded.pronoun_list,
-         hide_age = excluded.hide_age,
-         lat = excluded.lat,
-         lng = excluded.lng,
-         role = excluded.role,
-         onboarded = true,
-         last_active = now()
-       returning ${PROFILE_COLS}`,
-      [
-        context.userId,
-        data.handle,
-        data.displayName,
-        data.age,
-        data.identity,
-        data.pronounText,
-        data.bio,
-        data.location,
-        data.lookingFor[0] ?? null,
-        JSON.stringify(data.lookingFor),
-        JSON.stringify(data.photos),
-        JSON.stringify(data.interests),
-        data.heightCm,
-        JSON.stringify(data.identities),
-        JSON.stringify(data.pronouns),
-        data.hideAge,
-        data.lat,
-        data.lng,
-        data.role,
-      ],
-    );
-    return mapProfile(rows[0]!);
-  });
+  .validator((input: ProfileInput) => input)
+  .handler(async ({ context, data }) => writeProfileForUser(context.userId, data));
 
 function clampMiles(value: number | undefined): number {
   if (value == null || Number.isNaN(Number(value))) return 100;

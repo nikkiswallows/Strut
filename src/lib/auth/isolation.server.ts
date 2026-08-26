@@ -14,13 +14,9 @@ import { getRequest } from "@tanstack/react-start/server";
  * (fetch/XHR/form-POST) request to this app's server functions and ride this
  * app's session cookie.
  *
- * We allow only: same-origin requests (this app's own client), non-browser
- * requests (SSR / server-to-server, which send no `Sec-Fetch-Site`), and
- * top-level GET navigations (how the OAuth callback and normal page loads
- * arrive). Every cross-site / same-site *scripted* request is rejected.
- * Together with `__Host-` cookies and Better Auth's `trustedOrigins`, this
- * closes the sibling-tenant attack surface. Enforced at the `authMiddleware`
- * chokepoint (see `middleware.ts`).
+ * We allow: same-origin, non-browser, top-level GET navigations, and any
+ * request whose Origin/Referer host is THIS host (iOS Safari sometimes
+ * reports `sec-fetch-site: cross-site` on first-party POSTs).
  */
 export class CrossSiteRequestError extends Error {
   readonly status = 403;
@@ -30,17 +26,37 @@ export class CrossSiteRequestError extends Error {
   }
 }
 
+function requestHost(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  if (forwarded) return forwarded.toLowerCase();
+  try {
+    return new URL(request.url).host.toLowerCase();
+  } catch {
+    return (request.headers.get("host") ?? "").toLowerCase();
+  }
+}
+
+function headerHost(value: string | null): string | null {
+  if (!value || value === "null") return null;
+  try {
+    return new URL(value).host.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 /** Throw `CrossSiteRequestError` for a scripted cross-site/sibling request. */
 export function assertSameSiteRequest(): void {
   const request = getRequest();
-  if (!request) return; // no request context (e.g. build) — nothing to guard
+  if (!request) return;
   const h = request.headers;
   const site = h.get("sec-fetch-site");
-  // Non-browser client (no header), the app's own origin, or a direct
-  // (address-bar/bookmark) load are all fine.
   if (!site || site === "same-origin" || site === "none") return;
-  // A top-level GET navigation (e.g. the broker's OAuth callback redirect) is
-  // fine even when it's cross-site; scripted requests never set navigate mode.
+
+  const here = requestHost(request);
+  const from = headerHost(h.get("origin")) || headerHost(h.get("referer"));
+  if (here && from && here === from) return;
+
   const dest = h.get("sec-fetch-dest");
   const isTopLevelGet =
     h.get("sec-fetch-mode") === "navigate" &&

@@ -2,7 +2,7 @@ import { genericOAuthClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { runPreSignInSignOut, runSignOut } from "../../../scripts/sign-out-plan.mjs";
 import { GROK_PROVIDERS } from "./providers";
-import { restoreSessionBearer } from "@/lib/session-bearer";
+import { restoreSessionBearer, storeSessionBearer } from "@/lib/session-bearer";
 
 if (typeof window !== "undefined") restoreSessionBearer();
 
@@ -27,6 +27,11 @@ export const authClient = createAuthClient({
       const token = getBearerToken();
       if (token) ctx.headers.set("Authorization", `Bearer ${token}`);
       return ctx;
+    },
+    onSuccess(ctx) {
+      const data = ctx.data as { token?: string; session?: { token?: string } } | undefined;
+      const header = ctx.response?.headers.get("set-auth-token") ?? "";
+      storeSessionBearer(data?.token || data?.session?.token || header || null);
     },
   },
 });

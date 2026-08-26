@@ -18,11 +18,13 @@ import { Route as AppFeedRouteImport } from './routes/_app/feed'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppLikesRouteImport } from './routes/_app/likes'
 import { Route as AppMeRouteImport } from './routes/_app/me'
+import { Route as ApiProfileRouteImport } from './routes/api/profile'
 import { Route as AppInboxIndexRouteImport } from './routes/_app/inbox.index'
 import { Route as AppInboxIdRouteImport } from './routes/_app/inbox.$id'
 import { Route as AppUHandleRouteImport } from './routes/_app/u.$handle'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiPhoneLoginRouteImport } from './routes/api/phone/login'
+import { Route as ApiSessionTokenRouteImport } from './routes/api/session/token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -68,6 +70,11 @@ const AppMeRoute = AppMeRouteImport.update({
   path: '/me',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiProfileRoute = ApiProfileRouteImport.update({
+  id: '/api/profile',
+  path: '/api/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppInboxIndexRoute = AppInboxIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -93,6 +100,11 @@ const ApiPhoneLoginRoute = ApiPhoneLoginRouteImport.update({
   path: '/api/phone/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionTokenRoute = ApiSessionTokenRouteImport.update({
+  id: '/api/session/token',
+  path: '/api/session/token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,10 +115,12 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AppInboxRouteWithChildren
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
+  '/api/profile': typeof ApiProfileRoute
   '/inbox/$id': typeof AppInboxIdRoute
   '/u/$handle': typeof AppUHandleRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
+  '/api/session/token': typeof ApiSessionTokenRoute
   '/inbox/': typeof AppInboxIndexRoute
 }
 export interface FileRoutesByTo {
@@ -117,10 +131,12 @@ export interface FileRoutesByTo {
   '/feed': typeof AppFeedRoute
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
+  '/api/profile': typeof ApiProfileRoute
   '/inbox/$id': typeof AppInboxIdRoute
   '/u/$handle': typeof AppUHandleRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
+  '/api/session/token': typeof ApiSessionTokenRoute
   '/inbox': typeof AppInboxIndexRoute
 }
 export interface FileRoutesById {
@@ -134,10 +150,12 @@ export interface FileRoutesById {
   '/_app/inbox': typeof AppInboxRouteWithChildren
   '/_app/likes': typeof AppLikesRoute
   '/_app/me': typeof AppMeRoute
+  '/api/profile': typeof ApiProfileRoute
   '/_app/inbox/$id': typeof AppInboxIdRoute
   '/_app/u/$handle': typeof AppUHandleRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
+  '/api/session/token': typeof ApiSessionTokenRoute
   '/_app/inbox/': typeof AppInboxIndexRoute
 }
 export interface FileRouteTypes {
@@ -151,10 +169,12 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/likes'
     | '/me'
+    | '/api/profile'
     | '/inbox/$id'
     | '/u/$handle'
     | '/api/auth/$'
     | '/api/phone/login'
+    | '/api/session/token'
     | '/inbox/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,10 +185,12 @@ export interface FileRouteTypes {
     | '/feed'
     | '/likes'
     | '/me'
+    | '/api/profile'
     | '/inbox/$id'
     | '/u/$handle'
     | '/api/auth/$'
     | '/api/phone/login'
+    | '/api/session/token'
     | '/inbox'
   id:
     | '__root__'
@@ -181,10 +203,12 @@ export interface FileRouteTypes {
     | '/_app/inbox'
     | '/_app/likes'
     | '/_app/me'
+    | '/api/profile'
     | '/_app/inbox/$id'
     | '/_app/u/$handle'
     | '/api/auth/$'
     | '/api/phone/login'
+    | '/api/session/token'
     | '/_app/inbox/'
   fileRoutesById: FileRoutesById
 }
@@ -193,8 +217,10 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  ApiProfileRoute: typeof ApiProfileRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiPhoneLoginRoute: typeof ApiPhoneLoginRoute
+  ApiSessionTokenRoute: typeof ApiSessionTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -262,6 +288,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMeRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/profile': {
+      id: '/api/profile'
+      path: '/api/profile'
+      fullPath: '/api/profile'
+      preLoaderRoute: typeof ApiProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/inbox/': {
       id: '/_app/inbox/'
       path: '/'
@@ -295,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/api/phone/login'
       fullPath: '/api/phone/login'
       preLoaderRoute: typeof ApiPhoneLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/session/token': {
+      id: '/api/session/token'
+      path: '/api/session/token'
+      fullPath: '/api/session/token'
+      preLoaderRoute: typeof ApiSessionTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -339,8 +379,10 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  ApiProfileRoute: ApiProfileRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiPhoneLoginRoute: ApiPhoneLoginRoute,
+  ApiSessionTokenRoute: ApiSessionTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

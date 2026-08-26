@@ -11,7 +11,8 @@ import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
 import { listTags } from "@/lib/server/catalog";
-import { getMyProfile, saveMyProfile } from "@/lib/server/profiles";
+import { getMyProfile } from "@/lib/server/profiles";
+import { postProfile } from "@/lib/profile-api";
 import {
   IDENTITIES,
   identityLine,
@@ -81,22 +82,20 @@ function Me() {
 
   const save = useMutation({
     mutationFn: () =>
-      saveMyProfile({
-        data: {
-          displayName,
-          handle,
-          age: age ? Number(age) : null,
-          hideAge,
-          location,
-          identities,
-          pronouns,
-          role,
-          lookingFor,
-          photos,
-          bio,
-          interests,
-          heightCm: heightCm ? Number(heightCm) : null,
-        },
+      postProfile({
+        displayName,
+        handle,
+        age: age ? Number(age) : null,
+        hideAge,
+        location,
+        identities,
+        pronouns,
+        role,
+        lookingFor,
+        photos,
+        bio,
+        interests,
+        heightCm: heightCm ? Number(heightCm) : null,
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["me"] });
