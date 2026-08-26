@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/geo";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
-import { DISCOVER_TABS, ROLES, type DiscoverTab } from "@/lib/types";
+import { DISCOVER_TABS, identityLine, ROLES, type DiscoverTab } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
 import { ensureSeed } from "./seed";
@@ -131,18 +131,22 @@ export const listDiscover = createServerFn({ method: "POST" })
             : coordForLocation(profile.location);
         return {
           ...profile,
+          photos: profile.photos.slice(0, 6),
           distanceMiles: there ? milesBetween(origin, there) : null,
         };
       })
       .filter((profile) => {
         if (profile.userId === context.userId) return false;
         if (match.size) {
-          const hit = profile.identities.some((id) => match.has(id.toLowerCase()));
+          const labels = [...(profile.identities ?? []), identityLine(profile)]
+            .join(" ")
+            .toLowerCase();
+          const hit = [...match].some((token) => labels.includes(token));
           if (!hit) return false;
         }
         if (lookingFor) {
           const want = lookingFor.toLowerCase();
-          const hit = profile.lookingFor.some((item) => item.toLowerCase() === want);
+          const hit = (profile.lookingFor ?? []).some((item) => item.toLowerCase() === want);
           if (!hit) return false;
         }
         if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;

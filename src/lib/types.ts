@@ -41,15 +41,20 @@ export const INTERESTS = [
   "BNWO",
   "Cuckold",
   "BBC",
+  "Daddies",
+  "Hotwife",
 ] as const;
 
 export const DISCOVER_TABS = [
   { id: "nearby", label: "Nearby", match: [] as string[] },
-  { id: "tgirls", label: "T-Girls", match: ["T-Girl", "Trans woman"] },
-  { id: "sissies", label: "Sissies", match: ["Sissy", "Crossdresser", "Femboy"] },
+  { id: "trans", label: "Trans", match: ["T-Girl", "Trans woman"] },
+  { id: "sissies", label: "Sissies", match: ["Sissy"] },
+  { id: "crossdressers", label: "CDs", match: ["Crossdresser"] },
+  { id: "femboys", label: "Femboys", match: ["Femboy"] },
   { id: "men", label: "Men", match: ["Man", "Admirer"] },
   { id: "women", label: "Women", match: ["Woman"] },
-  { id: "couples", label: "Couples", match: ["Couple", "Group"] },
+  { id: "couples", label: "Couples", match: ["Couple"] },
+  { id: "groups", label: "Groups", match: ["Group"] },
 ] as const;
 
 export const MILE_STOPS = [5, 10, 25, 50, 100, 250, 500] as const;
@@ -94,11 +99,11 @@ export function shownAge(profile: Pick<Profile, "age" | "hideAge">): number | nu
 }
 
 export function identityLine(profile: Pick<Profile, "identities">): string {
-  return profile.identities.filter(Boolean).join(" · ");
+  return (profile.identities ?? []).filter(Boolean).join(" · ");
 }
 
 export function pronounLine(profile: Pick<Profile, "pronouns">): string {
-  return profile.pronouns.filter(Boolean).join(" · ");
+  return (profile.pronouns ?? []).filter(Boolean).join(" · ");
 }
 
 export function roleLine(profile: Pick<Profile, "role">): string | null {
@@ -109,6 +114,12 @@ export function lookingLine(profile: Pick<Profile, "lookingFor">): string | null
   const items = (profile.lookingFor ?? []).map((s) => s.trim()).filter(Boolean);
   if (!items.length) return null;
   return `Looking for ${items.join(" · ").toLowerCase()}`;
+}
+
+export function asPhotoList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
 }
 
 export type FeedPost = {

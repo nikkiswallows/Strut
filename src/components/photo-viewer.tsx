@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { asPhotoList } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Photo } from "./photo";
 
@@ -11,15 +12,17 @@ export function PhotoViewer({
   name: string;
   className?: string;
 }) {
-  const shots = photos.length ? photos : [null];
+  const shots = asPhotoList(photos);
+  const list = shots.length ? shots : [null];
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState<1 | -1>(1);
   const startX = useRef<number | null>(null);
-  const current = shots[Math.min(index, shots.length - 1)];
+  const safeIndex = Math.min(index, list.length - 1);
+  const current = list[safeIndex];
 
   function go(next: number, direction: 1 | -1) {
-    if (shots.length < 2) return;
-    const wrapped = (next + shots.length) % shots.length;
+    if (list.length < 2) return;
+    const wrapped = (next + list.length) % list.length;
     setDir(direction);
     setIndex(wrapped);
   }
@@ -42,7 +45,7 @@ export function PhotoViewer({
     >
       <div className="relative aspect-[3/4]">
         <Photo
-          key={`${index}-${dir}`}
+          key={`${safeIndex}-${dir}`}
           src={current}
           alt={name}
           name={name}
@@ -52,33 +55,36 @@ export function PhotoViewer({
           )}
         />
       </div>
-      {shots.length > 1 ? (
+      {list.length > 1 ? (
         <>
           <div className="absolute inset-x-3 top-3 z-10 flex gap-1">
-            {shots.map((_, i) => (
+            {list.map((_, i) => (
               <button
                 key={i}
                 type="button"
-                onClick={() => go(i, i > index ? 1 : -1)}
+                onClick={() => go(i, i > safeIndex ? 1 : -1)}
                 className={cn(
-                  "h-0.5 flex-1 rounded-full transition-colors duration-200",
-                  i === index ? "bg-fg" : "bg-fg/30",
+                  "h-1 flex-1 rounded-full transition-colors duration-200",
+                  i === safeIndex ? "bg-fg" : "bg-fg/30",
                 )}
                 aria-label={`Photo ${i + 1}`}
               />
             ))}
           </div>
+          <p className="absolute top-5 right-3 z-10 rounded-full bg-bg/55 px-2 py-0.5 text-[11px] text-fg backdrop-blur-sm">
+            {safeIndex + 1}/{list.length}
+          </p>
           <div className="absolute inset-0 z-[1] flex">
             <button
               type="button"
               className="flex-1"
-              onClick={() => go(index - 1, -1)}
+              onClick={() => go(safeIndex - 1, -1)}
               aria-label="Previous photo"
             />
             <button
               type="button"
               className="flex-1"
-              onClick={() => go(index + 1, 1)}
+              onClick={() => go(safeIndex + 1, 1)}
               aria-label="Next photo"
             />
           </div>
@@ -95,10 +101,11 @@ export function PhotoStrip({
   photos: string[];
   name: string;
 }) {
-  const shots = photos.length ? photos : [null];
+  const shots = asPhotoList(photos);
+  const list = shots.length ? shots : [null];
   return (
     <div className="hide-scrollbar flex snap-x snap-mandatory gap-2 overflow-x-auto">
-      {shots.map((src, i) => (
+      {list.map((src, i) => (
         <div
           key={i}
           className="relative aspect-[3/4] w-[86%] shrink-0 snap-center overflow-hidden rounded-xl bg-surface"

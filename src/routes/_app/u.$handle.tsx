@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Heart, MessageCircle, UserPlus } from "lucide-react";
+import { ChevronLeft, Heart, MessageCircle, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { PhotoViewer } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { queryClient } from "@/lib/query-client";
 import { openConversation } from "@/lib/server/messages";
 import { getMyProfile, getProfileForViewer } from "@/lib/server/profiles";
 import { toggleFollow, toggleLike } from "@/lib/server/social";
-import { identityLine, lookingLine, pronounLine, shownAge } from "@/lib/types";
+import { asPhotoList, identityLine, lookingLine, pronounLine, shownAge } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/u/$handle")({ component: ProfilePage });
@@ -42,12 +42,30 @@ function ProfilePage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const p = profile.data;
   if (profile.isPending) {
     return <div className="mx-auto max-w-lg aspect-[3/4] animate-pulse rounded-xl bg-surface" />;
   }
+  if (profile.isError) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-muted">Could not open that profile.</p>
+        <Link to="/discover" className="mt-4 inline-flex h-11 items-center rounded-full bg-elevated px-5 text-sm">
+          Back to Discover
+        </Link>
+      </div>
+    );
+  }
+
+  const p = profile.data;
   if (!p) {
-    return <p className="py-20 text-center text-muted">This profile doesn't exist.</p>;
+    return (
+      <div className="py-16 text-center">
+        <p className="text-muted">This profile doesn't exist.</p>
+        <Link to="/discover" className="mt-4 inline-flex h-11 items-center rounded-full bg-elevated px-5 text-sm">
+          Back to Discover
+        </Link>
+      </div>
+    );
   }
 
   const mine = me.data?.userId === p.userId;
@@ -55,13 +73,26 @@ function ProfilePage() {
   const ident = identityLine(p);
   const pronouns = pronounLine(p);
   const distance = formatMiles(p.distanceMiles);
+  const photos = asPhotoList(p.photos);
 
   return (
     <div className="mx-auto max-w-lg animate-fade-up">
-      <PhotoViewer photos={p.photos} name={p.displayName} />
-      {p.photos.length > 1 ? (
+      <div className="mb-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/discover" })}
+          className="grid size-11 place-items-center rounded-full bg-elevated transition-transform duration-150 ease-out active:scale-[0.96]"
+          aria-label="Back to Discover"
+        >
+          <ChevronLeft className="size-5" />
+        </button>
+        <p className="text-sm text-muted">@{p.handle}</p>
+      </div>
+
+      <PhotoViewer photos={photos} name={p.displayName} />
+      {photos.length > 1 ? (
         <p className="mt-2 text-center text-[11px] tracking-wide text-subtle uppercase">
-          Tap left or right to flip looks
+          Tap left or right · {photos.length} photos
         </p>
       ) : null}
 
@@ -85,6 +116,11 @@ function ProfilePage() {
           {p.role ? (
             <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-fg">{p.role}</span>
           ) : null}
+          {p.identities.map((id) => (
+            <span key={id} className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
+              {id}
+            </span>
+          ))}
           {lookingLine(p) ? (
             <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">
               {lookingLine(p)}
@@ -94,7 +130,9 @@ function ProfilePage() {
             <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">{p.heightCm} cm</span>
           ) : null}
         </div>
-        {p.bio ? <p className="mt-4 text-[15px] leading-relaxed text-fg">{p.bio}</p> : null}
+        {p.bio ? (
+          <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-fg">{p.bio}</p>
+        ) : null}
         {p.interests.length ? (
           <div className="mt-4 flex flex-wrap gap-2">
             {p.interests.map((tag) => (

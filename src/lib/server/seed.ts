@@ -3,11 +3,18 @@ import { getSql } from "@/lib/db";
 import { SEED_POSTS, SEED_PROFILES, type SeedProfile } from "@/lib/seed-data";
 import { unique } from "@/lib/utils";
 
+const SEED_VERSION = 7;
+
 const globalRef = globalThis as typeof globalThis & {
   __strutSeedPromise__?: Promise<void>;
+  __strutSeedVersion__?: number;
 };
 
 export async function ensureSeed(): Promise<void> {
+  if (globalRef.__strutSeedVersion__ !== SEED_VERSION) {
+    globalRef.__strutSeedPromise__ = undefined;
+    globalRef.__strutSeedVersion__ = SEED_VERSION;
+  }
   if (!globalRef.__strutSeedPromise__) {
     globalRef.__strutSeedPromise__ = runSeed().catch((err) => {
       globalRef.__strutSeedPromise__ = undefined;
@@ -85,36 +92,37 @@ async function runSeed() {
     `;
   }
 
-  const posts = await sql<{ n: number }>`select count(*)::int as n from posts`;
-  if ((posts[0]?.n ?? 0) === 0) {
-    for (const post of SEED_POSTS) {
-      await sql`
-        insert into posts (user_id, body, photo_url, created_at)
-        values (
-          ${post.userId},
-          ${post.body},
-          ${post.photoUrl ?? null},
-          now() - (${post.hoursAgo} || ' hours')::interval
-        )
-      `;
-    }
+  await sql`delete from posts where user_id like 'seed-%'`;
+  for (const post of SEED_POSTS) {
+    await sql`
+      insert into posts (user_id, body, photo_url, created_at)
+      values (
+        ${post.userId},
+        ${post.body},
+        ${post.photoUrl ?? null},
+        now() - (${post.hoursAgo} || ' hours')::interval
+      )
+    `;
   }
 
   const pairs: Array<[string, string]> = [
     ["seed-aria", "seed-marcus"],
     ["seed-marcus", "seed-aria"],
-    ["seed-blair", "seed-devon"],
-    ["seed-devon", "seed-blair"],
-    ["seed-dana", "seed-pilar"],
-    ["seed-pilar", "seed-dana"],
+    ["seed-blair", "seed-marcus"],
+    ["seed-marcus", "seed-blair"],
+    ["seed-quinn", "seed-devon"],
+    ["seed-devon", "seed-quinn"],
     ["seed-iris", "seed-andre"],
-    ["seed-hana", "seed-sloane"],
+    ["seed-wren", "seed-marcus"],
+    ["seed-sloane", "seed-marcus"],
+    ["seed-tessa", "seed-andre"],
+    ["seed-wests", "seed-marcus"],
+    ["seed-jesscam", "seed-marcus"],
+    ["seed-jules", "seed-devon"],
+    ["seed-nico", "seed-andre"],
+    ["seed-dana", "seed-cole"],
     ["seed-luna", "seed-mira"],
-    ["seed-sage", "seed-quinn"],
-    ["seed-eden", "seed-jules"],
-    ["seed-wests", "seed-aria"],
-    ["seed-tessa", "seed-ellis"],
-    ["seed-maya", "seed-remy"],
+    ["seed-house", "seed-aria"],
   ];
   for (const [from, to] of pairs) {
     await sql`

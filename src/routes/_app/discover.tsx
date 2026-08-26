@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ function Discover() {
   const profiles = useQuery({
     queryKey: ["discover", tab, miles, lookingFor, role, q],
     queryFn: () => listDiscover({ data: { tab, miles, lookingFor, role, q } }),
+    placeholderData: keepPreviousData,
   });
 
   const like = useMutation({
@@ -69,6 +70,7 @@ function Discover() {
     () => [activeTab.label, lookingFor && `looking for ${lookingFor.toLowerCase()}`, role, milesLabel].filter(Boolean),
     [activeTab.label, lookingFor, role, milesLabel],
   );
+  const rows = profiles.data ?? [];
 
   return (
     <div>
@@ -137,21 +139,30 @@ function Discover() {
         <p className="mb-3 text-xs text-subtle">{filterBits.join(" · ")}</p>
       ) : null}
 
-      {profiles.isError ? (
-        <p className="py-16 text-center text-muted">Could not load people. Try again.</p>
-      ) : profiles.isPending ? (
+      {profiles.isError && !rows.length ? (
+        <div className="py-16 text-center">
+          <p className="text-muted">Could not load people.</p>
+          <button
+            type="button"
+            onClick={() => void profiles.refetch()}
+            className="mt-4 h-11 rounded-full bg-elevated px-5 text-sm text-fg transition-transform duration-150 ease-out active:scale-[0.96]"
+          >
+            Try again
+          </button>
+        </div>
+      ) : profiles.isPending && !rows.length ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="aspect-[4/5] animate-pulse rounded-2xl bg-surface" />
           ))}
         </div>
-      ) : (profiles.data ?? []).length === 0 ? (
+      ) : rows.length === 0 ? (
         <p className="py-16 text-center text-muted">
           Nobody in {activeTab.label.toLowerCase()} within this distance yet. Widen the radius.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-in">
-          {(profiles.data ?? []).map((p) => (
+          {rows.map((p) => (
             <ProfileCard key={p.userId} profile={p} layout="feed" onLike={(prof) => like.mutate(prof)} />
           ))}
         </div>

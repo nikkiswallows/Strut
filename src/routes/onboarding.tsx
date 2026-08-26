@@ -224,7 +224,7 @@ function Onboarding() {
               <h1 className="font-display text-5xl leading-[0.92]">Identity</h1>
               <MultiChips
                 label="Identity"
-                hint="T-girl, sissy, man, woman, couple — pick what fits."
+                hint="Trans, sissy, man, woman, couple, group — or type your own."
                 options={identityTags.data ?? [...IDENTITIES]}
                 value={identities}
                 onChange={setIdentities}

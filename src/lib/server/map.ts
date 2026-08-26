@@ -1,5 +1,5 @@
 import { parseJson } from "@/lib/utils";
-import type { Profile } from "@/lib/types";
+import { asPhotoList, type Profile } from "@/lib/types";
 
 export const PROFILE_COLS = `id, user_id, handle, display_name, age, identity, pronouns, bio,
   location, looking_for, looking_for_list, photos, interests, height_cm, is_seed,
@@ -68,8 +68,8 @@ export function mapProfile(row: ProfileRow): Profile {
     bio: row.bio ?? "",
     location: row.location,
     lookingFor: asList(row.looking_for_list, row.looking_for),
-    photos: parseJson<string[]>(row.photos, []),
-    interests: parseJson<string[]>(row.interests, []),
+    photos: asPhotoList(parseJson<unknown>(row.photos, [])),
+    interests: asPhotoList(parseJson<unknown>(row.interests, [])),
     heightCm: row.height_cm == null ? null : Number(row.height_cm),
     lat: row.lat == null || row.lat === "" ? null : Number(row.lat),
     lng: row.lng == null || row.lng === "" ? null : Number(row.lng),

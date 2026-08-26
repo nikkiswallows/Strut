@@ -137,6 +137,18 @@ function Feed() {
             </button>
           </article>
         ))}
+        {feed.isError ? (
+          <div className="mt-6 py-10 text-center">
+            <p className="text-muted">Could not load the feed.</p>
+            <button
+              type="button"
+              onClick={() => void feed.refetch()}
+              className="mt-4 h-11 rounded-full bg-elevated px-5 text-sm"
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
         {feed.isPending ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (

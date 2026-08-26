@@ -1,6 +1,6 @@
 import { SEED_PROFILES, type SeedProfile } from "@/lib/seed-data";
 
-const MAX_TOKENS = 180;
+const MAX_TOKENS = 220;
 
 function systemPrompt(seed: SeedProfile): string {
   return `You are ${seed.displayName} (@${seed.handle}) texting on Strut, a dating app for T-girls, sissies, trans women, men, women, and couples.
