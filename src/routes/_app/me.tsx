@@ -103,7 +103,13 @@ function Me() {
       setEditing(false);
       toast.success("Profile saved.");
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      toast.error(
+        err.message === "Unauthorized"
+          ? "Session dropped. Sign in again, then save."
+          : err.message,
+      );
+    },
   });
 
   if (me.isPending || !p) {

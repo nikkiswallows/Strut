@@ -12,6 +12,7 @@ import {
   signIn,
 } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { captureAuthToken } from "@/lib/session-bearer";
 import { HERO_STREET } from "@/lib/seed-data";
 
 type Search = { mode?: "join" | "in" };
@@ -42,17 +43,37 @@ function Login() {
     setBusy(true);
     try {
       if (join) {
-        const { error } = await authClient.signUp.email({
+        const { data, error } = await authClient.signUp.email({
           email,
           password,
           name: name.trim() || email.split("@")[0]!,
+          fetchOptions: {
+            onSuccess(ctx) {
+              captureAuthToken(undefined, ctx.response);
+            },
+          },
         });
         if (error) throw new Error(error.message ?? "Could not create account.");
+        captureAuthToken(data);
       } else {
-        const { error } = await authClient.signIn.email({ email, password });
+        const { data, error } = await authClient.signIn.email({
+          email,
+          password,
+          fetchOptions: {
+            onSuccess(ctx) {
+              captureAuthToken(undefined, ctx.response);
+            },
+          },
+        });
         if (error) throw new Error(error.message ?? "Could not sign in.");
+        captureAuthToken(data);
       }
-      window.location.href = "/discover";
+      try {
+        await authClient.getSession();
+      } catch {
+        /* session store recovers on next fetch */
+      }
+      window.location.href = join ? "/onboarding" : "/discover";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong.");
       setBusy(false);

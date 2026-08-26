@@ -2,6 +2,7 @@ import { Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Compass, Heart, MessageCircle, Newspaper, UserRound } from "lucide-react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
+import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { getMyProfile } from "@/lib/server/profiles";
 import { listConversations } from "@/lib/server/messages";
@@ -45,6 +46,40 @@ export function AppShell() {
     return (
       <div className="grid min-h-dvh place-items-center bg-bg">
         <Mark className="size-14 animate-pulse" />
+      </div>
+    );
+  }
+  if (me.isError) {
+    const unauthorized = me.error instanceof Error && me.error.message === "Unauthorized";
+    return (
+      <div className="grid min-h-dvh place-items-center bg-bg px-6 text-center">
+        <div className="max-w-sm">
+          <p className="font-display text-3xl">Hold on.</p>
+          <p className="mt-2 text-sm text-muted">
+            {unauthorized
+              ? "Your session dropped. Sign in again and your profile will still be there."
+              : "Could not load your profile. Try once more."}
+          </p>
+          <div className="mt-6 flex flex-col gap-2">
+            {unauthorized ? (
+              <button
+                type="button"
+                onClick={() => void signOut("/login")}
+                className="h-12 rounded-lg bg-fg text-sm font-medium text-bg"
+              >
+                Sign in
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void me.refetch()}
+                className="h-12 rounded-lg bg-fg text-sm font-medium text-bg"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

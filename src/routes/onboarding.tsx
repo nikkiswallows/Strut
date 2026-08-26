@@ -8,6 +8,7 @@ import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { RedirectToSignIn } from "@/lib/auth/gates";
+import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
 import { listTags } from "@/lib/server/catalog";
@@ -109,7 +110,14 @@ function Onboarding() {
       toast.success("You're on Strut.");
       navigate({ to: "/discover" });
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      if (err.message === "Unauthorized") {
+        toast.error("Session dropped. Sign in again and we'll pick this up.");
+        void signOut("/login");
+        return;
+      }
+      toast.error(err.message);
+    },
   });
 
   if (isPending || me.isPending) {
