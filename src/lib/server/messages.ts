@@ -3,7 +3,7 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import type { ChatMessage, ConversationPreview } from "@/lib/types";
 import { parseJson } from "@/lib/utils";
-import { generateSeedReply, isSeedUser, typingDelayMs } from "./bot";
+import { generateSeedReply, isSeedUser } from "./bot";
 import { ensureSeed } from "./seed";
 
 export const listConversations = createServerFn({ method: "GET" })
@@ -166,49 +166,67 @@ export const sendMessage = createServerFn({ method: "POST" })
     ]);
 
     if (isSeedUser(otherId)) {
-      const history = await sql.query<{ sender_id: string; body: string }>(
-        `select sender_id, body from messages
-         where conversation_id = $1
-         order by created_at asc
-         limit 24`,
-        [data.conversationId],
-      );
-      const me = await sql.query<{
-        display_name: string;
-        identities: unknown;
-        role: string | null;
-        location: string | null;
-        looking_for_list: unknown;
-      }>(
-        `select display_name, identities, role, location, looking_for_list
-         from profiles where user_id = $1`,
-        [context.userId],
-      );
-      const mine = me[0];
-      const reply = await generateSeedReply({
-        seedUserId: otherId,
-        history: history.map((m) => ({ senderId: m.sender_id, body: m.body })),
-        viewer: mine
-          ? {
-              displayName: mine.display_name,
-              identities: parseJson<string[]>(mine.identities, []),
-              role: mine.role,
-              location: mine.location,
-              lookingFor: parseJson<string[]>(mine.looking_for_list, []),
-            }
-          : null,
-      });
-      if (reply) {
-        await new Promise((resolve) => setTimeout(resolve, typingDelayMs(reply)));
-        await sql.query(
-          `insert into messages (conversation_id, sender_id, body) values ($1, $2, $3)`,
-          [data.conversationId, otherId, reply],
-        );
-        await sql.query(`update conversations set last_message_at = now() where id = $1`, [
-          data.conversationId,
-        ]);
+      try {
+        await replyAsSeedUser({
+          sql,
+          conversationId: data.conversationId,
+          userId: context.userId,
+          seedUserId: otherId,
+        });
+      } catch (err) {
+        console.error("[bot] reply failed", err);
       }
     }
 
     return { ok: true };
   });
+
+async function replyAsSeedUser(input: {
+  sql: Awaited<ReturnType<typeof getSql>>;
+  conversationId: number;
+  userId: string;
+  seedUserId: string;
+}) {
+  const history = await input.sql.query<{ sender_id: string; body: string }>(
+    `select sender_id, body from messages
+     where conversation_id = $1
+     order by created_at asc
+     limit 24`,
+    [input.conversationId],
+  );
+  const last = history.at(-1);
+  if (!last || last.sender_id === input.seedUserId) return;
+  const me = await input.sql.query<{
+    display_name: string;
+    identities: unknown;
+    role: string | null;
+    location: string | null;
+    looking_for_list: unknown;
+  }>(
+    `select display_name, identities, role, location, looking_for_list
+     from profiles where user_id = $1`,
+    [input.userId],
+  );
+  const mine = me[0];
+  const reply = await generateSeedReply({
+    seedUserId: input.seedUserId,
+    history: history.map((m) => ({ senderId: m.sender_id, body: m.body })),
+    viewer: mine
+      ? {
+          displayName: mine.display_name,
+          identities: parseJson<string[]>(mine.identities, []),
+          role: mine.role,
+          location: mine.location,
+          lookingFor: parseJson<string[]>(mine.looking_for_list, []),
+        }
+      : null,
+  });
+  if (!reply) return;
+  await input.sql.query(
+    `insert into messages (conversation_id, sender_id, body) values ($1, $2, $3)`,
+    [input.conversationId, input.seedUserId, reply],
+  );
+  await input.sql.query(`update conversations set last_message_at = now() where id = $1`, [
+    input.conversationId,
+  ]);
+}
