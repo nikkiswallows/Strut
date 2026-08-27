@@ -29,11 +29,12 @@ export async function refreshLocalSession(): Promise<string | null> {
     } | null;
     if (payload?.userId && (payload.token || token)) {
       const next = payload.token || token!;
+      const existing = readLocalSession();
       writeLocalSession({
         token: next,
         userId: payload.userId,
-        name: payload.name ?? readLocalSession()?.name ?? null,
-        onboarded: payload.onboarded ?? readLocalSession()?.onboarded,
+        name: payload.name ?? (existing?.userId === payload.userId ? existing.name : null),
+        onboarded: Boolean(payload.onboarded),
       });
       return next;
     }

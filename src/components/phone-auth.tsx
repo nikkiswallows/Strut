@@ -162,7 +162,7 @@ export function PhoneAuth({
       } catch {
         /* session store recovers on next fetch */
       }
-      window.location.replace(payload?.isNew ? "/onboarding" : "/discover");
+      window.location.replace("/auth/complete");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not verify that code.");
       setBusy(false);

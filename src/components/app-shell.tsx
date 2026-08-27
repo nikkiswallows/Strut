@@ -2,9 +2,7 @@ import { Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Compass, Heart, MessageCircle, Newspaper, UserRound } from "lucide-react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { readLocalSession } from "@/lib/local-session";
-import { fetchMyProfile } from "@/lib/profile-api";
+import { useMembership } from "@/lib/auth/use-membership";
 import { fetchConversations } from "@/lib/messages-api";
 import { cn } from "@/lib/utils";
 import { Logo, Mark } from "./logo";
@@ -19,43 +17,28 @@ const NAV = [
 ] as const;
 
 export function AppShell() {
-  const { user, isPending } = useCurrentUserState();
+  const { phase, user, profile } = useMembership();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const inThread = /^\/inbox\/[^/]+$/.test(pathname);
 
-  const me = useQuery({
-    queryKey: ["me"],
-    queryFn: () => fetchMyProfile(),
-    enabled: Boolean(user),
-    retry: 1,
-  });
   const inbox = useQuery({
     queryKey: ["conversations"],
     queryFn: async () => (await fetchConversations()).conversations,
-    enabled: Boolean(user) && Boolean(me.data?.onboarded || readLocalSession()?.onboarded),
+    enabled: phase === "member",
   });
 
-  if (isPending) {
+  if (phase === "loading") {
     return (
       <div className="grid min-h-dvh place-items-center bg-bg">
         <Mark className="size-14 animate-pulse" />
       </div>
     );
   }
-  if (!user) return <RedirectToSignIn />;
-  const locallyOnboarded = Boolean(readLocalSession()?.onboarded);
-  if (me.isPending && !locallyOnboarded && !me.data) {
-    return (
-      <div className="grid min-h-dvh place-items-center bg-bg">
-        <Mark className="size-14 animate-pulse" />
-      </div>
-    );
-  }
-  if (!locallyOnboarded && !me.data?.onboarded) {
-    return <Navigate to="/onboarding" />;
-  }
+  if (phase === "guest") return <RedirectToSignIn />;
+  if (phase === "needs-profile") return <Navigate to="/onboarding" />;
 
   const unread = (inbox.data ?? []).reduce((n, c) => n + c.unread, 0);
+  const displayName = profile?.displayName || user?.displayName || "";
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
@@ -100,10 +83,10 @@ export function AppShell() {
           to="/me"
           className="mt-auto flex items-center gap-3 rounded-lg px-2 py-2 transition-[transform,background-color] duration-150 ease-out hover:bg-elevated active:scale-[0.96]"
         >
-          <Avatar src={me.data?.photos[0]} name={me.data?.displayName ?? user.displayName ?? "You"} />
+          <Avatar src={profile?.photos[0]} name={displayName} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{me.data?.displayName ?? "You"}</p>
-            <p className="truncate text-xs text-subtle">{me.data ? `@${me.data.handle}` : "Complete profile"}</p>
+            <p className="truncate text-sm font-medium">{displayName || `@${profile?.handle}`}</p>
+            <p className="truncate text-xs text-subtle">{profile ? `@${profile.handle}` : "Complete profile"}</p>
           </div>
         </Link>
       </aside>
@@ -119,7 +102,7 @@ export function AppShell() {
             <Logo markClassName="size-8" wordClassName="text-[1.65rem]" />
           </Link>
           <Link to="/me" className="transition-transform duration-150 ease-out active:scale-[0.96]">
-            <Avatar src={me.data?.photos[0]} name={me.data?.displayName ?? "You"} size="sm" />
+            <Avatar src={profile?.photos[0]} name={displayName} size="sm" />
           </Link>
         </header>
         <main

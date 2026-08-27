@@ -11,7 +11,6 @@ import { ensureSeed } from "./seed";
 export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    await ensureSeed();
     const sql = await getSql();
     const rows = await sql.query<ProfileRow>(
       `select ${PROFILE_COLS} from profiles where user_id = $1`,
@@ -88,7 +87,11 @@ export async function listDiscoverForUser(
   input: DiscoverInput | undefined,
 ) {
   const data = normalizeDiscover(input);
-  await ensureSeed();
+  try {
+    await ensureSeed();
+  } catch (err) {
+    console.error("[seed] discover continued without demo profiles:", err);
+  }
   const sql = await getSql();
   const meRows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS} from profiles where user_id = $1`,
@@ -167,7 +170,11 @@ export async function listDiscoverForUser(
 
 export async function getProfileForViewerUser(userId: string, handleRaw: string) {
   const handle = handleRaw.replace(/^@/, "").toLowerCase();
-  await ensureSeed();
+  try {
+    await ensureSeed();
+  } catch (err) {
+    console.error("[seed] viewer continued:", err);
+  }
   const sql = await getSql();
   const rows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS},
@@ -202,7 +209,12 @@ export const listDiscover = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => listDiscoverForUser(context.userId, data));
 
 export const listFeatured = createServerFn({ method: "GET" }).handler(async () => {
-  await ensureSeed();
+  try {
+    await ensureSeed();
+  } catch (err) {
+    console.error("[seed] featured skipped:", err);
+    return [];
+  }
   const sql = await getSql();
   const rows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS} from profiles
@@ -286,7 +298,11 @@ function cleanProfile(input: ProfileInput) {
 
 export async function writeProfileForUser(userId: string, input: ProfileInput) {
   const data = cleanProfile(input);
-  await ensureSeed();
+  try {
+    await ensureSeed();
+  } catch (err) {
+    console.error("[seed] save continued:", err);
+  }
   const sql = await getSql();
   const taken = await sql.query<{ user_id: string }>(
     `select user_id from profiles where handle = $1 and user_id <> $2`,

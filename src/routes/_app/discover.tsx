@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -141,7 +141,9 @@ function Discover() {
         <p className="mb-3 text-xs text-subtle">{filterBits.join(" · ")}</p>
       ) : null}
 
-      {profiles.isError && !rows.length ? (
+      {profiles.isError && !rows.length && /unauthorized/i.test(profiles.error instanceof Error ? profiles.error.message : "") ? (
+        <Navigate to="/login" />
+      ) : profiles.isError && !rows.length ? (
         <div className="py-16 text-center">
           <p className="text-muted">Could not load people.</p>
           <button

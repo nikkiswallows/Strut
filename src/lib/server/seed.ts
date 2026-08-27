@@ -55,6 +55,7 @@ async function runSeed() {
     const coord = coordForLocation(p.location);
     const hideAge = Boolean(p.hideAge);
 
+    try {
     await sql`
       insert into profiles (
         user_id, handle, display_name, age, identity, pronouns, bio, location,
@@ -90,6 +91,9 @@ async function runSeed() {
         is_seed = true,
         onboarded = true
     `;
+    } catch (err) {
+      console.error("[seed] skip", p.handle, err);
+    }
   }
 
   await sql`delete from posts where user_id like 'seed-%'`;

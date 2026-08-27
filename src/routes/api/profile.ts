@@ -5,7 +5,6 @@ import { getSql } from "@/lib/db";
 import { requireSession, sessionHeaders } from "@/lib/server/device-session.server";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "@/lib/server/map";
 import { writeProfileForUser, type ProfileInput } from "@/lib/server/profiles";
-import { ensureSeed } from "@/lib/server/seed";
 
 type ProfileBody = ProfileInput & { sessionToken?: string | null };
 
@@ -15,7 +14,6 @@ export const Route = createFileRoute("/api/profile")({
       GET: async ({ request }) => {
         const userId = await userIdFromRequest(request);
         if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
-        await ensureSeed();
         const sql = await getSql();
         const rows = await sql.query<ProfileRow>(
           `select ${PROFILE_COLS} from profiles where user_id = $1`,

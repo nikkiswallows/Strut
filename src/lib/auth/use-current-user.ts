@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  clearLocalSession,
   readLocalSession,
   subscribeLocalSession,
   tokenFromAnywhere,
@@ -50,14 +51,15 @@ async function recoverSessionFromServer(): Promise<void> {
     writeLocalSession({
       token: payload.token || token!,
       userId: payload.userId,
-      name: payload.name ?? existing?.name ?? null,
-      onboarded: payload.onboarded ?? existing?.onboarded,
+      name: payload.name ?? (existing?.userId === payload.userId ? existing.name : null),
+      onboarded: Boolean(payload.onboarded),
     });
     return;
   }
-  // Do not wipe a local session just because this GET missed cookies/token.
-  // iPhone Safari drops Lax cookies on some fetches; logging them out here is
-  // what stranded people on /login with no way back through Google.
+  // We presented a bearer token and the server still has no user. That session
+  // is dead — do not keep a fake "You" profile in the app. If there was no
+  // token, this GET may have dropped cookies; leave storage alone.
+  if (token && res.ok) clearLocalSession();
 }
 
 export function useCurrentUserState(): CurrentUserState {

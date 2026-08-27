@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Kicker, Logo, Wordmark } from "@/components/logo";
 import { Photo } from "@/components/photo";
 import { Button } from "@/components/ui/button";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { useMembership } from "@/lib/auth/use-membership";
 import { HERO_LOCKER, HERO_PHOTO, HERO_STREET } from "@/lib/seed-data";
 import { listFeatured } from "@/lib/server/profiles";
 import { shownAge } from "@/lib/types";
@@ -27,10 +27,11 @@ const PILLARS = [
 ];
 
 function Home() {
-  const { user, isPending } = useCurrentUserState();
+  const { phase } = useMembership();
   const featured = useQuery({ queryKey: ["featured"], queryFn: () => listFeatured() });
 
-  if (!isPending && user) return <Navigate to="/discover" />;
+  if (phase === "member") return <Navigate to="/discover" />;
+  if (phase === "needs-profile") return <Navigate to="/onboarding" />;
 
   return (
     <div className="min-h-dvh bg-bg text-fg">

@@ -61,7 +61,7 @@ function Feed() {
         }}
       >
         <div className="flex gap-3">
-          <Avatar src={me.data?.photos[0]} name={me.data?.displayName ?? "You"} />
+          <Avatar src={me.data?.photos[0]} name={me.data?.displayName || ""} />
           <Textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}

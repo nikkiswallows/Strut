@@ -1,4 +1,9 @@
-import { markOnboarded, tokenFromAnywhere, writeLocalSession } from "@/lib/local-session";
+import {
+  clearLocalSession,
+  markOnboarded,
+  tokenFromAnywhere,
+  writeLocalSession,
+} from "@/lib/local-session";
 import { persistPhotoList } from "@/lib/media";
 import { refreshLocalSession, sessionHeaders } from "@/lib/session-client";
 import type { ProfileInput } from "@/lib/server/profiles";
@@ -12,7 +17,11 @@ export async function fetchMyProfile(): Promise<Profile | null> {
     cache: "no-store",
     headers: sessionHeaders(token),
   });
-  if (res.status === 401) return null;
+  if (res.status === 401) {
+    // Bearer was sent and the server still said no — that token is dead.
+    if (token) clearLocalSession();
+    throw new Error("Unauthorized");
+  }
   if (!res.ok) throw new Error("Could not load your profile.");
   const profile = (await res.json()) as Profile | null;
   if (profile?.onboarded) markOnboarded();

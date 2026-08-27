@@ -30,3 +30,23 @@ test("refuses empty token or user id", () => {
   writeLocalSession({ token: "stk_oktokenabcdefghijklmnopqrstuvwx", userId: "  ", name: null });
   assert.equal(readLocalSession(), null);
 });
+
+test("switching accounts does not inherit onboarded or name", () => {
+  clearLocalSession();
+  writeLocalSession({
+    token: "stk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    userId: "user-1",
+    name: "Old",
+    onboarded: true,
+  });
+  writeLocalSession({
+    token: "stk_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    userId: "user-2",
+    name: null,
+  });
+  const session = readLocalSession();
+  assert.equal(session?.userId, "user-2");
+  assert.equal(session?.name, null);
+  assert.equal(session?.onboarded, false);
+  clearLocalSession();
+});

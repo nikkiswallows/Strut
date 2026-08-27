@@ -128,11 +128,14 @@ export function readLocalSession(): LocalSession | null {
 
 export function writeLocalSession(session: LocalSession): void {
   const prev = memory ?? readLocalSession();
+  const userId = session.userId.trim();
+  const sameUser = Boolean(prev && prev.userId === userId);
   const next: LocalSession = {
     token: session.token.trim(),
-    userId: session.userId.trim(),
-    name: session.name ?? prev?.name ?? null,
-    onboarded: session.onboarded ?? prev?.onboarded ?? false,
+    userId,
+    // A new account must not inherit the previous person's name or onboarded flag.
+    name: session.name ?? (sameUser ? prev?.name ?? null : null),
+    onboarded: session.onboarded ?? (sameUser ? Boolean(prev?.onboarded) : false),
   };
   if (!next.token || !next.userId) return;
   memory = next;

@@ -11,7 +11,7 @@ import {
   getBearerToken,
   signIn,
 } from "@/lib/auth/client";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { useMembership } from "@/lib/auth/use-membership";
 import { captureAuthToken } from "@/lib/session-bearer";
 import { writeLocalSession } from "@/lib/local-session";
 import { HERO_STREET } from "@/lib/seed-data";
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/login")({
 
 function Login() {
   const { mode } = Route.useSearch();
-  const { user, isPending } = useCurrentUserState();
+  const { phase } = useMembership();
   const [join, setJoin] = useState(mode === "join");
   const [method, setMethod] = useState<"phone" | "email">("email");
   const [phonePhase, setPhonePhase] = useState<"number" | "code">("number");
@@ -36,8 +36,9 @@ function Login() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (isPending) return <div className="min-h-dvh bg-bg" />;
-  if (user) return <Navigate to="/discover" />;
+  if (phase === "loading") return <div className="min-h-dvh bg-bg" />;
+  if (phase === "member") return <Navigate to="/discover" />;
+  if (phase === "needs-profile") return <Navigate to="/onboarding" />;
 
   async function onEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,9 +78,10 @@ function Login() {
       } catch {
         /* session store recovers on next fetch */
       }
-      window.location.replace(payload?.isNew || join ? "/onboarding" : "/discover");
+      window.location.replace("/auth/complete");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Something went wrong.";
+      if (/create a profile/i.test(raw) && !join) setJoin(true);
       toast.error(
         /invalid origin/i.test(raw)
           ? "This page couldn't verify the sign-in. Refresh and try again."

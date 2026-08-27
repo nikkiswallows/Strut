@@ -10,19 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { BIO_PLACEHOLDER, decreeFor, judgeRole } from "@/lib/bnwo";
 import { RedirectToSignIn } from "@/lib/auth/gates";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { useMembership } from "@/lib/auth/use-membership";
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { queryClient } from "@/lib/query-client";
 import { app } from "@/lib/http";
 import { fetchMyProfile, postProfile } from "@/lib/profile-api";
-import { readLocalSession } from "@/lib/local-session";
 import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
 
 function Onboarding() {
-  const { user, isPending } = useCurrentUserState();
+  const { phase, user, profile } = useMembership();
   const navigate = useNavigate();
   const me = useQuery({
     queryKey: ["me"],
@@ -69,7 +68,7 @@ function Onboarding() {
   useEffect(() => {
     if (hydrated || me.isPending) return;
     const draft = readOnboardingDraft();
-    const name = me.data?.displayName || user?.displayName || draft?.displayName || "";
+    const name = me.data?.displayName || profile?.displayName || user?.displayName || draft?.displayName || "";
     if (name) {
       setDisplayName(name);
       setHandle(slugifyHandle(me.data?.handle || draft?.handle || name));
@@ -184,11 +183,11 @@ function Onboarding() {
     },
   });
 
-  if (isPending || (user && me.isPending && !readLocalSession()?.onboarded)) {
+  if (phase === "loading") {
     return <div className="min-h-dvh bg-bg" />;
   }
-  if (!user) return <RedirectToSignIn />;
-  if (me.data?.onboarded || readLocalSession()?.onboarded) return <Navigate to="/discover" />;
+  if (phase === "guest" || !user) return <RedirectToSignIn />;
+  if (phase === "member") return <Navigate to="/discover" />;
 
   const steps = ["You", "Identity", "Looks", "Voice"];
 
