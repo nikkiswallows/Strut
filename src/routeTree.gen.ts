@@ -27,6 +27,7 @@ import { Route as AuthCompleteRouteImport } from './routes/auth.complete'
 import { Route as AppInboxIndexRouteImport } from './routes/_app/inbox.index'
 import { Route as AppInboxIdRouteImport } from './routes/_app/inbox.$id'
 import { Route as AppUHandleRouteImport } from './routes/_app/u.$handle'
+import { Route as ApiAiSelftestRouteImport } from './routes/api/ai/selftest'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMessagesListRouteImport } from './routes/api/messages/list'
 import { Route as ApiMessagesOpenRouteImport } from './routes/api/messages/open'
@@ -125,6 +126,11 @@ const AppUHandleRoute = AppUHandleRouteImport.update({
   path: '/u/$handle',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiAiSelftestRoute = ApiAiSelftestRouteImport.update({
+  id: '/api/ai/selftest',
+  path: '/api/ai/selftest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -183,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/auth/complete': typeof AuthCompleteRoute
   '/inbox/$id': typeof AppInboxIdRoute
   '/u/$handle': typeof AppUHandleRoute
+  '/api/ai/selftest': typeof ApiAiSelftestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/messages/list': typeof ApiMessagesListRoute
   '/api/messages/open': typeof ApiMessagesOpenRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/auth/complete': typeof AuthCompleteRoute
   '/inbox/$id': typeof AppInboxIdRoute
   '/u/$handle': typeof AppUHandleRoute
+  '/api/ai/selftest': typeof ApiAiSelftestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/messages/list': typeof ApiMessagesListRoute
   '/api/messages/open': typeof ApiMessagesOpenRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/auth/complete': typeof AuthCompleteRoute
   '/_app/inbox/$id': typeof AppInboxIdRoute
   '/_app/u/$handle': typeof AppUHandleRoute
+  '/api/ai/selftest': typeof ApiAiSelftestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/messages/list': typeof ApiMessagesListRoute
   '/api/messages/open': typeof ApiMessagesOpenRoute
@@ -267,6 +276,7 @@ export interface FileRouteTypes {
     | '/auth/complete'
     | '/inbox/$id'
     | '/u/$handle'
+    | '/api/ai/selftest'
     | '/api/auth/$'
     | '/api/messages/list'
     | '/api/messages/open'
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
     | '/auth/complete'
     | '/inbox/$id'
     | '/u/$handle'
+    | '/api/ai/selftest'
     | '/api/auth/$'
     | '/api/messages/list'
     | '/api/messages/open'
@@ -321,6 +332,7 @@ export interface FileRouteTypes {
     | '/auth/complete'
     | '/_app/inbox/$id'
     | '/_app/u/$handle'
+    | '/api/ai/selftest'
     | '/api/auth/$'
     | '/api/messages/list'
     | '/api/messages/open'
@@ -343,6 +355,7 @@ export interface RootRouteChildren {
   ApiMediaRoute: typeof ApiMediaRoute
   ApiProfileRoute: typeof ApiProfileRoute
   AuthCompleteRoute: typeof AuthCompleteRoute
+  ApiAiSelftestRoute: typeof ApiAiSelftestRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiMessagesListRoute: typeof ApiMessagesListRoute
   ApiMessagesOpenRoute: typeof ApiMessagesOpenRoute
@@ -481,6 +494,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUHandleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/ai/selftest': {
+      id: '/api/ai/selftest'
+      path: '/api/ai/selftest'
+      fullPath: '/api/ai/selftest'
+      preLoaderRoute: typeof ApiAiSelftestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -585,6 +605,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMediaRoute: ApiMediaRoute,
   ApiProfileRoute: ApiProfileRoute,
   AuthCompleteRoute: AuthCompleteRoute,
+  ApiAiSelftestRoute: ApiAiSelftestRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiMessagesListRoute: ApiMessagesListRoute,
   ApiMessagesOpenRoute: ApiMessagesOpenRoute,

@@ -80,14 +80,14 @@ function allProviders(): Provider[] {
       label: "Groq",
       apiBase: "https://api.groq.com/openai/v1",
       apiKey: groq,
-      // Current (post-2026) Groq ids; Kimi is notably more roleplay-friendly.
+      // Known Groq production ids (verified family). Runtime discovery appends
+      // any other chat models your key can access and ranks them.
       models: withOverride([
-        "moonshotai/kimi-k2-instruct",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
         "openai/gpt-oss-120b",
         "openai/gpt-oss-20b",
-        "z-ai/glm-4.6",
-        "qwen/qwen3-32b",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
       ]),
     });
   }
@@ -185,12 +185,76 @@ async function callOneModel(
       throw new Error(`HTTP ${res.status}: ${short}`);
     }
     const body = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
+      choices?: { message?: { content?: string; reasoning_content?: string } }[];
     };
-    return (body.choices?.[0]?.message?.content ?? "").trim();
+    const msg = body.choices?.[0]?.message;
+    // Some reasoning models put text in content; if empty but there is
+    // reasoning_content, use it (stripped of the think tags elsewhere).
+    return (msg?.content ?? "").trim() || (msg?.reasoning_content ?? "").trim();
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Fetch a provider's LIVE model list (OpenAI-compatible GET /models). Model ids
+ * churn constantly (Groq retires them), so discovering them at runtime means a
+ * retired/renamed id never silently breaks chat.
+ */
+async function fetchRemoteModels(provider: Provider): Promise<string[]> {
+  try {
+    const res = await fetch(`${provider.apiBase}/models`, {
+      headers: { Authorization: `Bearer ${provider.apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as {
+      data?: { id?: string }[];
+      models?: { id?: string }[];
+    };
+    const list = body.data ?? body.models ?? [];
+    return list
+      .map((m) => m.id ?? "")
+      .filter(Boolean)
+      .filter((id) => !/whisper|tts|speech|embedding|rerank|guard|moderation|safety|transcri/i.test(id));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rank a model id by how likely it is to be a good, permissive CHAT model.
+ * Higher = try first. Heavily-filtered or non-chat models rank low.
+ */
+const RP_PRIORITY = [
+  "kimi", "llama-4", "llama4", "llama-3.3", "llama-3-70b", "3.3-70b",
+  "mistral-large", "nemo", "magistral", "qwen3-coder", "qwen3-235", "qwen-2.5-7",
+  "deepseek", "grok", "llama-3.1-70b", "70b", "minimax-m3", "glm",
+  "llama-3.1-8b", "8b", "gpt-oss", "gemma", "compound",
+];
+
+function rankScore(id: string): number {
+  const low = id.toLowerCase();
+  for (let i = 0; i < RP_PRIORITY.length; i++) {
+    if (low.includes(RP_PRIORITY[i]!)) return RP_PRIORITY.length - i;
+  }
+  return 0;
+}
+
+/** Candidate models for a provider: curated ids first, then live-discovered ones. */
+async function candidateModels(
+  provider: Provider,
+  discover: boolean,
+): Promise<string[]> {
+  const ordered = [...provider.models];
+  if (discover) {
+    const remote = await fetchRemoteModels(provider);
+    remote.sort((a, b) => rankScore(b) - rankScore(a));
+    for (const id of remote) {
+      if (!ordered.some((m) => m.toLowerCase() === id.toLowerCase())) ordered.push(id);
+    }
+  }
+  return ordered;
 }
 
 export type ChatResult = {
@@ -218,12 +282,27 @@ export async function chatComplete(
 
   const errors: string[] = [];
   for (const provider of providers) {
+    const tried = new Set<string>();
+    // 1) curated model ids
     for (const model of provider.models) {
+      tried.add(model.toLowerCase());
       try {
         const raw = await callOneModel(provider, model, messages, settings);
-        if (!isRefusal(raw)) {
-          return { text: raw, provider: provider.id, model };
-        }
+        if (!isRefusal(raw)) return { text: raw, provider: provider.id, model };
+        errors.push(`${provider.id}/${model}: refused`);
+      } catch (err) {
+        errors.push(`${provider.id}/${model}: ${err instanceof Error ? err.message : "failed"}`);
+      }
+    }
+    // 2) if all curated ids failed, discover the provider's LIVE models and try
+    //    the most roleplay-friendly ones (max 8) — survives model-id churn.
+    const remote = (await candidateModels(provider, true)).filter(
+      (m) => !tried.has(m.toLowerCase()),
+    );
+    for (const model of remote.slice(0, 8)) {
+      try {
+        const raw = await callOneModel(provider, model, messages, settings);
+        if (!isRefusal(raw)) return { text: raw, provider: provider.id, model };
         errors.push(`${provider.id}/${model}: refused`);
       } catch (err) {
         errors.push(`${provider.id}/${model}: ${err instanceof Error ? err.message : "failed"}`);
@@ -266,7 +345,10 @@ export async function aiSelfTest(): Promise<SelfTestReport> {
       configured: true,
       results: [],
     };
-    for (const model of provider.models) {
+    // Curated ids first, then the provider's live-discovered chat models
+    // (discovery runs in the self-test so we can see what actually answers).
+    const candidates = await candidateModels(provider, true);
+    for (const model of candidates.slice(0, 14)) {
       try {
         const raw = await callOneModel(provider, model, messages, {
           maxTokens: 80,
