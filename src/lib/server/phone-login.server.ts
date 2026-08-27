@@ -101,8 +101,25 @@ async function createPhoneSession(
   let cookies: string[] = [];
   let isNew = !existing[0];
 
+  const signInRecovering = async (userId?: string | null) => {
+    try {
+      return await signIn();
+    } catch (err) {
+      const id =
+        userId ||
+        (
+          await sql.query<{ id: string }>(`select id from "user" where lower(email) = $1 limit 1`, [
+            email,
+          ])
+        )[0]?.id;
+      if (!id) throw err;
+      await attachPassword(id, password);
+      return signIn();
+    }
+  };
+
   if (existing[0]) {
-    const signed = await signIn();
+    const signed = await signInRecovering(existing[0].user_id);
     token = signed.token;
     cookies = signed.cookies;
   } else {
@@ -112,7 +129,7 @@ async function createPhoneSession(
       cookies = signed.cookies;
       isNew = true;
     } catch {
-      const signed = await signIn();
+      const signed = await signInRecovering(null);
       token = signed.token;
       cookies = signed.cookies;
       isNew = false;

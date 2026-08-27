@@ -121,7 +121,7 @@ export function PhoneAuth({
       setSent(result);
       setIso(nextIso);
       setNational(nextNational);
-      setCode("");
+      setCode(result.previewCode ?? "");
       setResendIn(result.resendIn);
       setPhase("code");
       onPhase?.("code");
