@@ -4,6 +4,7 @@ import {
   userIdFromRequest,
 } from "@/lib/auth/session-from-request.server";
 import { getSql } from "@/lib/db";
+import { sessionHeaders } from "@/lib/server/device-session.server";
 
 export const Route = createFileRoute("/api/session/token")({
   server: {
@@ -12,25 +13,33 @@ export const Route = createFileRoute("/api/session/token")({
         const userId = await userIdFromRequest(request);
         if (!userId) {
           return Response.json(
-            { token: null, userId: null, name: null },
+            { token: null, userId: null, name: null, onboarded: false },
             { headers: { "cache-control": "no-store" } },
           );
         }
-        const token =
+        const presented =
           request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ||
-          (await sessionTokenForUser(userId));
+          request.headers.get("x-strut-session")?.trim() ||
+          null;
+        const token = presented || (await sessionTokenForUser(userId));
         const sql = await getSql();
-        const rows = await sql.query<{ name: string }>(
+        const userRows = await sql.query<{ name: string }>(
           `select name from "user" where id = $1`,
           [userId],
         );
-        const headers = new Headers({
-          "content-type": "application/json",
-          "cache-control": "no-store",
-        });
-        if (token) headers.set("set-auth-token", token);
+        const profileRows = await sql.query<{ onboarded: boolean }>(
+          `select onboarded from profiles where user_id = $1`,
+          [userId],
+        );
+        const headers = token ? sessionHeaders(token) : new Headers({ "cache-control": "no-store" });
+        headers.set("content-type", "application/json");
         return new Response(
-          JSON.stringify({ token, userId, name: rows[0]?.name ?? null }),
+          JSON.stringify({
+            token,
+            userId,
+            name: userRows[0]?.name ?? null,
+            onboarded: Boolean(profileRows[0]?.onboarded),
+          }),
           { status: 200, headers },
         );
       },

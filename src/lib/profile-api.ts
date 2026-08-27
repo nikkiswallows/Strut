@@ -1,45 +1,7 @@
-import { authEnabled, getBearerToken } from "@/lib/auth/client";
+import { getBearerToken } from "@/lib/auth/client";
 import { markOnboarded, writeLocalSession } from "@/lib/local-session";
 import type { ProfileInput } from "@/lib/server/profiles";
 import type { Profile } from "@/lib/types";
-import { storeSessionBearer } from "@/lib/session-bearer";
-
-export async function ensureLocalSession(displayName?: string): Promise<string | null> {
-  const existing = getBearerToken();
-  try {
-    const res = await fetch("/api/session/ensure", {
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json",
-        ...(existing ? { authorization: `Bearer ${existing}`, "x-strut-session": existing } : {}),
-      },
-      body: JSON.stringify({ sessionToken: existing, displayName }),
-    });
-    const payload = (await res.json().catch(() => null)) as {
-      token?: string;
-      userId?: string;
-      name?: string | null;
-    } | null;
-    if (payload?.token && payload.userId) {
-      writeLocalSession({
-        token: payload.token,
-        userId: payload.userId,
-        name: payload.name ?? displayName ?? null,
-      });
-      return payload.token;
-    }
-    if (payload?.token) {
-      storeSessionBearer(payload.token);
-      return payload.token;
-    }
-  } catch {
-    /* ignore */
-  }
-  return getBearerToken();
-}
 
 function authHeaders(token: string | null): HeadersInit {
   return {
@@ -49,36 +11,6 @@ function authHeaders(token: string | null): HeadersInit {
 }
 
 export async function fetchMyProfile(): Promise<Profile | null> {
-  // When auth is disabled (VITE_AUTH_ENABLED=false), return the dev user fallback
-  if (!authEnabled) return {
-    id: 0,
-    userId: "dev-user",
-    handle: "dev-user",
-    displayName: "Dev User",
-    age: null,
-    hideAge: false,
-    identities: ["T-Girl"],
-    pronouns: ["she/her"],
-    role: "Switch",
-    bio: "",
-    location: "",
-    lookingFor: ["Dates"],
-    photos: [],
-    interests: [],
-    heightCm: null,
-    lat: null,
-    lng: null,
-    isSeed: false,
-    lastActive: "",
-    onboarded: false,
-    createdAt: "",
-    likedByMe: undefined,
-    likesMe: undefined,
-    matched: undefined,
-    following: undefined,
-    likeCount: undefined,
-    distanceMiles: undefined,
-  };
   const token = getBearerToken();
   if (!token) return null;
   const res = await fetch("/api/profile", {
@@ -103,6 +35,7 @@ type ProfileResponse = {
 
 export async function postProfile(input: ProfileInput) {
   const token = getBearerToken();
+  if (!token) throw new Error("Unauthorized");
   const res = await fetch("/api/profile", {
     method: "POST",
     credentials: "same-origin",
@@ -126,9 +59,6 @@ export async function postProfile(input: ProfileInput) {
       name: payload.displayName ?? input.displayName ?? null,
       onboarded: true,
     });
-  } else if (payload?.token) {
-    storeSessionBearer(payload.token);
-    markOnboarded();
   } else {
     markOnboarded();
   }

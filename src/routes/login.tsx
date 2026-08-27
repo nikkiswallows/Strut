@@ -8,7 +8,6 @@ import { Field, Input } from "@/components/ui/input";
 import {
   GROK_PROVIDERS,
   authClient,
-  authEnabled,
   getBearerToken,
   signIn,
 } from "@/lib/auth/client";
@@ -21,7 +20,7 @@ type Search = { mode?: "join" | "in" };
 
 export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>): Search => ({
-    mode: s.mode === "join" ? "join" : "in",
+    mode: s.mode === "join" ? "join" : s.mode === "in" ? "in" : undefined,
   }),
   component: Login,
 });
@@ -30,18 +29,18 @@ function Login() {
   const { mode } = Route.useSearch();
   const { user, isPending } = useCurrentUserState();
   const [join, setJoin] = useState(mode === "join");
-  const [method, setMethod] = useState<"phone" | "email">("phone");
+  const [method, setMethod] = useState<"phone" | "email">("email");
   const [phonePhase, setPhonePhase] = useState<"number" | "code">("number");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (!isPending && user) return <Navigate to="/discover" />;
+  if (isPending) return <div className="min-h-dvh bg-bg" />;
+  if (user) return <Navigate to="/discover" />;
 
   async function onEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!authEnabled) return;
     setBusy(true);
     try {
       const res = await fetch("/api/email/login", {
@@ -162,7 +161,7 @@ function Login() {
                       className="h-12 text-base"
                     />
                   </Field>
-                  <Button type="submit" size="lg" className="mt-2 h-14 w-full text-base" disabled={busy || !authEnabled}>
+                  <Button type="submit" size="lg" className="mt-2 h-14 w-full text-base" disabled={busy}>
                     {busy ? "One moment…" : join ? "Enter the order" : "Sign in"}
                   </Button>
                 </form>
@@ -177,15 +176,17 @@ function Login() {
                   <span className="h-px flex-1 bg-border" />
                 </div>
 
-            {authEnabled ? (
-              <div className="space-y-2">
+            <div className="space-y-2">
                 {GROK_PROVIDERS.map((p) => (
                   <Button
                     key={p.providerId}
                     variant="outline"
                     className="h-12 w-full"
                     onClick={() => {
-                      void signIn(p.providerId, { callbackURL: "/discover" }).catch((err) => {
+                      void signIn(p.providerId, {
+                        callbackURL: "/auth/complete",
+                        errorCallbackURL: "/login",
+                      }).catch((err) => {
                         toast.error(
                           err instanceof Error
                             ? err.message
@@ -212,9 +213,6 @@ function Login() {
                   {method === "phone" ? "Use email instead" : "Use phone instead"}
                 </Button>
               </div>
-            ) : (
-              <p className="text-sm text-muted">Sign-in is disabled.</p>
-            )}
 
             <p className="mt-8 text-center text-sm text-muted">
               {join ? "Already in the order?" : "New here?"}{" "}

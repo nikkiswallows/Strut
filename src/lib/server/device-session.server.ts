@@ -2,8 +2,12 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
 import { sessionTokenForUser, userIdFromRequest } from "@/lib/auth/session-from-request.server";
 
-export function sessionCookie(token: string): string {
-  return `strut_session=${encodeURIComponent(token)}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+export function sessionCookie(token: string, name = "strut_session"): string {
+  return `${name}=${encodeURIComponent(token)}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+}
+
+export function clearSessionCookie(name: string): string {
+  return `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
 }
 
 export function sessionHeaders(token: string): Headers {
@@ -11,30 +15,22 @@ export function sessionHeaders(token: string): Headers {
     "cache-control": "no-store",
     "set-auth-token": token,
   });
-  headers.append("set-cookie", sessionCookie(token));
+  headers.append("set-cookie", sessionCookie(token, "strut_session"));
+  headers.append("set-cookie", sessionCookie(token, "strut_at"));
   return headers;
 }
 
-export async function createDeviceSession(
-  name: string,
-): Promise<{ userId: string; token: string }> {
-  const sql = await getSql();
-  const userId = randomUUID();
-  const sessionId = randomUUID();
-  const token = `stk_${randomBytes(32).toString("base64url")}`;
-  const email = `device-${userId.replace(/-/g, "")}@strut.app`;
-  const display = (name || "Member").trim().slice(0, 40) || "Member";
-  await sql.query(
-    `insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
-     values ($1, $2, $3, false, now(), now())`,
-    [userId, display, email],
-  );
-  await sql.query(
-    `insert into session (id, "expiresAt", token, "createdAt", "updatedAt", "userId")
-     values ($1, now() + interval '365 days', $2, now(), now(), $3)`,
-    [sessionId, token, userId],
-  );
-  return { userId, token };
+export function clearSessionHeaders(): Headers {
+  const headers = new Headers({ "cache-control": "no-store" });
+  for (const name of [
+    "strut_session",
+    "strut_at",
+    "__Host-grok-auth.session_token",
+    "__Host-grok-auth.session_data",
+  ]) {
+    headers.append("set-cookie", clearSessionCookie(name));
+  }
+  return headers;
 }
 
 export async function mintSessionForUser(userId: string): Promise<string> {
@@ -50,18 +46,17 @@ export async function mintSessionForUser(userId: string): Promise<string> {
   return token;
 }
 
-export async function ensureSession(
+/** Look up an existing login. Never creates an anonymous user. */
+export async function requireSession(
   request: Request,
   extraToken?: string | null,
-  name?: string,
-): Promise<{ userId: string; token: string; created: boolean }> {
+): Promise<{ userId: string; token: string }> {
   const existingId = await userIdFromRequest(request, extraToken);
-  if (existingId) {
-    const token = await mintSessionForUser(existingId);
-    return { userId: existingId, token, created: false };
+  if (!existingId) {
+    throw new Error("Unauthorized");
   }
-  const created = await createDeviceSession(name || "Member");
-  return { ...created, created: true };
+  const token = await mintSessionForUser(existingId);
+  return { userId: existingId, token };
 }
 
 export async function migrateProfile(fromUserId: string, toUserId: string): Promise<void> {

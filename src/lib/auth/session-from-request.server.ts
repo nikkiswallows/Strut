@@ -1,59 +1,7 @@
 import { getSql } from "@/lib/db";
+import { tokenCandidates, tokensFromRequest } from "./session-tokens";
 
-const COOKIE_NAMES = new Set([
-  "strut_session",
-  "__Host-grok-auth.session_token",
-  "grok-auth.session_token",
-  "better-auth.session_token",
-  "strut.session_token",
-]);
-
-function decode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-export function tokenCandidates(raw: string | null | undefined): string[] {
-  if (!raw) return [];
-  const trimmed = raw.trim().replace(/^Bearer\s+/i, "");
-  if (!trimmed) return [];
-  const decoded = decode(trimmed);
-  const out = new Set<string>();
-  for (const value of [trimmed, decoded]) {
-    const clean = value.trim();
-    if (!clean) continue;
-    out.add(clean);
-    const dot = clean.lastIndexOf(".");
-    if (dot > 8) out.add(clean.slice(0, dot));
-  }
-  return [...out].filter((value) => value.length >= 8 && value.length < 512);
-}
-
-function tokensFromCookieHeader(cookie: string | null): string[] {
-  if (!cookie) return [];
-  const found: string[] = [];
-  for (const part of cookie.split(/;\s*/)) {
-    const eq = part.indexOf("=");
-    if (eq < 0) continue;
-    const name = part.slice(0, eq).trim();
-    if (COOKIE_NAMES.has(name) || /session_token$/i.test(name) || name === "strut_session") {
-      found.push(...tokenCandidates(part.slice(eq + 1)));
-    }
-  }
-  return found;
-}
-
-export function tokensFromRequest(request: Request, extra?: string | null): string[] {
-  return [
-    ...tokenCandidates(extra),
-    ...tokenCandidates(request.headers.get("authorization")),
-    ...tokenCandidates(request.headers.get("x-strut-session")),
-    ...tokensFromCookieHeader(request.headers.get("cookie")),
-  ].filter((value, index, all) => all.indexOf(value) === index);
-}
+export { tokenCandidates, tokensFromRequest };
 
 export async function lookupUserIdByTokens(tokens: string[]): Promise<string | null> {
   if (!tokens.length) return null;
@@ -110,4 +58,12 @@ export async function sessionTokenForUser(userId: string): Promise<string | null
     [userId],
   );
   return rows[0]?.token ?? null;
+}
+
+export async function deleteSessionsByTokens(tokens: string[]): Promise<void> {
+  if (!tokens.length) return;
+  const sql = await getSql();
+  for (const token of tokens) {
+    await sql.query(`delete from session where token = $1`, [token]);
+  }
 }

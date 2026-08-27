@@ -81,9 +81,9 @@ function sessionSecret(): string {
   return previewAuthSecret();
 }
 
-// Explicit off-switch. The deployer sets `VITE_AUTH_ENABLED=true` when it
-// provisions auth; set it to "false" to force auth off everywhere (dev user).
-const authDisabled = env("VITE_AUTH_ENABLED") === "false";
+// Auth stays on. The old VITE_AUTH_ENABLED=false switch minted a shared
+// "dev user" and hid login on Vercel.
+const authDisabled = false;
 
 // Broker federation creds: the deployer injects a per-app client when deployed;
 // otherwise fall back to the shared live-preview client, which the broker accepts

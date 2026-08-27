@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 import { getSql } from "@/lib/db";
-import { ensureSession, sessionHeaders } from "@/lib/server/device-session.server";
+import { requireSession, sessionHeaders } from "@/lib/server/device-session.server";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "@/lib/server/map";
 import { writeProfileForUser, type ProfileInput } from "@/lib/server/profiles";
 import { ensureSeed } from "@/lib/server/seed";
@@ -28,11 +28,7 @@ export const Route = createFileRoute("/api/profile")({
         try {
           const input = (await request.json()) as ProfileBody;
           const { sessionToken, ...profileInput } = input;
-          const session = await ensureSession(
-            request,
-            sessionToken,
-            profileInput.displayName,
-          );
+          const session = await requireSession(request, sessionToken);
           const profile = await writeProfileForUser(session.userId, profileInput);
           const headers = sessionHeaders(session.token);
           headers.set("content-type", "application/json");
@@ -46,7 +42,10 @@ export const Route = createFileRoute("/api/profile")({
           );
         } catch (err) {
           const message = err instanceof Error ? err.message : "Could not save profile.";
-          return Response.json({ error: message }, { status: 400 });
+          return Response.json(
+            { error: message },
+            { status: message === "Unauthorized" ? 401 : 400 },
+          );
         }
       },
     },

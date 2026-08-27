@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
+import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
 import { queryClient } from "@/lib/query-client";
@@ -192,6 +193,7 @@ function Onboarding() {
   if (isPending || (user && me.isPending && !readLocalSession()?.onboarded)) {
     return <div className="min-h-dvh bg-bg" />;
   }
+  if (!user) return <RedirectToSignIn />;
   if (me.data?.onboarded || readLocalSession()?.onboarded) return <Navigate to="/discover" />;
 
   const steps = ["You", "Identity", "Looks", "Voice"];

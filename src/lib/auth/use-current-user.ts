@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { authEnabled } from "./client";
 import {
+  clearLocalSession,
   readLocalSession,
   subscribeLocalSession,
   tokenFromAnywhere,
@@ -13,14 +13,6 @@ export type AppUser = {
   primaryEmail: string | null;
   profileImageUrl: string | null;
   isDevFallback: boolean;
-};
-
-export const DEV_USER: AppUser = {
-  id: "dev-user",
-  displayName: "Dev User",
-  primaryEmail: "dev@example.com",
-  profileImageUrl: null,
-  isDevFallback: true,
 };
 
 export type CurrentUserState = {
@@ -40,46 +32,52 @@ function userFromLocal(): AppUser | null {
   };
 }
 
+async function recoverSessionFromServer(): Promise<void> {
+  const existing = readLocalSession();
+  const token = tokenFromAnywhere();
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+    headers["x-strut-session"] = token;
+  }
+  const res = await fetch("/api/session/token", {
+    credentials: "same-origin",
+    cache: "no-store",
+    headers,
+  });
+  const payload = (await res.json().catch(() => null)) as {
+    token?: string | null;
+    userId?: string | null;
+    name?: string | null;
+    onboarded?: boolean | null;
+  } | null;
+  if (payload?.userId && (payload.token || token)) {
+    writeLocalSession({
+      token: payload.token || token!,
+      userId: payload.userId,
+      name: payload.name ?? existing?.name ?? null,
+      onboarded: payload.onboarded ?? existing?.onboarded,
+    });
+    return;
+  }
+  if (res.ok && (existing || token) && !payload?.userId) {
+    clearLocalSession();
+  }
+}
+
 export function useCurrentUserState(): CurrentUserState {
-  if (!authEnabled) return { user: DEV_USER, isPending: false };
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [hydrated, setHydrated] = useState(false);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [user, setUser] = useState<AppUser | null>(null);
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     const sync = () => setUser(userFromLocal());
     sync();
-    setHydrated(true);
     const unsub = subscribeLocalSession(sync);
-
-    const token = tokenFromAnywhere();
-    const existing = readLocalSession();
-    if (!existing && token) {
-      void fetch("/api/session/token", {
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: {
-          accept: "application/json",
-          authorization: `Bearer ${token}`,
-          "x-strut-session": token,
-        },
+    void recoverSessionFromServer()
+      .catch(() => {
+        /* keep whatever local session we have */
       })
-        .then((res) => res.json())
-        .then((payload: { token?: string; userId?: string; name?: string | null }) => {
-          if (payload?.userId && (payload.token || token)) {
-            writeLocalSession({
-              token: payload.token || token,
-              userId: payload.userId,
-              name: payload.name ?? null,
-            });
-          }
-        })
-        .catch(() => {
-          /* keep whatever local session we have */
-        });
-    }
+      .finally(() => setHydrated(true));
     return unsub;
   }, []);
 

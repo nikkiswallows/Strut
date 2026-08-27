@@ -127,15 +127,6 @@ export function readLocalSession(): LocalSession | null {
 }
 
 export function writeLocalSession(session: LocalSession): void {
-  if (typeof window === "undefined") {
-    memory = {
-      token: session.token.trim(),
-      userId: session.userId.trim(),
-      name: session.name ?? null,
-      onboarded: session.onboarded,
-    };
-    return;
-  }
   const prev = memory ?? readLocalSession();
   const next: LocalSession = {
     token: session.token.trim(),
@@ -145,6 +136,7 @@ export function writeLocalSession(session: LocalSession): void {
   };
   if (!next.token || !next.userId) return;
   memory = next;
+  if (typeof window === "undefined") return;
   persist(next);
   emit();
 }

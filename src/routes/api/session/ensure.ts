@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ensureSession, sessionHeaders } from "@/lib/server/device-session.server";
+import { requireSession, sessionHeaders } from "@/lib/server/device-session.server";
 
 export const Route = createFileRoute("/api/session/ensure")({
   server: {
@@ -10,21 +10,21 @@ export const Route = createFileRoute("/api/session/ensure")({
             sessionToken?: string;
             displayName?: string;
           };
-          const session = await ensureSession(request, body.sessionToken, body.displayName);
+          const session = await requireSession(request, body.sessionToken);
           const headers = sessionHeaders(session.token);
           headers.set("content-type", "application/json");
           return new Response(
             JSON.stringify({
               token: session.token,
               userId: session.userId,
-              created: session.created,
+              created: false,
               name: body.displayName ?? null,
             }),
             { status: 200, headers },
           );
         } catch (err) {
-          const message = err instanceof Error ? err.message : "Could not start a session.";
-          return Response.json({ error: message }, { status: 500 });
+          const message = err instanceof Error ? err.message : "Unauthorized";
+          return Response.json({ error: message }, { status: message === "Unauthorized" ? 401 : 500 });
         }
       },
     },

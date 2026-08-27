@@ -1,6 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
-import { gateIdentityEnabled } from "./gate-identity.server";
-import { auth, authConfigured } from "./server";
+import { authConfigured } from "./server";
 
 /**
  * Server-side session resolution (server-only).
@@ -26,7 +25,7 @@ if (databaseConfigured && !authConfigured) {
   );
 }
 
-/** Dev fallback user id, used only when auth is disabled (VITE_AUTH_ENABLED=false). */
+/** @deprecated Never used. Kept so old imports typecheck. */
 export const DEV_USER_ID = "dev-user";
 
 /**
@@ -57,7 +56,6 @@ export type VerifiedUser = { id: string; email: string | null };
 export async function getSessionUser(
   bearerToken?: string,
 ): Promise<VerifiedUser | null> {
-  if (!authConfigured && !gateIdentityEnabled()) return null;
   const request = getRequest();
   if (!request && !bearerToken) return null;
   const { userIdFromRequest } = await import("./session-from-request.server");
@@ -83,15 +81,6 @@ export async function getSessionUser(
  * - Auth disabled + no database -> the shared dev user id.
  */
 export async function requireUserId(bearerToken?: string): Promise<string> {
-  if (!authConfigured && !gateIdentityEnabled()) {
-    if (databaseConfigured) {
-      throw new Error(
-        "Auth is disabled (VITE_AUTH_ENABLED=false) but DATABASE_URL is set — " +
-          "refusing to fall back to the shared dev user against a real database.",
-      );
-    }
-    return DEV_USER_ID;
-  }
   const user = await getSessionUser(bearerToken);
   if (!user) throw new UnauthorizedError();
   return user.id;

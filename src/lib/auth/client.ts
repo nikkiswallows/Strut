@@ -38,13 +38,10 @@ export const authClient = createAuthClient({
 });
 
 /**
- * True when sign-in UI should be shown — i.e. whenever `VITE_AUTH_ENABLED` is
- * not `"false"`. The shipped template sets it to `"false"`
- * (`.grok/app-env.json`), which selects the dev user (see `use-current-user`);
- * with the key removed, sign-in is real in preview (baked preview client) and
- * when deployed (injected per-app client).
+ * Sign-in is always on. The old VITE_AUTH_ENABLED=false switch baked a shared
+ * "dev user" into Vercel builds and hid the login page.
  */
-export const authEnabled = import.meta.env.VITE_AUTH_ENABLED !== "false";
+export const authEnabled = true;
 
 /** The upstream providers to render sign-in buttons for. */
 export { GROK_PROVIDERS };
@@ -109,8 +106,8 @@ export async function signIn(
   providerId: string,
   opts: { callbackURL?: string; errorCallbackURL?: string } = {},
 ): Promise<void> {
-  const callbackURL = opts.callbackURL ?? "/";
-  const errorCallbackURL = opts.errorCallbackURL ?? "/";
+  const callbackURL = opts.callbackURL ?? "/auth/complete";
+  const errorCallbackURL = opts.errorCallbackURL ?? "/login";
 
   // Open the popup SYNCHRONOUSLY on the user gesture — before any await
   // (including signOut). Awaiting first drops user-gesture privilege in some
@@ -227,7 +224,26 @@ function waitForPopupToken(popup: Window): Promise<string | null> {
  * a hand-rolled control must catch it and let the visitor retry. In the live
  * preview the local clear is sufficient, so it always resolves.
  */
-export async function signOut(redirectTo = "/"): Promise<void> {
+export async function signOut(redirectTo = "/login"): Promise<void> {
+  const token = getBearerToken();
+  try {
+    await fetch("/api/session/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
+        ...(token ? { authorization: `Bearer ${token}`, "x-strut-session": token } : {}),
+      },
+    });
+  } catch {
+    /* local clear still signs the browser out */
+  }
+  try {
+    await authClient.signOut();
+  } catch {
+    /* ignore */
+  }
   setBearerToken(null);
   clearLocalSession();
   window.location.href = redirectTo;
