@@ -71,6 +71,7 @@ export function SingleChips({
   onChange,
   allowed,
   onDenied,
+  hint,
 }: {
   label: string;
   options: string[];
@@ -78,10 +79,12 @@ export function SingleChips({
   onChange: (next: string) => void;
   allowed?: string[];
   onDenied?: (opt: string) => void;
+  hint?: string;
 }) {
   return (
     <div>
       <p className="mb-2 text-xs font-medium tracking-wide text-muted uppercase">{label}</p>
+      {hint ? <p className="mb-2 text-xs text-subtle">{hint}</p> : null}
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => {
           const on = value === opt;

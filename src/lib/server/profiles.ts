@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/geo";
+import { bboxFor, coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/geo";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { judgeRole } from "@/lib/bnwo";
@@ -69,6 +69,7 @@ export type DiscoverInput = {
   miles?: number;
   lookingFor?: string;
   role?: string;
+  ethnicity?: string;
   q?: string;
 };
 
@@ -78,9 +79,17 @@ export function normalizeDiscover(input: DiscoverInput | undefined) {
     miles: clampMiles(input?.miles),
     lookingFor: input?.lookingFor ?? "",
     role: input?.role ?? "",
+    ethnicity: input?.ethnicity ?? "",
     q: input?.q ?? "",
   };
 }
+
+// How many candidate rows the SQL query may return at most before the exact
+// (JS) distance sort/slice. The SQL WHERE now filters identity/role/looking-for
+// and a geo bounding-box, so the candidate set is already bounded and
+// index-backed; a large number here is safe because the box and tag filters do
+// the real work. Bump it if a dense metro yields more than this.
+const DISCOVER_MAX_CANDIDATES = 1_000;
 
 export async function listDiscoverForUser(
   userId: string,
@@ -104,17 +113,66 @@ export async function listDiscoverForUser(
     data.role && (ROLES as readonly string[]).includes(data.role as (typeof ROLES)[number])
       ? data.role
       : null;
+  const ethnicity = data.ethnicity.trim() || null;
   const q = data.q.trim() ? `%${data.q.trim().toLowerCase()}%` : null;
 
   const params: unknown[] = [userId];
   let where = `user_id <> $1 and onboarded = true`;
+
+  // Deterministic filters are pushed into SQL so the DB return set is bounded and
+  // index-backed (see migrations/0011). This is what keeps discover O(page-ish)
+  // instead of "load everything into the app and filter in JS".
   if (role) {
     params.push(role);
     where += ` and role = $${params.length}`;
   }
+
+  if (ethnicity) {
+    params.push(ethnicity);
+    where += ` and lower(coalesce(ethnicity, '')) = lower($${params.length})`;
+  }
+
   if (q) {
     params.push(q);
     where += ` and (lower(display_name) like $${params.length} or lower(handle) like $${params.length} or lower(coalesce(location,'')) like $${params.length})`;
+  }
+
+  const tab = DISCOVER_TABS.find((t) => t.id === data.tab) ?? DISCOVER_TABS[0]!;
+  if (tab.match.length) {
+    const preds: string[] = [];
+    // Match against the canonical identities array (indexed via GIN) and the
+    // legacy single `identity` column for pre-fill rows.
+    for (const label of tab.match) {
+      params.push(JSON.stringify([label]));
+      preds.push(`identities @> $${params.length}::jsonb`);
+      params.push(label);
+      preds.push(`lower(coalesce(identity, '')) = lower($${params.length})`);
+    }
+    where += ` and (${preds.join(" or ")})`;
+    if (tab.id === "women") {
+      params.push(JSON.stringify(["T-Girl"]));
+      params.push(JSON.stringify(["Trans woman"]));
+      where += ` and not (identities @> $${params.length - 1}::jsonb or identities @> $${params.length}::jsonb)`;
+    }
+  }
+
+  if (lookingFor) {
+    params.push(JSON.stringify([lookingFor]));
+    params.push(lookingFor);
+    where += ` and (looking_for_list @> $${params.length - 1}::jsonb or lower(coalesce(looking_for, '')) = lower($${params.length}))`;
+  }
+
+  // Geo: an index-friendly bounding-box prefilter in SQL for profiles that have
+  // coordinates (the common case). Profiles without coords are kept out of the
+  // box clause and resolved from their `location` in JS below, so nothing that
+  // worked before disappears.
+  const originAt =
+    origin?.lat != null && origin?.lng != null ? { lat: origin.lat, lng: origin.lng } : null;
+  const box =
+    originAt && data.miles < 500 ? bboxFor(originAt, data.miles) : null;
+  if (box) {
+    params.push(box.latMin, box.latMax, box.lngMin, box.lngMax);
+    where += ` and (lat is null or (lat between $${params.length - 3} and $${params.length - 2} and lng between $${params.length - 1} and $${params.length}))`;
   }
 
   const rows = await sql.query<ProfileRow>(
@@ -124,48 +182,53 @@ export async function listDiscoverForUser(
      from profiles
      where ${where}
      order by last_active desc, id desc
-     limit 200`,
+     limit ${DISCOVER_MAX_CANDIDATES}`,
     params,
   );
 
-  const tab = DISCOVER_TABS.find((t) => t.id === data.tab) ?? DISCOVER_TABS[0]!;
   const match = new Set(tab.match.map((s) => s.toLowerCase()));
+  const wantLooking = lookingFor?.toLowerCase() ?? null;
 
-  return rows
-    .map((row) => {
-      const profile = mapProfile(row);
-      const there =
-        profile.lat != null && profile.lng != null
-          ? { lat: profile.lat, lng: profile.lng }
-          : coordForLocation(profile.location);
-      return {
-        ...profile,
-        photos: profile.photos.slice(0, 6),
-        distanceMiles: there ? milesBetween(origin, there) : null,
-      };
-    })
-    .filter((profile) => {
-      if (profile.userId === userId) return false;
-      if (match.size) {
-        const labels = [...(profile.identities ?? []), identityLine(profile)]
-          .join(" ")
-          .toLowerCase();
-        const hit = [...match].some((token) => labels.includes(token));
-        if (!hit) return false;
-        if (tab.id === "women") {
-          if (labels.includes("trans") || labels.includes("t-girl")) return false;
+  return (
+    rows
+      .map((row) => {
+        const profile = mapProfile(row);
+        const there =
+          profile.lat != null && profile.lng != null
+            ? { lat: profile.lat, lng: profile.lng }
+            : coordForLocation(profile.location);
+        return {
+          ...profile,
+          photos: profile.photos.slice(0, 6),
+          distanceMiles: there && originAt ? milesBetween(originAt, there) : null,
+        };
+      })
+      .filter((profile) => {
+        if (profile.userId === userId) return false;
+        // Identity-tab fuzzy membership, kept as a safety net in case a profile
+        // has a label that is only present in the joined "identity line" text.
+        if (match.size) {
+          const labels = [...(profile.identities ?? []), identityLine(profile)]
+            .join(" ")
+            .toLowerCase();
+          const hit = [...match].some((token) => labels.includes(token));
+          if (!hit) return false;
+          if (tab.id === "women") {
+            if (labels.includes("trans") || labels.includes("t-girl")) return false;
+          }
         }
-      }
-      if (lookingFor) {
-        const want = lookingFor.toLowerCase();
-        const hit = (profile.lookingFor ?? []).some((item) => item.toLowerCase() === want);
-        if (!hit) return false;
-      }
-      if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
-      return true;
-    })
-    .sort((a, b) => (a.distanceMiles ?? 9_999) - (b.distanceMiles ?? 9_999))
-    .slice(0, 80);
+        if (wantLooking) {
+          const hit = (profile.lookingFor ?? []).some(
+            (item) => item.toLowerCase() === wantLooking,
+          );
+          if (!hit) return false;
+        }
+        if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
+        return true;
+      })
+      .sort((a, b) => (a.distanceMiles ?? 9_999) - (b.distanceMiles ?? 9_999))
+      .slice(0, 80)
+  );
 }
 
 export async function getProfileForViewerUser(userId: string, handleRaw: string) {
@@ -235,6 +298,7 @@ export type ProfileInput = {
   role?: string | null;
   bio: string;
   location: string | null;
+  ethnicity?: string | null;
   lookingFor?: string[] | string | null;
   photos: string[];
   interests: string[];
@@ -260,6 +324,7 @@ function cleanProfile(input: ProfileInput) {
   const pronouns = unique(input.pronouns).slice(0, 6);
   const interests = unique(input.interests).slice(0, 16);
   const location = input.location?.trim().slice(0, 80) || null;
+  const ethnicity = input.ethnicity?.trim().slice(0, 40) || null;
   const coord = coordForLocation(location);
   const roleRaw = input.role?.trim() || "";
   const role = judgeRole(identities, roleRaw).forced;
@@ -275,6 +340,7 @@ function cleanProfile(input: ProfileInput) {
     role,
     bio: input.bio.trim().slice(0, 500),
     location,
+    ethnicity,
     lookingFor: asLookingList(input.lookingFor),
     photos: input.photos
       .filter((src) => typeof src === "string" && src.trim())
@@ -311,12 +377,12 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
   if (taken[0]) throw new Error("That handle is taken.");
   const rows = await sql.query<ProfileRow>(
     `insert into profiles (
-       user_id, handle, display_name, age, identity, pronouns, bio, location,
+       user_id, handle, display_name, age, identity, pronouns, bio, location, ethnicity,
        looking_for, looking_for_list, photos, interests, height_cm, onboarded, last_active,
        identities, pronoun_list, hide_age, lat, lng, role
      ) values (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,true,now(),
-       $14::jsonb,$15::jsonb,$16::boolean,$17,$18,$19
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14,true,now(),
+       $15::jsonb,$16::jsonb,$17::boolean,$18,$19,$20
      )
      on conflict (user_id) do update set
        handle = excluded.handle,
@@ -326,6 +392,7 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
        pronouns = excluded.pronouns,
        bio = excluded.bio,
        location = excluded.location,
+       ethnicity = excluded.ethnicity,
        looking_for = excluded.looking_for,
        looking_for_list = excluded.looking_for_list,
        photos = excluded.photos,
@@ -349,6 +416,7 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
       data.pronounText,
       data.bio,
       data.location,
+      data.ethnicity,
       data.lookingFor[0] ?? null,
       JSON.stringify(data.lookingFor),
       JSON.stringify(data.photos),

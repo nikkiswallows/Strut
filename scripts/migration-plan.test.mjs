@@ -58,8 +58,29 @@ test("non-.sql entries are dropped (readdir also yields the auth/ directory)", (
 
 test("the auth schema ships outside the globbed directory", () => {
   const migrationsDir = join(projectRoot(), "migrations");
-  assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), []), []);
-  assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
+  const readdir = readdirSync(migrationsDir);
+
+  // The `auth/` directory is never picked up as a migration file (drop non-.sql).
+  assert.ok(readdir.includes("auth"), "migrations/auth/ must exist");
+  assert.equal(isMigrationFile("auth"), false);
+
+  // Auth-off template (shipped state): the globbed dir has no .sql yet, so
+  // nothing is pending and the auth source is the only copy, outside the glob.
+  if (!readdir.includes(AUTH_MIGRATION)) {
+    assert.deepEqual(pendingMigrations(readdir, []), []);
+    assert.ok(readdirSync(join(migrationsDir, "auth")).includes(AUTH_MIGRATION));
+    return;
+  }
+
+  // Auth-on: 0001_auth.sql is copied up so it applies by basename, and is then
+  // among the (unapplied) migrations. The auth/ source still exists and stays
+  // out of the glob; byte-identity of the copy is asserted separately.
+  const pending = pendingMigrations(readdir, []);
+  assert.ok(
+    pending.some((m) => m.name === AUTH_MIGRATION),
+    "the copied-up auth schema must be listed as a pending migration when unapplied",
+  );
+  assert.ok(readdirSync(join(migrationsDir, "auth")).includes(AUTH_MIGRATION));
 });
 
 test("this workspace's auth schema copy is byte-identical to its source", () => {

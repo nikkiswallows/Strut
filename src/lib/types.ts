@@ -38,6 +38,23 @@ export const PRONOUNS = ["she/her", "they/them", "she/they", "he/him", "he/they"
 
 export const ROLES = ["Top", "Bottom", "Switch", "Side"] as const;
 
+// Ethnicity / origin categories surfaced on the profile and used as a discover
+// filter. This is the identity dimension the demographic reads first, so it
+// lives as a first-class field (not buried in interests tag soup). It is
+// normalized to the canonical casing on save; matching is case-insensitive.
+export const ETHNICITIES = [
+  "Black",
+  "White",
+  "Latina",
+  "Asian",
+  "Middle Eastern",
+  "Indigenous",
+  "Mixed",
+  "Other",
+] as const;
+
+export type Ethnicity = (typeof ETHNICITIES)[number];
+
 export const INTERESTS = [
   "Fashion",
   "Heels",
@@ -109,6 +126,7 @@ export type Profile = {
   role: string | null;
   bio: string;
   location: string | null;
+  ethnicity: string | null;
   lookingFor: string[];
   photos: string[];
   interests: string[];

@@ -43,6 +43,7 @@ export const Route = createFileRoute("/api/app")({
                 miles: typeof body.miles === "number" ? body.miles : undefined,
                 lookingFor: typeof body.lookingFor === "string" ? body.lookingFor : undefined,
                 role: typeof body.role === "string" ? body.role : undefined,
+                ethnicity: typeof body.ethnicity === "string" ? body.ethnicity : undefined,
                 q: typeof body.q === "string" ? body.q : undefined,
               });
               break;

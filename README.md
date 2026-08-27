@@ -63,7 +63,9 @@ for future native apps):
 - Photos upload through `/api/media` to **Vercel Blob** (one store is enough —
   reads are CDN-served); profiles/feed store URLs only.
 
-See **[ARCHITECTURE.md](./ARCHITECTURE.md)** and copy **[`.env.example`](./.env.example)**
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** (engineering) and **[STRATEGY.md](./STRATEGY.md)**
+(market, acquisition, monetization, compliance and Tinder-scale data plan), and copy
+**[`.env.example`](./.env.example)**
 for the full env-var list. Quick deploy checklist:
 
 1. Create a Postgres DB (e.g. Neon) and set `DATABASE_URL`.

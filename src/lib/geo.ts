@@ -53,6 +53,30 @@ export function milesBetween(a: Coord, b: Coord): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
+/**
+ * Bounding-box (in degrees) for a radius in miles around a point, usable as a
+ * cheap, index-friendly SQL prefilter before the exact haversine clip. Adds a
+ * small margin so profiles near the edge of a square are never missed by the
+ * final JS distance filter.
+ */
+export function bboxFor(origin: Coord, miles: number): {
+  latMin: number;
+  latMax: number;
+  lngMin: number;
+  lngMax: number;
+} {
+  const R = 3958.8;
+  const margin = miles * 1.05; // ~5% slack to avoid edge misses
+  const dLat = (margin / R) * (180 / Math.PI);
+  const dLng = (margin / R) * (180 / Math.PI) / Math.max(0.2, Math.cos((origin.lat * Math.PI) / 180));
+  return {
+    latMin: origin.lat - dLat,
+    latMax: origin.lat + dLat,
+    lngMin: origin.lng - dLng,
+    lngMax: origin.lng + dLng,
+  };
+}
+
 export function formatMiles(miles: number | null | undefined): string | null {
   if (miles == null || Number.isNaN(miles)) return null;
   if (miles < 1) return "Nearby";

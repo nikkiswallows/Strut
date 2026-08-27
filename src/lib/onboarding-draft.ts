@@ -7,6 +7,7 @@ export type OnboardingDraft = {
   age: string;
   hideAge: boolean;
   location: string;
+  ethnicity: string;
   identities: string[];
   pronouns: string[];
   role: string;
@@ -31,6 +32,7 @@ export function readOnboardingDraft(): OnboardingDraft | null {
       age: parsed.age ?? "24",
       hideAge: Boolean(parsed.hideAge),
       location: parsed.location ?? "",
+      ethnicity: parsed.ethnicity ?? "",
       identities: Array.isArray(parsed.identities) ? parsed.identities : [],
       pronouns: Array.isArray(parsed.pronouns) ? parsed.pronouns : [],
       role: parsed.role ?? "Switch",

@@ -15,7 +15,7 @@ import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from 
 import { queryClient } from "@/lib/query-client";
 import { app } from "@/lib/http";
 import { fetchMyProfile, postProfile } from "@/lib/profile-api";
-import { IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
+import { ETHNICITIES, IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({ component: Onboarding });
@@ -55,6 +55,7 @@ function Onboarding() {
   const [age, setAge] = useState("24");
   const [hideAge, setHideAge] = useState(false);
   const [location, setLocation] = useState("");
+  const [ethnicity, setEthnicity] = useState("");
   const [identities, setIdentities] = useState<string[]>(["T-Girl"]);
   const [pronouns, setPronouns] = useState<string[]>(["she/her"]);
   const [role, setRole] = useState("Switch");
@@ -77,6 +78,7 @@ function Onboarding() {
       setAge(me.data.age ? String(me.data.age) : draft?.age || "24");
       setHideAge(me.data.hideAge);
       setLocation(me.data.location ?? draft?.location ?? "");
+      setEthnicity(me.data.ethnicity ?? draft?.ethnicity ?? "");
       setIdentities(me.data.identities.length ? me.data.identities : draft?.identities?.length ? draft.identities : ["T-Girl"]);
       setPronouns(me.data.pronouns.length ? me.data.pronouns : draft?.pronouns?.length ? draft.pronouns : ["she/her"]);
       setRole(me.data.role ?? draft?.role ?? "Switch");
@@ -89,6 +91,7 @@ function Onboarding() {
       setAge(draft.age);
       setHideAge(draft.hideAge);
       setLocation(draft.location);
+      setEthnicity(draft.ethnicity ?? "");
       setIdentities(draft.identities.length ? draft.identities : ["T-Girl"]);
       setPronouns(draft.pronouns.length ? draft.pronouns : ["she/her"]);
       setRole(draft.role);
@@ -111,6 +114,7 @@ function Onboarding() {
       age,
       hideAge,
       location,
+      ethnicity,
       identities,
       pronouns,
       role,
@@ -128,6 +132,7 @@ function Onboarding() {
     age,
     hideAge,
     location,
+    ethnicity,
     identities,
     pronouns,
     role,
@@ -146,6 +151,7 @@ function Onboarding() {
         age: Number(age) || 18,
         hideAge,
         location,
+        ethnicity: ethnicity || null,
         identities,
         pronouns,
         role: judgeRole(identities, role).forced,
@@ -170,6 +176,7 @@ function Onboarding() {
         age,
         hideAge,
         location,
+        ethnicity,
         identities,
         pronouns,
         role,
@@ -307,6 +314,13 @@ function Onboarding() {
                 onChange={setPronouns}
                 kind="pronoun"
                 max={6}
+              />
+              <SingleChips
+                label="Ethnicity"
+                hint="The order reads this first — kings, wives, sissies all filter on it."
+                options={[...ETHNICITIES]}
+                value={ethnicity}
+                onChange={setEthnicity}
               />
               <SingleChips
                 label="Top / bottom / switch"

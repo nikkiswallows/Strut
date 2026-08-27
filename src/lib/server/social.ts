@@ -25,6 +25,13 @@ export async function toggleLikeFor(userId: string, toUserId: string) {
     userId,
     toUserId,
   ]);
+  // A like is a strong engagement signal: bump the actor's last_active so the
+  // discover deck (ordered by last_active desc) surfaces them, and so "recently
+  // active" reflects real behavior rather than last profile save.
+  await sql.query(
+    `update profiles set last_active = now() where user_id = $1 and last_active < now() - interval '1 minute'`,
+    [userId],
+  );
   const seed = SEED_PROFILES.find((p) => p.userId === toUserId);
   if (seed?.autoMatch) {
     await sql.query(

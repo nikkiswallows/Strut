@@ -164,9 +164,15 @@ test("cli: relative paths follow the script's root, not the caller's cwd", () =>
   assert.equal(existsSync(join(root, "public/og.jpg")), false);
 });
 
-test("every hand-over the og skill prints is one this script accepts", () => {
+test("every hand-over the og skill prints is one this script accepts", (t) => {
   // The card and banner recipes live in the skill's references/, not SKILL.md.
   const skillDir = join(TEMPLATE_ROOT, ".grok/skills/og");
+  // Grok-generated docs (gitignored, not shipped in a clone/CI). Only run the
+  // "generated prompt stays in sync with the CLI" check where the docs exist.
+  if (!existsSync(skillDir) || !existsSync(join(skillDir, "references"))) {
+    t.skip("generated Grok agent docs (.grok/skills/og) are not in a clone/deploy");
+    return;
+  }
   const docs = [
     join(skillDir, "SKILL.md"),
     ...readdirSync(join(skillDir, "references")).map((f) => join(skillDir, "references", f)),
