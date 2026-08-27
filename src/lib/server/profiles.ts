@@ -3,7 +3,7 @@ import { bboxFor, coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/ge
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { judgeRole } from "@/lib/bnwo";
-import { DISCOVER_TABS, identityLine, ROLES, type DiscoverTab } from "@/lib/types";
+import { DISCOVER_TABS, identityLine, ROLES, type DiscoverTab, type Profile } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
 import { ensureSeed } from "./seed";
@@ -71,7 +71,18 @@ export type DiscoverInput = {
   role?: string;
   ethnicity?: string;
   q?: string;
+  /** Opaque keyset cursor from the previous page (see `makeDiscoverCursor`). */
+  cursor?: string;
+  /** Page size (clamped). Defaults to PAGE_SIZE. */
+  limit?: number;
 };
+
+export type DiscoverPage = {
+  items: DiscoverItem[];
+  nextCursor: string | null;
+};
+
+export type DiscoverItem = Profile & { distanceMiles?: number | null };
 
 export function normalizeDiscover(input: DiscoverInput | undefined) {
   return {
@@ -81,20 +92,55 @@ export function normalizeDiscover(input: DiscoverInput | undefined) {
     role: input?.role ?? "",
     ethnicity: input?.ethnicity ?? "",
     q: input?.q ?? "",
+    cursor: input?.cursor ?? "",
+    limit: clampPageSize(input?.limit),
   };
 }
 
-// How many candidate rows the SQL query may return at most before the exact
-// (JS) distance sort/slice. The SQL WHERE now filters identity/role/looking-for
-// and a geo bounding-box, so the candidate set is already bounded and
-// index-backed; a large number here is safe because the box and tag filters do
-// the real work. Bump it if a dense metro yields more than this.
-const DISCOVER_MAX_CANDIDATES = 1_000;
+// Default rows per page and bounds. Discover now paginates with a keyset cursor
+// on the deck's canonical order (last_active DESC, id DESC) so it stays O(page)
+// and never loads the whole table — this is what makes the deck Tinder-sized.
+export const DISCOVER_PAGE_SIZE = 40;
+const DISCOVER_PAGE_MIN = 10;
+const DISCOVER_PAGE_MAX = 80;
+
+function clampPageSize(value: number | undefined): number {
+  if (value == null || Number.isNaN(Number(value))) return DISCOVER_PAGE_SIZE;
+  return Math.max(DISCOVER_PAGE_MIN, Math.min(DISCOVER_PAGE_MAX, Math.round(Number(value))));
+}
+
+/**
+ * The cursor is the (last_active, id) of the last row in the page, in the deck
+ * order. Encoding it in the row handles any timestamp formatting the driver
+ * returns (Neon/PGLite may render timestamptz differently), so the client
+ * treats it as opaque. `|` can't appear in the ISO timestamp or the numeric id.
+ */
+export function makeDiscoverCursor(row: { last_active: string | Date; id: number }): string {
+  // The driver may hand back last_active as a JS Date (Neon and PGLite both do
+  // for timestamptz unless type-cast), which String() would render as the
+  // locale "Thu Aug ..." form — invalid when the cursor is re-cast to
+  // timestamptz on the next page. Normalize to ISO here so the cursor round-trips.
+  const la =
+    row.last_active instanceof Date ? row.last_active.toISOString() : String(row.last_active);
+  return `${la}|${row.id}`;
+}
+
+function parseDiscoverCursor(
+  cursor: string,
+): { lastActive: string; id: number } | null {
+  const i = cursor.lastIndexOf("|");
+  if (i <= 0 || i >= cursor.length - 1) return null;
+  const lastActive = cursor.slice(0, i);
+  const id = Number(cursor.slice(i + 1));
+  if (!Number.isFinite(id)) return null;
+  if (!lastActive) return null;
+  return { lastActive, id };
+}
 
 export async function listDiscoverForUser(
   userId: string,
   input: DiscoverInput | undefined,
-) {
+): Promise<DiscoverPage> {
   const data = normalizeDiscover(input);
   try {
     await ensureSeed();
@@ -175,6 +221,14 @@ export async function listDiscoverForUser(
     where += ` and (lat is null or (lat between $${params.length - 3} and $${params.length - 2} and lng between $${params.length - 1} and $${params.length}))`;
   }
 
+  // Keyset cursor: restart the deck strictly after the previous page's last row
+  // in (last_active DESC, id DESC) order. No OFFSET, no full-table load.
+  const cursor = data.cursor ? parseDiscoverCursor(data.cursor) : null;
+  if (cursor) {
+    params.push(cursor.lastActive, cursor.id);
+    where += ` and (last_active, id) < ($${params.length - 1}::timestamptz, $${params.length})`;
+  }
+
   const rows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS},
             exists(select 1 from likes l where l.from_user_id = $1 and l.to_user_id = profiles.user_id) as liked_by_me,
@@ -182,53 +236,60 @@ export async function listDiscoverForUser(
      from profiles
      where ${where}
      order by last_active desc, id desc
-     limit ${DISCOVER_MAX_CANDIDATES}`,
+     limit ${data.limit}`,
     params,
   );
 
   const match = new Set(tab.match.map((s) => s.toLowerCase()));
   const wantLooking = lookingFor?.toLowerCase() ?? null;
 
-  return (
-    rows
-      .map((row) => {
-        const profile = mapProfile(row);
-        const there =
-          profile.lat != null && profile.lng != null
-            ? { lat: profile.lat, lng: profile.lng }
-            : coordForLocation(profile.location);
-        return {
-          ...profile,
-          photos: profile.photos.slice(0, 6),
-          distanceMiles: there && originAt ? milesBetween(originAt, there) : null,
-        };
-      })
-      .filter((profile) => {
-        if (profile.userId === userId) return false;
-        // Identity-tab fuzzy membership, kept as a safety net in case a profile
-        // has a label that is only present in the joined "identity line" text.
-        if (match.size) {
-          const labels = [...(profile.identities ?? []), identityLine(profile)]
-            .join(" ")
-            .toLowerCase();
-          const hit = [...match].some((token) => labels.includes(token));
-          if (!hit) return false;
-          if (tab.id === "women") {
-            if (labels.includes("trans") || labels.includes("t-girl")) return false;
-          }
+  const items = rows
+    .map((row) => {
+      const profile = mapProfile(row);
+      const there =
+        profile.lat != null && profile.lng != null
+          ? { lat: profile.lat, lng: profile.lng }
+          : coordForLocation(profile.location);
+      return {
+        ...profile,
+        photos: profile.photos.slice(0, 6),
+        distanceMiles: there && originAt ? milesBetween(originAt, there) : null,
+      };
+    })
+    .filter((profile) => {
+      if (profile.userId === userId) return false;
+      // Identity-tab fuzzy membership, kept as a safety net in case a profile
+      // has a label that is only present in the joined "identity line" text.
+      if (match.size) {
+        const labels = [...(profile.identities ?? []), identityLine(profile)]
+          .join(" ")
+          .toLowerCase();
+        const hit = [...match].some((token) => labels.includes(token));
+        if (!hit) return false;
+        if (tab.id === "women") {
+          if (labels.includes("trans") || labels.includes("t-girl")) return false;
         }
-        if (wantLooking) {
-          const hit = (profile.lookingFor ?? []).some(
-            (item) => item.toLowerCase() === wantLooking,
-          );
-          if (!hit) return false;
-        }
-        if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
-        return true;
-      })
-      .sort((a, b) => (a.distanceMiles ?? 9_999) - (b.distanceMiles ?? 9_999))
-      .slice(0, 80)
-  );
+      }
+      if (wantLooking) {
+        const hit = (profile.lookingFor ?? []).some(
+          (item) => item.toLowerCase() === wantLooking,
+        );
+        if (!hit) return false;
+      }
+      if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
+      return true;
+    })
+    .sort((a, b) => (a.distanceMiles ?? 9_999) - (b.distanceMiles ?? 9_999));
+
+  // nextCursor reflects the last row actually returned (the deck-order boundary),
+  // so the next page resumes right after it and never overlaps or skips.
+  const boundary = rows[rows.length - 1];
+  const nextCursor =
+    rows.length >= data.limit && boundary
+      ? makeDiscoverCursor({ last_active: boundary.last_active, id: Number(boundary.id) })
+      : null;
+
+  return { items, nextCursor };
 }
 
 export async function getProfileForViewerUser(userId: string, handleRaw: string) {

@@ -52,8 +52,9 @@ function Thread() {
         // transient — keep polling
       }
       if (cancelled) return;
-      // ~4 minutes max (Horde queues can be slow); then stop the indicator.
-      if (tries >= 48) {
+      // ~2 minutes max (Horde queues can be slow); then stop the indicator so
+      // the thread never looks stuck. The reply still lands on next load/refresh.
+      if (tries >= 24) {
         setWaitingBot(false);
         return;
       }
@@ -170,17 +171,17 @@ function Thread() {
         className="flex gap-2 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:px-0"
         onSubmit={(e) => {
           e.preventDefault();
-          if (body.trim() && !send.isPending && !waitingBot) send.mutate();
+          if (body.trim() && !send.isPending) send.mutate();
         }}
       >
         <Input
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Serve. Beg. Confess."
-          disabled={send.isPending || waitingBot}
+          disabled={send.isPending}
         />
-        <Button type="submit" disabled={!body.trim() || send.isPending || waitingBot}>
-          {send.isPending || waitingBot ? "…" : "Send"}
+        <Button type="submit" disabled={!body.trim() || send.isPending}>
+          {send.isPending ? "…" : "Send"}
         </Button>
       </form>
     </div>

@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProfileCard } from "@/components/profile-card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/discover")({ component: Discover });
 
+type DiscoverPage = { items: Profile[]; nextCursor: string | null };
+
 function Discover() {
   const [tab, setTab] = useState<DiscoverTab>("nearby");
   const [miles, setMiles] = useState(100);
@@ -30,29 +32,65 @@ function Discover() {
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const profiles = useQuery({
-    queryKey: ["discover", tab, miles, lookingFor, role, q, ethnicity],
-    queryFn: () =>
-      app<Profile[]>("discover", { tab, miles, lookingFor, role, q, ethnicity }),
+  const queryKey = ["discover", tab, miles, lookingFor, role, q, ethnicity] as const;
+  const profiles = useInfiniteQuery({
+    queryKey,
+    queryFn: ({ pageParam }) =>
+      app<DiscoverPage>("discover", {
+        tab,
+        miles,
+        lookingFor,
+        role,
+        ethnicity,
+        q,
+        cursor: pageParam ?? undefined,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
     placeholderData: keepPreviousData,
   });
+
+  const rows = useMemo(
+    () => (profiles.data?.pages ?? []).flatMap((p) => p.items),
+    [profiles.data],
+  );
+  const hasNext = Boolean(profiles.hasNextPage);
+
+  // Auto-load the next page when the sentinel scrolls into view.
+  useEffect(() => {
+    if (!hasNext || profiles.isFetchingNextPage) return;
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) void profiles.fetchNextPage();
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasNext, profiles.isFetchingNextPage, profiles]);
 
   const like = useMutation({
     mutationFn: (p: Profile) => app<{ liked: boolean; matched: boolean }>("like", { userId: p.userId }),
     onMutate: async (p) => {
       await queryClient.cancelQueries({ queryKey: ["discover"] });
-      const key = ["discover", tab, miles, lookingFor, role, q, ethnicity] as const;
-      const prev = queryClient.getQueryData<Profile[]>(key);
+      const key = queryKey;
+      const prev = queryClient.getQueryData<{ pages: DiscoverPage[]; pageParams: unknown[] }>(key);
       if (prev) {
-        queryClient.setQueryData<Profile[]>(
-          key,
-          prev.map((row) =>
-            row.userId === p.userId
-              ? { ...row, likedByMe: !row.likedByMe, matched: !row.likedByMe && Boolean(row.likesMe) }
-              : row,
-          ),
-        );
+        queryClient.setQueryData(key, {
+          ...prev,
+          pages: prev.pages.map((page) => ({
+            ...page,
+            items: page.items.map((row) =>
+              row.userId === p.userId
+                ? { ...row, likedByMe: !row.likedByMe, matched: !row.likedByMe && Boolean(row.likesMe) }
+                : row,
+            ),
+          })),
+        });
       }
       return { prev, key };
     },
@@ -73,7 +111,6 @@ function Discover() {
     () => [activeTab.label, lookingFor && `looking for ${lookingFor.toLowerCase()}`, ethnicity, role, milesLabel].filter(Boolean),
     [activeTab.label, lookingFor, ethnicity, role, milesLabel],
   );
-  const rows = profiles.data ?? [];
 
   return (
     <div>
@@ -167,11 +204,28 @@ function Discover() {
           {discoverEmpty(tab)}
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-in">
-          {rows.map((p) => (
-            <ProfileCard key={p.userId} profile={p} layout="feed" onLike={(prof) => like.mutate(prof)} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-in">
+            {rows.map((p) => (
+              <ProfileCard key={p.userId} profile={p} layout="feed" onLike={(prof) => like.mutate(prof)} />
+            ))}
+          </div>
+          <div ref={sentinelRef} className="py-6 text-center">
+            {profiles.isFetchingNextPage ? (
+              <p className="text-sm text-subtle">Loading more…</p>
+            ) : hasNext ? (
+              <button
+                type="button"
+                onClick={() => void profiles.fetchNextPage()}
+                className="h-11 rounded-full bg-elevated px-5 text-sm text-muted transition-transform duration-150 ease-out hover:text-fg active:scale-[0.96]"
+              >
+                Load more
+              </button>
+            ) : (
+              <p className="text-sm text-subtle">The order thins out here.</p>
+            )}
+          </div>
+        </>
       )}
 
       {filtersOpen ? (

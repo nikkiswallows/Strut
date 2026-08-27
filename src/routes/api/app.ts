@@ -45,6 +45,8 @@ export const Route = createFileRoute("/api/app")({
                 role: typeof body.role === "string" ? body.role : undefined,
                 ethnicity: typeof body.ethnicity === "string" ? body.ethnicity : undefined,
                 q: typeof body.q === "string" ? body.q : undefined,
+                cursor: typeof body.cursor === "string" ? body.cursor : undefined,
+                limit: typeof body.limit === "number" ? body.limit : undefined,
               });
               break;
             case "view":

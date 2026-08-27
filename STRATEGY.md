@@ -209,9 +209,11 @@ path, and what's already staged:
   demographic.
 - **`last_active` bumps on real engagement** (likes), so the "recently active" deck ordering
   reflects behavior.
+- **Discover now paginates** with a keyset cursor on `(last_active DESC, id DESC)` (see §9):
+  the deck is O(page), loads more with infinite scroll, and no longer hard-caps at a page.
 
 ### The roadmap (when you cross scale thresholds)
-1. **PostGIS + keyset pagination** — the clean endgame for the deck. Add PostGIS (`postgis`
+1. **PostGIS (optional endgame)** — keyset pagination is now shipped in plain SQL; add PostGIS (`postgis`
    extension) and a `geography` column with a GiST index; then the radius filter *and* the
    "nearest N" ordering happen in one indexed query. Drive **infinite scroll with a keyset
    cursor** (order by last_active/id or distance; never `OFFSET`). This removes the current
@@ -244,9 +246,9 @@ For the near term, the **current model is correct and I would not change it**:
   **single `getSessionUserFromRequest`** path (no client-supplied identity, ever). This is the
   right shape.
 - **The one thing I'd change at the very start:** profiles are a `TEXT`-keyed table with the
-  auth user id — good. But the deck query must not be "re-scale now," so the **PostGIS + keyset**
-  work (§7.1) is the *next* thing to do, not the open-ended "someday." It's ~a day of work and it
-  is what makes "Tinder size" a real claim.
+  auth user id — good. **Keyset pagination for the deck is now done** (§9), so the deck is
+  O(page). The only remaining slice is **PostGIS** for a true "nearest-N" index when a metro
+  gets dense; it's optional and can wait.
 
 ---
 
@@ -280,12 +282,15 @@ against the embedded Postgres (PGlite) to confirm the SQL runs.
 | `src/lib/server/social.ts` | Bump `last_active` on a new like (engagement-driven deck ordering). |
 | `src/routes/api/app.ts` | Pass `ethnicity` to discover. |
 | `src/routes/onboarding.tsx` | Optional ethnicity field (single-select) + state/draft/save wiring. |
-| `src/routes/_app/discover.tsx` | Ethnicity filter chip in the filters sheet + pass to the query. |
+| `src/routes/_app/discover.tsx` | Ethnicity filter chip in the filters sheet + pass to the query; switched to `useInfiniteQuery` with a load-more sentinel. |
 | `src/components/chips.tsx` | Optional `hint` on `SingleChips`. |
 | `src/lib/onboarding-draft.ts` | Persist `ethnicity` in the onboarding draft. |
+| `src/lib/server/profiles.ts` (paginate) | `DiscoverPage { items, nextCursor }`; keyset cursor on `(last_active DESC, id DESC)`; `makeDiscoverCursor`/`parseDiscoverCursor` (ISO-normalized so it round-trips on Neon & PGlite); page-size clamp. |
+| `src/routes/api/app.ts` | Pass `cursor`/`limit` to discover. |
+| `src/routes/_app/inbox.$id.tsx` | Seed chat: composer no longer disabled while the seed is "writing" (server dedupes pending jobs, so you can keep typing); typing indicator cap shortened to ~2 min and clears reliably. |
 
-**Suggested next one-week build list:** §4.1 (real-time chat), §7.1 (PostGIS + keyset infinite
-scroll), §4.2 (swipe left/right), and the 18+ age gate + reporting in §6.
+**Suggested next build list:** §4.1 (real-time chat), §4.2 (swipe left/right), and the 18+
+age gate + reporting in §6.
 
 ---
 
