@@ -262,9 +262,28 @@ function Me() {
             </Button>
             <Button type="submit" className="flex-1" disabled={save.isPending}>
               {save.isPending ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        </form>
+          <Button
+          type="button"
+          onClick={() => {
+    clearOnboardingDraft();
+    setDisplayName("")
+    setHandle("")
+    setAge("")
+    setHideAge(false)
+    setLocation("")
+    setIdentities([])
+    setPronouns([])
+    setRole("")
+    setLookingFor([])
+    setPhotos([])
+    setBio("")
+    setInterests([])
+    setHeightCm("")
+    toast.success("Logged out. Create a new profile.")
+  }
+          className="mr-2"
+          > Log out
+        </Button>
       )}
     </div>
   );
