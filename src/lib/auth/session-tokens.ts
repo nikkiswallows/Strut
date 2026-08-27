@@ -50,8 +50,16 @@ function tokensFromCookieHeader(cookie: string | null): string[] {
 }
 
 export function tokensFromRequest(request: Request, extra?: string | null): string[] {
+  let queryToken: string | null = null;
+  try {
+    const url = new URL(request.url);
+    queryToken = url.searchParams.get("sessionToken") || url.searchParams.get("st");
+  } catch {
+    /* ignore */
+  }
   return [
     ...tokenCandidates(extra),
+    ...tokenCandidates(queryToken),
     ...tokenCandidates(request.headers.get("authorization")),
     ...tokenCandidates(request.headers.get("x-strut-session")),
     ...tokensFromCookieHeader(request.headers.get("cookie")),

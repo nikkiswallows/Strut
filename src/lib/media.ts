@@ -30,20 +30,33 @@ export async function fileToJpegBlob(file: File, maxSize = MAX_EDGE): Promise<Bl
   return blob;
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read that photo."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export async function uploadPhotoBlob(blob: Blob, filename = "photo.jpg"): Promise<string> {
-  let token = tokenFromAnywhere();
-  const send = (authToken: string | null) => {
-    const body = new FormData();
-    body.append("file", blob, filename);
-    if (authToken) body.append("sessionToken", authToken);
-    return fetch("/api/media", {
+  // GET /api/session/token still sees iPhone cookies; mint a stk_ token first
+  // so the POST does not depend on multipart headers Safari sometimes drops.
+  let token = (await refreshLocalSession()) || tokenFromAnywhere();
+  const image = await blobToDataUrl(blob);
+  const send = (authToken: string | null) =>
+    fetch("/api/media", {
       method: "POST",
       credentials: "include",
       cache: "no-store",
-      headers: sessionHeaders(authToken),
-      body,
+      headers: sessionHeaders(authToken, true),
+      body: JSON.stringify({
+        image,
+        filename,
+        sessionToken: authToken,
+      }),
     });
-  };
+
   let res = await send(token);
   if (res.status === 401) {
     token = await refreshLocalSession();
@@ -51,7 +64,8 @@ export async function uploadPhotoBlob(blob: Blob, filename = "photo.jpg"): Promi
   }
   const payload = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
   if (!res.ok || !payload?.url) {
-    throw new Error(payload?.error || "Could not upload that photo.");
+    const raw = payload?.error || "Could not upload that photo.";
+    throw new Error(raw === "Unauthorized" ? "Sign in again to add photos." : raw);
   }
   return payload.url;
 }

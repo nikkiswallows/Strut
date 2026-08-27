@@ -33,6 +33,12 @@ test("anonymous requests produce no tokens", () => {
   assert.deepEqual(tokensFromRequest(request), []);
 });
 
+test("tokensFromRequest reads sessionToken on the query string", () => {
+  const token = "stk_fromquerycccccccccccccccccccc";
+  const request = new Request(`https://strut.app/api/media?sessionToken=${token}`);
+  assert.ok(tokensFromRequest(request).includes(token));
+});
+
 test("lookupValues includes sha256 forms so hashed Better Auth rows still match", async () => {
   const { lookupValues } = await import("./session-tokens.ts");
   const token = "stk_abcdefghijklmnopqrstuvwxyz012345";

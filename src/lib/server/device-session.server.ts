@@ -41,7 +41,9 @@ export function clearSessionHeaders(): Headers {
 
 export async function mintSessionForUser(userId: string): Promise<string> {
   const existing = await sessionTokenForUser(userId);
-  if (existing) return existing;
+  // Only reuse first-party tokens the iPhone can echo on POST. Better Auth
+  // hashes are not something the browser has in raw form.
+  if (existing && existing.startsWith("stk_")) return existing;
   const sql = await getSql();
   const token = `stk_${randomBytes(32).toString("base64url")}`;
   await sql.query(

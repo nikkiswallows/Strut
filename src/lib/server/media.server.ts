@@ -10,7 +10,7 @@ export async function storePhotoObject(input: {
   if (input.bytes.byteLength > MAX_BYTES) {
     throw new Error("That photo is too large. Use a smaller shot.");
   }
-  const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
+  const token = (process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_READ_WRITE_TOKEN || "").trim();
   const key = `photos/${input.userId}/${Date.now()}-${randomUUID().slice(0, 8)}.jpg`;
   if (token) {
     const { put } = await import("@vercel/blob");
