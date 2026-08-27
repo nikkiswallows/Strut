@@ -5,6 +5,7 @@
  * Server-only (it reads process.env).
  */
 import { blobToken, env, hasDatabase, isProduction, smsConfigured } from "@/lib/env";
+import { aiConfigured, aiPublicInfo } from "@/lib/server/ai.server";
 
 export type PublicRuntimeConfig = {
   /** Which social sign-in providers actually have credentials configured. */
@@ -17,6 +18,13 @@ export type PublicRuntimeConfig = {
   sms: boolean;
   /** True when a stable session secret is configured. */
   secret: boolean;
+  /** Seed chat is backed by a configured AI provider (else canned replies). */
+  ai: {
+    configured: boolean;
+    provider: string | null;
+    label: string | null;
+    model: string | null;
+  };
   /** Whether the app is running in a deployed production environment. */
   production: boolean;
 };
@@ -34,6 +42,7 @@ export function publicRuntimeConfig(): PublicRuntimeConfig {
     blob: Boolean(blobToken()),
     sms: smsConfigured(),
     secret: Boolean(env("BETTER_AUTH_SECRET") ?? env("AUTH_SECRET")),
+    ai: { configured: aiConfigured(), ...aiPublicInfo() },
     production: isProduction(),
   };
 }

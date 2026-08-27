@@ -155,3 +155,30 @@ the database automatically). Node 22+ is required (`engines.node`).
   `feed`, `createPost`, `postLike`, `tags`, `addTag`).
 - `GET/POST /api/messages/*` — `list`, `thread`, `open`, `send`, `reply`.
 - `POST /api/media` — photo upload → Vercel Blob URL.
+
+---
+
+## 6. Seed chat AI
+
+Seeded profiles answer in their own persona (`src/lib/seed-data.ts`, each seed
+has a `persona` voice and identity). Replies are generated server-side by
+`src/lib/server/bot.ts` → `src/lib/server/ai.server.ts`, which calls an
+**OpenAI-compatible** chat model. With no key configured it falls back to short
+rotating canned lines.
+
+The provider is auto-selected from whichever key is present (first match wins):
+
+1. `AI_API_KEY` + `AI_API_BASE` (+`AI_MODEL`) — any compatible gateway/self-hosted model.
+2. `XAI_API_KEY` — **xAI Grok** (`grok-3-mini`); paid but cheap and the least
+   likely to refuse this app's explicit content.
+3. `GROQ_API_KEY` — **Groq**, free tier, very fast (`llama-3.3-70b-versatile`). *Recommended free start.*
+4. `OPENROUTER_API_KEY` — **OpenRouter**, has free models.
+5. `GEMINI_API_KEY` / `GOOGLE_AI_API_KEY` — **Google Gemini**, free; note it
+   filters explicit content most aggressively.
+
+Override any default model with `AI_MODEL`. The active provider is reported by
+`GET /api/config` (`ai` field) so you can confirm wiring without secrets. Free
+tier to start; switch to Grok/OpenRouter paid or your own endpoint at scale.
+
+Free key: sign up at **console.groq.com** → API Keys → Create → add `GROQ_API_KEY`
+in Vercel → redeploy.

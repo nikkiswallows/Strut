@@ -1,4 +1,5 @@
 import { SEED_PROFILES, type SeedProfile } from "@/lib/seed-data";
+import { aiConfigured, chatComplete } from "./ai.server";
 
 export type ChatViewer = {
   displayName: string;
@@ -7,15 +8,6 @@ export type ChatViewer = {
   location: string | null;
   lookingFor: string[];
 };
-
-function envKey(name: string): string {
-  try {
-    const v = typeof process !== "undefined" ? process.env[name] : undefined;
-    return (v ?? "").trim();
-  } catch {
-    return "";
-  }
-}
 
 function clock(): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -146,32 +138,45 @@ export function isSeedUser(userId: string): boolean {
   return SEED_PROFILES.some((p) => p.userId === userId);
 }
 
-async function complete(messages: { role: string; content: string }[], maxTokens: number) {
-  const apiKey = envKey("XAI_API_KEY");
-  if (!apiKey) throw new Error("no-key");
-  const res = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "grok-4.5",
-      messages,
-      max_tokens: maxTokens,
-      temperature: 1.05,
-    }),
-    signal: AbortSignal.timeout(18_000),
-  });
-  if (!res.ok) {
-    const err = await res.text().catch(() => "");
-    console.error("[bot] xAI", res.status, err.slice(0, 200));
-    throw new Error(`xAI ${res.status}`);
+// Short, in-character-ish openers used ONLY when no AI provider is configured
+// (or the model refuses), so a seed never repeats one identical line. The real
+// experience comes from generateSeedReply via the AI model.
+const FALLBACK_LINES = [
+  "you actually texted. keep going.",
+  "mhmm. tell me what you're really here for.",
+  "saw your profile. you're gonna have to keep up.",
+  "don't be shy now. you messaged first.",
+  "what are you into? be specific.",
+  "you're cute when you want something.",
+  "keep talking. i like the energy.",
+  "so… what do you want to happen tonight?",
+];
+
+function fallbackReply(seed: SeedProfile, prior: string[]): string {
+  const used = new Set(prior.map((s) => s.trim().toLowerCase()));
+  const fresh = FALLBACK_LINES.filter((l) => !used.has(l));
+  if (seed.reply && !used.has(seed.reply.trim().toLowerCase())) {
+    fresh.unshift(seed.reply);
   }
-  const body = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return sanitize(body.choices?.[0]?.message?.content ?? "");
+  if (fresh.length) {
+    // Deterministic-ish rotation, seeded by how many messages we've sent.
+    return fresh[prior.length % fresh.length]!;
+  }
+  return seed.reply || FALLBACK_LINES[0]!;
+}
+
+async function complete(
+  messages: { role: "system" | "user" | "assistant"; content: string }[],
+  maxTokens: number,
+): Promise<string> {
+  // No AI provider configured: signal the caller to use a canned reply.
+  if (!aiConfigured()) throw new Error("no-key");
+  const raw = await chatComplete(messages, {
+    maxTokens,
+    temperature: 1.05,
+    timeoutMs: 15_000,
+  });
+  return sanitize(raw);
 }
 
 export async function generateSeedReply(input: {
@@ -211,7 +216,7 @@ export async function generateSeedReply(input: {
       text = await complete(messages, maxTokens);
     } catch (err) {
       console.error("[bot] attempt", attempt + 1, err);
-      if (attempt === 1) return seed?.reply ?? "";
+      if (attempt === 1) return fallbackReply(seed, prior);
       continue;
     }
     if (!text) continue;
@@ -224,9 +229,7 @@ export async function generateSeedReply(input: {
     }
     return text;
   }
-  if (!text) return seed?.reply ?? "";
-  // if we got here and text was flagged too-similar on the final loop
-  // iteration, still return it rather than dropping the reply entirely;
-  // the caller will render it. the similarity guard is best-effort.
-  return text;
+  // Both attempts produced nothing usable (refusal / no key): fall back to a
+  // rotating canned line so the chat still gets a response.
+  return fallbackReply(seed, prior);
 }
