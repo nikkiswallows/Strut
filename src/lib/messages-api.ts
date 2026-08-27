@@ -26,7 +26,16 @@ export async function postSendChat(conversationId: number, body: string) {
 }
 
 export async function postBotReply(conversationId: number) {
-  return http<{ body: string | null }>("/api/messages/reply", {
-    conversationId,
-  });
+  // Fast providers answer inline ("replied"); the uncensored async worker
+  // (AI Horde) returns "pending" and the UI polls botStatus until "ready".
+  return http<{ status: "replied" | "pending" | "noop"; body?: string | null }>(
+    "/api/messages/reply",
+    { conversationId },
+  );
+}
+
+export async function botStatus(conversationId: number) {
+  return http<{ status: "pending" | "ready" | "idle"; queuePosition?: number | null }>(
+    `/api/messages/bot-status?conversationId=${conversationId}`,
+  );
 }

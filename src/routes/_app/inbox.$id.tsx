@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Avatar } from "@/components/photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetchThread, postBotReply, postSendChat } from "@/lib/messages-api";
+import { botStatus, fetchThread, postBotReply, postSendChat } from "@/lib/messages-api";
 import { queryClient } from "@/lib/query-client";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,62 @@ function Thread() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [thread.data?.messages.length, thread.isFetching, waitingBot]);
 
+  // Poll the bot-reply job while a seed match is "typing". Fast providers
+  // resolve on the first check; the uncensored async worker (AI Horde) can take
+  // a while, so we keep polling until it lands (or time out and stop showing the
+  // indicator — the reply will still appear on next load).
+  useEffect(() => {
+    if (!waitingBot) return;
+    let cancelled = false;
+    let tries = 0;
+    const tick = async () => {
+      tries += 1;
+      try {
+        const r = await botStatus(convId);
+        if (cancelled) return;
+        if (r.status === "ready") {
+          setWaitingBot(false);
+          await queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
+          await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+          return;
+        }
+      } catch {
+        // transient — keep polling
+      }
+      if (cancelled) return;
+      // ~4 minutes max (Horde queues can be slow); then stop the indicator.
+      if (tries >= 48) {
+        setWaitingBot(false);
+        return;
+      }
+      timer = setTimeout(tick, 5000);
+    };
+    let timer = setTimeout(tick, 2500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [waitingBot, convId]);
+
+  // When opening a seed thread that already has a reply pending (e.g. user left
+  // while the Horde job was queued), resume waiting/polling.
+  const isSeedThread = thread.data?.other.isSeed === true;
+  useEffect(() => {
+    if (!isSeedThread) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await botStatus(convId);
+        if (!cancelled && r.status === "pending") setWaitingBot(true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [convId, isSeedThread]);
+
   const send = useMutation({
     mutationFn: async () => {
       const text = body.trim();
@@ -39,12 +95,17 @@ function Thread() {
       if (sent.seed) {
         setWaitingBot(true);
         try {
-          await postBotReply(convId);
-        } finally {
+          const r = await postBotReply(convId);
+          // Fast path already replied; the poll effect picks up "pending".
+          if (r.status === "replied") {
+            await queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
+            await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+            setWaitingBot(false);
+          }
+          // status === "pending" -> leave waitingBot true; poll effect handles it.
+        } catch {
           setWaitingBot(false);
         }
-        await queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
-        await queryClient.invalidateQueries({ queryKey: ["conversations"] });
       }
     },
     onError: (err: Error) => toast.error(err.message),

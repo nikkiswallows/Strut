@@ -10,12 +10,16 @@ export const Route = createFileRoute("/api/messages/reply")({
           const body = (await request.json()) as { conversationId?: number };
           const user = await getSessionUserFromRequest(request);
           if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-          const userId = user.id;
-          const text = await replyAsSeed(userId, Number(body.conversationId));
-          return Response.json({ body: text });
+          const result = await replyAsSeed(user.id, Number(body.conversationId));
+          // "replied" = fast providers answered inline (body included).
+          // "pending" = handed to the uncensored async worker (AI Horde); the
+          // client should poll /api/messages/bot-status until it resolves.
+          return Response.json(result, {
+            headers: { "cache-control": "no-store" },
+          });
         } catch (err) {
           console.error("[bot] reply route", err);
-          return Response.json({ body: null });
+          return Response.json({ status: "noop" });
         }
       },
     },

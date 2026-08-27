@@ -170,6 +170,29 @@ const TEASE_LINES = [
   "mhm. save some of that energy for when i'm actually in front of you.",
 ];
 
+export function getSeed(seedUserId: string): SeedProfile | undefined {
+  return SEED_PROFILES.find((p) => p.userId === seedUserId);
+}
+
+export function isFreaky(history: { body: string }[]): boolean {
+  return SEXY.test(history.map((m) => m.body).join(" "));
+}
+
+/** Clean a raw model generation for display; returns "" if unusable. */
+export function cleanReply(text: string): string {
+  return sanitize(text);
+}
+
+/** A refusal (or empty) should never be shown as the bot's text. */
+export function looksLikeRefusal(text: string): boolean {
+  return isRefusal(text);
+}
+
+/** Rotating in-character canned line (openers or tease, by context). */
+export function cannedReply(seed: SeedProfile, prior: string[], freaky = false): string {
+  return fallbackReply(seed, prior, freaky);
+}
+
 function fallbackReply(seed: SeedProfile, prior: string[], freaky = false): string {
   const pool = freaky ? TEASE_LINES : FALLBACK_LINES;
   const used = new Set(prior.map((s) => s.trim().toLowerCase()));
@@ -182,6 +205,20 @@ function fallbackReply(seed: SeedProfile, prior: string[], freaky = false): stri
     return fresh[prior.length % fresh.length]!;
   }
   return pool[0]!;
+}
+
+/**
+ * Build the full OpenAI-style message array (system persona + turns + nudge).
+ * Shared by the inline provider path and the async AI Horde path so both speak
+ * with the exact same persona.
+ */
+export function buildSeedMessages(
+  seed: SeedProfile,
+  viewer: ChatViewer | null,
+  history: { senderId: string; body: string }[],
+  mode: "full" | "tease" = "full",
+): { role: "system" | "user" | "assistant"; content: string }[] {
+  return buildMessages(seed, viewer, history, mode);
 }
 
 async function complete(
@@ -259,29 +296,83 @@ async function tryReply(
   return null;
 }
 
-export async function generateSeedReply(input: {
+/**
+ * Try the FAST hosted providers (Groq/OpenRouter/xAI…). Returns an in-character
+ * reply, or null when none of them will answer (e.g. they refused explicit
+ * content). Never returns a refusal string.
+ */
+export async function tryFastReply(input: {
   seedUserId: string;
   history: { senderId: string; body: string }[];
   viewer?: ChatViewer | null;
-}): Promise<string> {
-  const seed = SEED_PROFILES.find((p) => p.userId === input.seedUserId);
-  if (!seed) return "";
-
+}): Promise<string | null> {
+  const seed = getSeed(input.seedUserId);
+  if (!seed) return null;
   const history = input.history.slice(-16);
   const prior = history.filter((m) => m.senderId === seed.userId).map((m) => m.body);
   const viewer = input.viewer ?? null;
-  const freaky = SEXY.test(history.map((m) => m.body).join(" "));
 
   // 1) Full in-character reply (explicit if the conversation is).
   const full = await tryReply(seed, viewer, history, prior, "full");
   if (full) return full;
 
-  // 2) Free models often refuse explicit content. Retry as a playful tease
-  //    that still reacts to what they said and keeps the scene alive — but with
-  //    no graphic words, so it doesn't trip the filter.
+  // 2) Mainstream free models often refuse explicit content. Retry as a playful
+  //    tease that still reacts to what they said without the graphic words.
   const tease = await tryReply(seed, viewer, history, prior, "tease");
-  if (tease) return tease;
+  return tease;
+}
 
-  // 3) Last resort: a rotating in-character line so the chat never freezes.
+/**
+ * Full reply, never failing: fast providers → (caller may fall back to the
+ * uncensored async Horde) → a rotating in-character canned line. This is the
+ * all-in-one path used when no async worker is involved.
+ */
+export async function generateSeedReply(input: {
+  seedUserId: string;
+  history: { senderId: string; body: string }[];
+  viewer?: ChatViewer | null;
+}): Promise<string> {
+  const seed = getSeed(input.seedUserId);
+  if (!seed) return "";
+  const history = input.history.slice(-16);
+  const prior = history.filter((m) => m.senderId === seed.userId).map((m) => m.body);
+  const freaky = isFreaky(history);
+
+  const fast = await tryFastReply(input);
+  if (fast) return fast;
+
   return fallbackReply(seed, prior, freaky);
+}
+
+/**
+ * Build the chat messages for the UNCENSORED async provider (AI Horde). We only
+ * reach it after the mainstream providers refused, so we go straight for full,
+ * explicit-in-character RP (these models do not refuse).
+ */
+export function hordeMessagesFor(input: {
+  seedUserId: string;
+  history: { senderId: string; body: string }[];
+  viewer?: ChatViewer | null;
+}): { role: "system" | "user" | "assistant"; content: string }[] | null {
+  const seed = getSeed(input.seedUserId);
+  if (!seed) return null;
+  const history = input.history.slice(-16);
+  return buildMessages(seed, input.viewer ?? null, history, "full");
+}
+
+/**
+ * Turn a raw Horde generation into a display reply. Returns null if the model
+ * somehow refused or returned junk (caller falls back to a canned line).
+ */
+export function hordeResultToReply(
+  seedUserId: string,
+  prior: string[],
+  raw: string,
+): string | null {
+  const seed = getSeed(seedUserId);
+  if (!seed) return null;
+  const text = sanitize(raw);
+  if (!text || isRefusal(text)) return null;
+  if (prior.some((p) => tooSimilar(p, text))) return null;
+  return text;
 }

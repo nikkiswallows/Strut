@@ -29,6 +29,7 @@ import { Route as AppInboxIdRouteImport } from './routes/_app/inbox.$id'
 import { Route as AppUHandleRouteImport } from './routes/_app/u.$handle'
 import { Route as ApiAiSelftestRouteImport } from './routes/api/ai/selftest'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiMessagesBotStatusRouteImport } from './routes/api/messages/bot-status'
 import { Route as ApiMessagesListRouteImport } from './routes/api/messages/list'
 import { Route as ApiMessagesOpenRouteImport } from './routes/api/messages/open'
 import { Route as ApiMessagesReplyRouteImport } from './routes/api/messages/reply'
@@ -136,6 +137,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMessagesBotStatusRoute = ApiMessagesBotStatusRouteImport.update({
+  id: '/api/messages/bot-status',
+  path: '/api/messages/bot-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMessagesListRoute = ApiMessagesListRouteImport.update({
   id: '/api/messages/list',
   path: '/api/messages/list',
@@ -191,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/u/$handle': typeof AppUHandleRoute
   '/api/ai/selftest': typeof ApiAiSelftestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/messages/bot-status': typeof ApiMessagesBotStatusRoute
   '/api/messages/list': typeof ApiMessagesListRoute
   '/api/messages/open': typeof ApiMessagesOpenRoute
   '/api/messages/reply': typeof ApiMessagesReplyRoute
@@ -218,6 +225,7 @@ export interface FileRoutesByTo {
   '/u/$handle': typeof AppUHandleRoute
   '/api/ai/selftest': typeof ApiAiSelftestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/messages/bot-status': typeof ApiMessagesBotStatusRoute
   '/api/messages/list': typeof ApiMessagesListRoute
   '/api/messages/open': typeof ApiMessagesOpenRoute
   '/api/messages/reply': typeof ApiMessagesReplyRoute
@@ -248,6 +256,7 @@ export interface FileRoutesById {
   '/_app/u/$handle': typeof AppUHandleRoute
   '/api/ai/selftest': typeof ApiAiSelftestRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/messages/bot-status': typeof ApiMessagesBotStatusRoute
   '/api/messages/list': typeof ApiMessagesListRoute
   '/api/messages/open': typeof ApiMessagesOpenRoute
   '/api/messages/reply': typeof ApiMessagesReplyRoute
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
     | '/u/$handle'
     | '/api/ai/selftest'
     | '/api/auth/$'
+    | '/api/messages/bot-status'
     | '/api/messages/list'
     | '/api/messages/open'
     | '/api/messages/reply'
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/u/$handle'
     | '/api/ai/selftest'
     | '/api/auth/$'
+    | '/api/messages/bot-status'
     | '/api/messages/list'
     | '/api/messages/open'
     | '/api/messages/reply'
@@ -334,6 +345,7 @@ export interface FileRouteTypes {
     | '/_app/u/$handle'
     | '/api/ai/selftest'
     | '/api/auth/$'
+    | '/api/messages/bot-status'
     | '/api/messages/list'
     | '/api/messages/open'
     | '/api/messages/reply'
@@ -357,6 +369,7 @@ export interface RootRouteChildren {
   AuthCompleteRoute: typeof AuthCompleteRoute
   ApiAiSelftestRoute: typeof ApiAiSelftestRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiMessagesBotStatusRoute: typeof ApiMessagesBotStatusRoute
   ApiMessagesListRoute: typeof ApiMessagesListRoute
   ApiMessagesOpenRoute: typeof ApiMessagesOpenRoute
   ApiMessagesReplyRoute: typeof ApiMessagesReplyRoute
@@ -508,6 +521,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/messages/bot-status': {
+      id: '/api/messages/bot-status'
+      path: '/api/messages/bot-status'
+      fullPath: '/api/messages/bot-status'
+      preLoaderRoute: typeof ApiMessagesBotStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/messages/list': {
       id: '/api/messages/list'
       path: '/api/messages/list'
@@ -607,6 +627,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthCompleteRoute: AuthCompleteRoute,
   ApiAiSelftestRoute: ApiAiSelftestRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiMessagesBotStatusRoute: ApiMessagesBotStatusRoute,
   ApiMessagesListRoute: ApiMessagesListRoute,
   ApiMessagesOpenRoute: ApiMessagesOpenRoute,
   ApiMessagesReplyRoute: ApiMessagesReplyRoute,
