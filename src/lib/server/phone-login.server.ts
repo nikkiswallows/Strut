@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
 import { planEmailLogin } from "@/lib/auth/email-login-plan";
 import { publicOrigin } from "@/lib/auth/public-origin.server";
@@ -207,13 +206,14 @@ async function lookupEmailAccount(email: string): Promise<{
 }
 
 async function hashCredentialPassword(password: string): Promise<string> {
+  // Stay on auth.$context — importing better-auth/crypto made Nitro split the
+  // TanStack server entry so `ssr_exports` was missing and every route 500'd.
   const { auth } = await import("@/lib/auth/server");
   const ctx = await auth.$context;
-  if (ctx.password && typeof ctx.password.hash === "function") {
-    return ctx.password.hash(password);
+  if (!ctx.password || typeof ctx.password.hash !== "function") {
+    throw new Error("Could not set a password for this account.");
   }
-  const { hashPassword } = await import("better-auth/crypto");
-  return hashPassword(password);
+  return ctx.password.hash(password);
 }
 
 async function attachPassword(userId: string, password: string): Promise<void> {
@@ -233,7 +233,7 @@ async function attachPassword(userId: string, password: string): Promise<void> {
   await sql.query(
     `insert into account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
      values ($1, $2, 'credential', $3, $4, now(), now())`,
-    [randomUUID(), userId, userId, hash],
+    [crypto.randomUUID(), userId, userId, hash],
   );
 }
 

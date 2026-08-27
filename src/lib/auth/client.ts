@@ -163,10 +163,10 @@ export async function signIn(
       const previewClient = target.searchParams.get("client_id") === "grok_preview";
       const previewHost = window.location.hostname.endsWith(".grok-sandbox.com");
       if (previewClient && !previewHost) {
-        throw new Error("Google and X aren’t connected on this site yet. Use email or phone.");
+        throw new Error("Google and X are not connected on this site yet. Use email or phone.");
       }
     } catch (err) {
-      if (err instanceof Error && /aren’t connected/i.test(err.message)) throw err;
+      if (err instanceof Error && /not connected on this site/i.test(err.message)) throw err;
     }
     window.location.href = data.url;
   }
