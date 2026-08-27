@@ -66,6 +66,9 @@ export function AppShell() {
           className="mb-10 px-2 transition-transform duration-150 ease-out active:scale-[0.96]"
         >
           <Logo markClassName="size-10" wordClassName="text-3xl" />
+          <p className="mt-2 px-1 text-[10px] tracking-[0.22em] text-accent uppercase">
+            Black first · Kneel
+          </p>
         </Link>
         <nav className="flex flex-1 flex-col gap-1">
           {NAV.map((item) => {

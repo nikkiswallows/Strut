@@ -19,12 +19,12 @@ function Inbox() {
       <div className={nested ? "hidden lg:block" : ""}>
         <div className="px-4 pt-4 lg:px-0 lg:pt-0">
           <h1 className="font-display text-4xl">DMs</h1>
-          <p className="mt-1 text-sm text-muted">Kneel in the thread. They write back in character.</p>
+          <p className="mt-1 text-sm text-muted">Kneel in the thread. Confess the cage. They write back in character.</p>
         </div>
         <div className="mt-5 divide-y divide-border rounded-xl border border-border bg-surface">
           {(inbox.data ?? []).length === 0 && !inbox.isPending ? (
             <p className="px-4 py-10 text-center text-sm text-muted">
-              No conversations yet. Open a king and confess.
+              No threads. Open a king and confess. Cleanup talk counts.
             </p>
           ) : null}
           {(inbox.data ?? []).map((c) => (

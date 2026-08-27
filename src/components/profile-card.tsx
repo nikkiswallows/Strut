@@ -2,6 +2,7 @@ import { Heart } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useState, type MouseEvent } from "react";
 import { formatMiles } from "@/lib/geo";
+import { badgeFor } from "@/lib/bnwo";
 import { asPhotoList, identityLine, shownAge, type Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Photo } from "./photo";
@@ -23,6 +24,7 @@ export function ProfileCard({
   const ident = identityLine(profile);
   const feed = layout === "feed";
   const count = photos.length;
+  const badge = badgeFor(profile);
 
   function cycle(next: number, event: MouseEvent) {
     if (count < 2) return;
@@ -46,6 +48,11 @@ export function ProfileCard({
           className="absolute inset-0 size-full transition-transform duration-500 group-hover:scale-[1.03]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/25 to-transparent" />
+        {badge ? (
+          <span className="absolute top-3 left-3 z-[3] rounded-full border border-accent/50 bg-bg/70 px-2 py-0.5 text-[10px] tracking-[0.18em] text-accent uppercase backdrop-blur-sm">
+            {badge}
+          </span>
+        ) : null}
         {count > 1 ? (
           <>
             <div className="absolute inset-x-4 top-3 z-10 flex gap-1 pr-12">

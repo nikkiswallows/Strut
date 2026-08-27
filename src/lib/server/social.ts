@@ -145,11 +145,15 @@ export async function createPostFor(
 ) {
   const body = input.body.trim().slice(0, 400);
   if (!body) throw new Error("Write something first.");
+  const photoUrl = input.photoUrl?.trim() || null;
+  if (photoUrl?.startsWith("data:")) {
+    throw new Error("Upload the photo first. Feed posts store URLs, not raw files.");
+  }
   const sql = await getSql();
   await sql.query(`insert into posts (user_id, body, photo_url) values ($1, $2, $3)`, [
     userId,
     body,
-    input.photoUrl ?? null,
+    photoUrl,
   ]);
   await sql.query(`update profiles set last_active = now() where user_id = $1`, [userId]);
   return { ok: true as const };

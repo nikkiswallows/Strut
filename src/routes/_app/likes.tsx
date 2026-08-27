@@ -31,7 +31,7 @@ function Likes() {
   return (
     <div>
       <h1 className="font-display text-4xl">Claimed</h1>
-      <p className="mt-1 text-sm text-muted">Who you knelt for. Mutual likes are matches.</p>
+      <p className="mt-1 text-sm text-muted">Who you knelt for. Who bred her. Mutual likes are matches.</p>
       <div className="mt-5 flex gap-1 rounded-full bg-elevated p-1">
         {(
           [
@@ -63,10 +63,10 @@ function Likes() {
       ) : active.length === 0 ? (
         <p className="py-16 text-center text-muted">
           {tab === "matches"
-            ? "No matches yet. Like someone who likes you back."
+            ? "No matches yet. Like a king who already wants the hole."
             : tab === "incoming"
-              ? "Nobody has liked you yet. Keep showing up."
-              : "You haven't liked anyone. The grid is waiting."}
+              ? "Nobody claimed you yet. Better photos. Clearer kneeling."
+              : "You haven't liked anyone. Point at a bull or a wife and mean it."}
         </p>
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">

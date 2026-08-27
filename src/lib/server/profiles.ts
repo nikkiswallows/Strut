@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { coordForLocation, DEFAULT_COORD, milesBetween } from "@/lib/geo";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
+import { judgeRole } from "@/lib/bnwo";
 import { DISCOVER_TABS, identityLine, ROLES, type DiscoverTab } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
@@ -248,11 +249,8 @@ function cleanProfile(input: ProfileInput) {
   const interests = unique(input.interests).slice(0, 16);
   const location = input.location?.trim().slice(0, 80) || null;
   const coord = coordForLocation(location);
-  const roleRaw = input.role?.trim() || null;
-  const role =
-    roleRaw && (ROLES as readonly string[]).includes(roleRaw as (typeof ROLES)[number])
-      ? roleRaw
-      : null;
+  const roleRaw = input.role?.trim() || "";
+  const role = judgeRole(identities, roleRaw).forced;
   return {
     handle,
     displayName,
@@ -266,7 +264,16 @@ function cleanProfile(input: ProfileInput) {
     bio: input.bio.trim().slice(0, 500),
     location,
     lookingFor: asLookingList(input.lookingFor),
-    photos: input.photos.filter(Boolean).slice(0, 8),
+    photos: input.photos
+      .filter((src) => typeof src === "string" && src.trim())
+      .filter((src) => /^(https?:\/\/|\/photos\/|\/uploads\/)/i.test(src) || src.startsWith("data:image/"))
+      .map((src) => {
+        if (src.startsWith("data:image/") && src.length > 240_000) {
+          throw new Error("Upload photos before saving. Data URLs are too large for the profile.");
+        }
+        return src;
+      })
+      .slice(0, 8),
     interests,
     heightCm:
       input.heightCm == null || Number.isNaN(Number(input.heightCm))

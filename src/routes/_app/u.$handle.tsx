@@ -2,8 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Heart, MessageCircle, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { Decree } from "@/components/decree";
 import { PhotoViewer } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
+import { decreeFor } from "@/lib/bnwo";
 import { formatMiles } from "@/lib/geo";
 import { queryClient } from "@/lib/query-client";
 import { app } from "@/lib/http";
@@ -131,6 +133,7 @@ function ProfilePage() {
             <span className="rounded-full bg-elevated px-3 py-1 text-xs text-muted">{p.heightCm} cm</span>
           ) : null}
         </div>
+        <Decree className="mt-4">{decreeFor(p.identities)}</Decree>
         {p.bio ? (
           <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-fg">{p.bio}</p>
         ) : null}

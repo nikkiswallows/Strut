@@ -1,7 +1,8 @@
 import { GripVertical, Star, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { cn, fileToJpegDataUrl, moveItem } from "@/lib/utils";
+import { uploadPhotoFile } from "@/lib/media";
+import { cn, moveItem } from "@/lib/utils";
 import { Photo } from "./photo";
 
 export function PhotoEditor({
@@ -37,9 +38,9 @@ export function PhotoEditor({
     const next = [...photos];
     for (const file of Array.from(list).slice(0, max - next.length)) {
       try {
-        next.push(await fileToJpegDataUrl(file));
-      } catch {
-        toast.error("Could not read that photo.");
+        next.push(await uploadPhotoFile(file));
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not upload that photo.");
       }
     }
     onChange(next.slice(0, max));

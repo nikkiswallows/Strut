@@ -3,7 +3,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { MultiChips, SingleChips } from "@/components/chips";
+import { Decree } from "@/components/decree";
 import { PhotoEditor } from "@/components/photo-editor";
+import { decreeFor, judgeRole } from "@/lib/bnwo";
 import { PhotoStrip } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
@@ -91,7 +93,7 @@ function Me() {
         location,
         identities,
         pronouns,
-        role,
+        role: judgeRole(identities, role).forced,
         lookingFor,
         photos,
         bio,
@@ -131,7 +133,7 @@ function Me() {
     <div className="mx-auto max-w-lg">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs tracking-[0.28em] text-accent uppercase">QOS · Profile</p>
+          <p className="text-xs tracking-[0.28em] text-accent uppercase">QOS · Your place</p>
           <h1 className="font-display text-5xl leading-[0.92]">You</h1>
           <p className="text-sm text-muted">{user?.primaryEmail}</p>
         </div>
@@ -172,6 +174,7 @@ function Me() {
           </div>
           {p.location ? <p className="mt-2 text-sm text-muted">{p.location}</p> : null}
           {p.bio ? <p className="mt-3 leading-relaxed">{p.bio}</p> : null}
+          <Decree className="mt-4">{decreeFor(p.identities)}</Decree>
           {p.interests.length ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {p.interests.map((tag) => (
@@ -242,9 +245,17 @@ function Me() {
           </button>
           <MultiChips
             label="Identity"
+            hint="Whiteboi / sissy / CD / femboy locks Bottom. Cuck locks Bottom or Side. Bull locks Top."
             options={identityTags.data ?? [...IDENTITIES]}
             value={identities}
-            onChange={setIdentities}
+            onChange={(next) => {
+              setIdentities(next);
+              const verdict = judgeRole(next, role);
+              if (verdict.forced !== role) {
+                setRole(verdict.forced);
+                if (verdict.line) toast.message(verdict.line);
+              }
+            }}
             kind="identity"
           />
           <MultiChips
@@ -255,10 +266,22 @@ function Me() {
             kind="pronoun"
             max={6}
           />
-          <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
+          <SingleChips
+            label="Top / bottom / switch"
+            options={[...ROLES]}
+            value={role}
+            allowed={judgeRole(identities, role).allowed}
+            onChange={setRole}
+            onDenied={(opt) => {
+              const verdict = judgeRole(identities, opt);
+              setRole(verdict.forced);
+              toast.message(verdict.line ?? "That role is not for what you checked.");
+            }}
+          />
+          <Decree>{decreeFor(identities)}</Decree>
           <MultiChips
             label="Looking for"
-            hint="Pick as many as you want."
+            hint="BBC, bulls, cleanup, chastity, breeding — say it."
             options={lookingTags.data ?? [...LOOKING_FOR]}
             value={lookingFor}
             onChange={setLookingFor}

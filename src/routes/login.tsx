@@ -80,7 +80,6 @@ function Login() {
       window.location.replace(payload?.isNew || join ? "/onboarding" : "/discover");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Something went wrong.";
-      if (/create a profile/i.test(raw) && !join) setJoin(true);
       toast.error(
         /invalid origin/i.test(raw)
           ? "This page couldn't verify the sign-in. Refresh and try again."
@@ -123,8 +122,8 @@ function Login() {
                 </h1>
                 <p className="mt-2 text-sm text-muted">
                   {join
-                    ? "Email and a password. If you already started with this email, this sets the password and continues."
-                    : "Sign in. Kings, sissies, wives, and cucks are already here."}
+                    ? "Email and a password. Then you tell the order if you kneel, watch, or walk in first."
+                    : "Sign in. Kings first. Sissies, wives, and cucks already on the floor."}
                 </p>
                 <form onSubmit={onEmailSubmit} className="mt-8 space-y-3.5">
                   {join ? (
@@ -200,8 +199,8 @@ function Login() {
                   </Button>
                 ))}
                 <p className="pt-1 text-center text-[11px] leading-relaxed text-subtle">
-                  Google and X need a connected auth client. Until then, use email or
-                  phone — that session stays on this site.
+                  If Google or X show "invalid redirect", stay here and use email or
+                  phone. That session stays on this site.
                 </p>
                 <Button
                   variant="ghost"
@@ -229,7 +228,7 @@ function Login() {
             )}
           </div>
           <p className="mt-8 text-center text-xs tracking-wide text-subtle uppercase">
-            18+ only · BNWO · QOS · Serve in the DMs
+            18+ only · BNWO · QOS · BBC · Cleanup · Chastity
           </p>
         </div>
       </div>

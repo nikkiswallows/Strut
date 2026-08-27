@@ -15,6 +15,7 @@ import {
   type DiscoverTab,
   type Profile,
 } from "@/lib/types";
+import { discoverEmpty } from "@/lib/bnwo";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/discover")({ component: Discover });
@@ -76,8 +77,9 @@ function Discover() {
     <div>
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
-          <p className="text-xs tracking-[0.28em] text-accent uppercase">BNWO · Discover</p>
+          <p className="text-xs tracking-[0.28em] text-accent uppercase">BNWO · Kings first</p>
           <h1 className="font-display text-5xl leading-[0.9]">The order</h1>
+          <p className="mt-1 text-sm text-muted">Bulls. Sissies. Wives. Cucks. Whitebois already on Bottom.</p>
         </div>
         <button
           type="button"
@@ -158,7 +160,7 @@ function Discover() {
         </div>
       ) : rows.length === 0 ? (
         <p className="py-16 text-center text-muted">
-          Nobody in {activeTab.label.toLowerCase()} within this distance yet. Widen the radius.
+          {discoverEmpty(tab)}
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-in">
@@ -263,7 +265,7 @@ function Discover() {
               onClick={() => setFiltersOpen(false)}
               className="mt-6 h-12 w-full rounded-lg bg-fg text-sm font-medium text-bg transition-transform duration-150 ease-out active:scale-[0.96]"
             >
-              Show people
+              Show the order
             </button>
           </div>
         </div>

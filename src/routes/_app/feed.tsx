@@ -10,7 +10,8 @@ import { app } from "@/lib/http";
 import { fetchMyProfile } from "@/lib/profile-api";
 import { queryClient } from "@/lib/query-client";
 import type { FeedPost } from "@/lib/types";
-import { cn, fileToJpegDataUrl, timeAgo } from "@/lib/utils";
+import { uploadPhotoFile } from "@/lib/media";
+import { cn, timeAgo } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/feed")({ component: Feed });
 
@@ -39,16 +40,18 @@ function Feed() {
     const file = list?.[0];
     if (!file) return;
     try {
-      setPhotoUrl(await fileToJpegDataUrl(file));
-    } catch {
-      toast.error("Could not read that photo.");
+      setPhotoUrl(await uploadPhotoFile(file));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not upload that photo.");
     }
   }
 
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="font-display text-4xl">The room</h1>
-      <p className="mt-1 text-sm text-muted">Looks, leftover filth, whitebois on display. Black first.</p>
+      <p className="mt-1 text-sm text-muted">
+        Looks, cages, leftover filth. Whitebois on display. Wives after the king. Black first.
+      </p>
 
       <form
         className="mt-6 rounded-xl border border-border bg-surface p-4"
@@ -62,7 +65,7 @@ function Feed() {
           <Textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="What's the look tonight?"
+            placeholder="Cage on? QOS out? Kneeling for who tonight?"
             className="min-h-20 bg-elevated"
             maxLength={400}
           />
@@ -149,6 +152,11 @@ function Feed() {
               Try again
             </button>
           </div>
+        ) : null}
+        {!feed.isPending && !feed.isError && (feed.data ?? []).length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted">
+            The Room is quiet. Post the look. Whitebois belong on display.
+          </p>
         ) : null}
         {feed.isPending ? (
           <div className="space-y-3">

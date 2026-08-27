@@ -69,11 +69,15 @@ export function SingleChips({
   options,
   value,
   onChange,
+  allowed,
+  onDenied,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (next: string) => void;
+  allowed?: string[];
+  onDenied?: (opt: string) => void;
 }) {
   return (
     <div>
@@ -81,14 +85,22 @@ export function SingleChips({
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => {
           const on = value === opt;
+          const locked = Boolean(allowed && !allowed.includes(opt));
           return (
             <button
               key={opt}
               type="button"
-              onClick={() => onChange(opt)}
+              onClick={() => {
+                if (locked) {
+                  onDenied?.(opt);
+                  return;
+                }
+                onChange(opt);
+              }}
               className={cn(
                 "h-10 rounded-full px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
                 on ? "bg-fg text-bg" : "bg-elevated text-muted hover:text-fg",
+                locked && !on && "opacity-40 line-through decoration-accent/70",
               )}
             >
               {opt}

@@ -81,7 +81,7 @@ function Thread() {
       <div className="hide-scrollbar flex-1 space-y-2 overflow-y-auto px-4 py-4 lg:px-0">
         {data.messages.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted">
-            On your knees in the DMs. Say it. They write back.
+            On your knees in the DMs. Beg, offer cleanup, say the cage size.
           </p>
         ) : null}
         {data.messages.map((m) => (

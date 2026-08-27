@@ -1,4 +1,5 @@
 import { markOnboarded, tokenFromAnywhere, writeLocalSession } from "@/lib/local-session";
+import { persistPhotoList } from "@/lib/media";
 import { refreshLocalSession, sessionHeaders } from "@/lib/session-client";
 import type { ProfileInput } from "@/lib/server/profiles";
 import type { Profile } from "@/lib/types";
@@ -38,14 +39,16 @@ async function postProfileOnce(input: ProfileInput, token: string | null, useBea
 }
 
 export async function postProfile(input: ProfileInput) {
+  const photos = await persistPhotoList(input.photos ?? []);
+  const payloadInput = { ...input, photos };
   let token = tokenFromAnywhere() || (await refreshLocalSession());
-  let { res, payload } = await postProfileOnce(input, token, true);
+  let { res, payload } = await postProfileOnce(payloadInput, token, true);
   if (res.status === 401) {
     token = await refreshLocalSession();
-    ({ res, payload } = await postProfileOnce(input, token, true));
+    ({ res, payload } = await postProfileOnce(payloadInput, token, true));
   }
   if (res.status === 401) {
-    ({ res, payload } = await postProfileOnce(input, token, false));
+    ({ res, payload } = await postProfileOnce(payloadInput, token, false));
   }
   if (!res.ok) {
     throw new Error(

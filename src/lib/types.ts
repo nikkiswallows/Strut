@@ -18,7 +18,21 @@ export const IDENTITIES = [
   "Group",
 ] as const;
 
-export const LOOKING_FOR = ["Friends", "Dates", "Relationship", "Now", "Chat"] as const;
+export const LOOKING_FOR = [
+  "Friends",
+  "Dates",
+  "Relationship",
+  "Now",
+  "Chat",
+  "BBC",
+  "Bulls",
+  "To serve",
+  "To be bred",
+  "Cuckold",
+  "Cleanup",
+  "Chastity",
+  "Hotwife nights",
+] as const;
 
 export const PRONOUNS = ["she/her", "they/them", "she/they", "he/him", "he/they", "any"] as const;
 
@@ -51,6 +65,16 @@ export const INTERESTS = [
   "Breeding",
   "Feminization",
   "Interracial",
+  "Cleanup",
+  "Chastity",
+  "SPH",
+  "Hypno",
+  "BBC Hypno",
+  "Locked",
+  "Sissy training",
+  "Cuckoldress",
+  "Interracial breeding",
+  "Kneeling",
 ] as const;
 
 export const DISCOVER_TABS = [

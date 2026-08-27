@@ -51,7 +51,8 @@ npm run build
 ## Notes
 
 - 18+ only
-- Photos in `public/photos/`
+- Seed photos in `public/photos/`
+- User photos upload through `/api/media` to Vercel Blob (`BLOB_READ_WRITE_TOKEN`). Profiles and feed store URLs only.
 - Auth is Better Auth (`/api/auth/*`)
 - Seed chats use the xAI API when `XAI_API_KEY` is present
 - Brand: black / ivory / gold. Queen of spades. Cinzel + Outfit.

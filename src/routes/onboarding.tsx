@@ -3,10 +3,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { MultiChips, SingleChips } from "@/components/chips";
+import { Decree } from "@/components/decree";
 import { Logo } from "@/components/logo";
 import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
+import { BIO_PLACEHOLDER, decreeFor, judgeRole } from "@/lib/bnwo";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { clearOnboardingDraft, readOnboardingDraft, writeOnboardingDraft } from "@/lib/onboarding-draft";
@@ -147,21 +149,13 @@ function Onboarding() {
         location,
         identities,
         pronouns,
-        role,
+        role: judgeRole(identities, role).forced,
         lookingFor,
         bio,
         interests,
         heightCm: heightCm ? Number(heightCm) : null,
       };
-      const saved = await postProfile({ ...base, photos: [] });
-      if (photos.length) {
-        try {
-          return await postProfile({ ...base, photos });
-        } catch {
-          return saved;
-        }
-      }
-      return saved;
+      return postProfile({ ...base, photos });
     },
     onSuccess: async (saved) => {
       queryClient.setQueryData(["me"], saved);
@@ -294,10 +288,17 @@ function Onboarding() {
               <h1 className="font-display text-5xl leading-[0.92]">What are you to the order?</h1>
               <MultiChips
                 label="Identity"
-                hint="Sissy, whiteboi, king, wife, cuck, T-girl, couple — or type your own."
+                hint="Sissy, whiteboi, king, wife, cuck, T-girl, couple — or type your own. Whiteboi / sissy locks you to Bottom."
                 options={identityTags.data ?? [...IDENTITIES]}
                 value={identities}
-                onChange={setIdentities}
+                onChange={(next) => {
+                  setIdentities(next);
+                  const verdict = judgeRole(next, role);
+                  if (verdict.forced !== role) {
+                    setRole(verdict.forced);
+                    if (verdict.line) toast.message(verdict.line);
+                  }
+                }}
                 kind="identity"
               />
               <MultiChips
@@ -308,10 +309,22 @@ function Onboarding() {
                 kind="pronoun"
                 max={6}
               />
-              <SingleChips label="Top / bottom / switch" options={[...ROLES]} value={role} onChange={setRole} />
+              <SingleChips
+                label="Top / bottom / switch"
+                options={[...ROLES]}
+                value={role}
+                allowed={judgeRole(identities, role).allowed}
+                onChange={setRole}
+                onDenied={(opt) => {
+                  const verdict = judgeRole(identities, opt);
+                  setRole(verdict.forced);
+                  toast.message(verdict.line ?? "That role is not for what you checked.");
+                }}
+              />
+              <Decree>{decreeFor(identities)}</Decree>
               <MultiChips
                 label="Looking for"
-                hint="Pick as many as you want."
+                hint="BBC, bulls, cleanup, chastity, breeding — say it."
                 options={lookingTags.data ?? [...LOOKING_FOR]}
                 value={lookingFor}
                 onChange={setLookingFor}
@@ -339,12 +352,12 @@ function Onboarding() {
                   value={bio}
                   maxLength={500}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="King, sissy, wife, cuck — what you want done to you, or who you do it to."
+                  placeholder={BIO_PLACEHOLDER}
                 />
               </Field>
               <MultiChips
                 label="Interests"
-                hint="BNWO, QOS, BBC, Cuckold, Breeding, Feminization…"
+                hint="BNWO, QOS, BBC, Cuckold, Breeding, Cleanup, Chastity, Hypno…"
                 options={interestTags.data ?? [...INTERESTS]}
                 value={interests}
                 onChange={setInterests}
