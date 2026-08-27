@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { tokenCandidates, tokensFromRequest } from "./session-tokens.ts";
+import { lookupValues, tokenCandidates, tokensFromRequest } from "./session-tokens.ts";
 
 test("tokenCandidates strips Bearer and keeps signed + unsigned forms", () => {
   assert.deepEqual(tokenCandidates(null), []);
@@ -31,4 +31,13 @@ test("tokensFromRequest reads bearer, custom header, body extra, and cookies", (
 test("anonymous requests produce no tokens", () => {
   const request = new Request("https://strut.app/");
   assert.deepEqual(tokensFromRequest(request), []);
+});
+
+test("lookupValues includes sha256 forms so hashed Better Auth rows still match", async () => {
+  const { lookupValues } = await import("./session-tokens.ts");
+  const token = "stk_abcdefghijklmnopqrstuvwxyz012345";
+  const values = lookupValues([token]);
+  assert.ok(values.includes(token));
+  assert.equal(values.length, 3);
+  assert.ok(values.every((value) => value.length >= 32));
 });

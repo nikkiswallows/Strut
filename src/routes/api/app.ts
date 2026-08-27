@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { isTrustedAppOrigin } from "@/lib/auth/isolation.server";
 import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 import { addTagFor, listTagsFor } from "@/lib/server/catalog";
 import { getProfileForViewerUser, listDiscoverForUser } from "@/lib/server/profiles";
@@ -16,6 +17,9 @@ export const Route = createFileRoute("/api/app")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          if (!isTrustedAppOrigin(request)) {
+            return Response.json({ error: "Forbidden" }, { status: 403 });
+          }
           const body = (await request.json()) as Record<string, unknown> & {
             op?: string;
             sessionToken?: string;

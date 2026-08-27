@@ -112,7 +112,7 @@ export function PhoneAuth({
     try {
       const res = await fetch("/api/phone/start", {
         method: "POST",
-        credentials: "same-origin",
+        credentials: "include",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify({ iso: nextIso, national: nextNational }),
       });
@@ -139,7 +139,7 @@ export function PhoneAuth({
     try {
       const res = await fetch("/api/phone/login", {
         method: "POST",
-        credentials: "same-origin",
+        credentials: "include",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify({ iso, national, code: digits, sessionToken: getBearerToken() }),
       });

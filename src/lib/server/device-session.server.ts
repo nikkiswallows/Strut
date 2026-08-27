@@ -2,12 +2,18 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
 import { sessionTokenForUser, userIdFromRequest } from "@/lib/auth/session-from-request.server";
 
+/**
+ * SameSite=None so iPhone Safari still sends the cookie on first-party POSTs it
+ * sometimes mislabels as cross-site (Lax cookies are dropped; the page stays
+ * signed in from GET/navigation). CSRF is checked via Origin on mutating routes.
+ */
 export function sessionCookie(token: string, name = "strut_session"): string {
-  return `${name}=${encodeURIComponent(token)}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+  const httpOnly = name === "strut_session" ? "; HttpOnly" : "";
+  return `${name}=${encodeURIComponent(token)}; Path=/; Max-Age=31536000; SameSite=None; Secure${httpOnly}`;
 }
 
 export function clearSessionCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+  return `${name}=; Path=/; Max-Age=0; SameSite=None; Secure`;
 }
 
 export function sessionHeaders(token: string): Headers {

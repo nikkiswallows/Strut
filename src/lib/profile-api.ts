@@ -1,22 +1,15 @@
-import { getBearerToken } from "@/lib/auth/client";
-import { markOnboarded, writeLocalSession } from "@/lib/local-session";
+import { markOnboarded, tokenFromAnywhere, writeLocalSession } from "@/lib/local-session";
+import { refreshLocalSession, sessionHeaders } from "@/lib/session-client";
 import type { ProfileInput } from "@/lib/server/profiles";
 import type { Profile } from "@/lib/types";
 
-function authHeaders(token: string | null): HeadersInit {
-  return {
-    accept: "application/json",
-    ...(token ? { authorization: `Bearer ${token}`, "x-strut-session": token } : {}),
-  };
-}
-
 export async function fetchMyProfile(): Promise<Profile | null> {
-  const token = getBearerToken();
-  if (!token) return null;
+  let token = tokenFromAnywhere();
+  if (!token) token = await refreshLocalSession();
   const res = await fetch("/api/profile", {
-    credentials: "same-origin",
+    credentials: "include",
     cache: "no-store",
-    headers: authHeaders(token),
+    headers: sessionHeaders(token),
   });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error("Could not load your profile.");
@@ -33,19 +26,27 @@ type ProfileResponse = {
   onboarded?: boolean;
 };
 
-export async function postProfile(input: ProfileInput) {
-  const token = getBearerToken();
-  if (!token) throw new Error("Unauthorized");
+async function postProfileOnce(input: ProfileInput, token: string | null, useBearer: boolean) {
   const res = await fetch("/api/profile", {
     method: "POST",
-    credentials: "same-origin",
-    headers: {
-      "content-type": "application/json",
-      ...authHeaders(token),
-    },
+    credentials: "include",
+    headers: sessionHeaders(useBearer ? token : null, true),
     body: JSON.stringify({ ...input, sessionToken: token }),
   });
   const payload = (await res.json().catch(() => null)) as ProfileResponse | null;
+  return { res, payload };
+}
+
+export async function postProfile(input: ProfileInput) {
+  let token = tokenFromAnywhere() || (await refreshLocalSession());
+  let { res, payload } = await postProfileOnce(input, token, true);
+  if (res.status === 401) {
+    token = await refreshLocalSession();
+    ({ res, payload } = await postProfileOnce(input, token, true));
+  }
+  if (res.status === 401) {
+    ({ res, payload } = await postProfileOnce(input, token, false));
+  }
   if (!res.ok) {
     throw new Error(
       (payload && typeof payload.error === "string" && payload.error) ||

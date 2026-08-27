@@ -45,7 +45,7 @@ function Login() {
     try {
       const res = await fetch("/api/email/login", {
         method: "POST",
-        credentials: "same-origin",
+        credentials: "include",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify({
           email,

@@ -1,5 +1,7 @@
 /** Pure session-token parsing. Safe to import from tests and the server. */
 
+import { createHash } from "node:crypto";
+
 export const SESSION_COOKIE_NAMES = new Set([
   "strut_at",
   "strut_session",
@@ -54,4 +56,23 @@ export function tokensFromRequest(request: Request, extra?: string | null): stri
     ...tokenCandidates(request.headers.get("x-strut-session")),
     ...tokensFromCookieHeader(request.headers.get("cookie")),
   ].filter((value, index, all) => all.indexOf(value) === index);
+}
+
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function sha256Base64Url(value: string): string {
+  return createHash("sha256").update(value).digest("base64url");
+}
+
+/** Raw tokens plus hashed forms Better Auth may store in `session.token`. */
+export function lookupValues(tokens: string[]): string[] {
+  const out = new Set<string>();
+  for (const token of tokens) {
+    out.add(token);
+    out.add(sha256Hex(token));
+    out.add(sha256Base64Url(token));
+  }
+  return [...out];
 }

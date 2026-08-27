@@ -1,17 +1,18 @@
 import { getSql } from "@/lib/db";
-import { tokenCandidates, tokensFromRequest } from "./session-tokens";
+import { lookupValues, tokenCandidates, tokensFromRequest } from "./session-tokens";
 
-export { tokenCandidates, tokensFromRequest };
+export { lookupValues, tokenCandidates, tokensFromRequest };
 
 export async function lookupUserIdByTokens(tokens: string[]): Promise<string | null> {
   if (!tokens.length) return null;
   const sql = await getSql();
+  const values = lookupValues(tokens);
+  const exact = await sql.query<{ userId: string }>(
+    `select "userId" from session where token = any($1::text[]) and "expiresAt" > now() limit 1`,
+    [values],
+  );
+  if (exact[0]?.userId) return exact[0].userId;
   for (const token of tokens) {
-    const exact = await sql.query<{ userId: string }>(
-      `select "userId" from session where token = $1 and "expiresAt" > now() limit 1`,
-      [token],
-    );
-    if (exact[0]?.userId) return exact[0].userId;
     const signed = await sql.query<{ userId: string }>(
       `select "userId" from session
        where "expiresAt" > now() and $1 like replace(token, '%', '\\%') || '.%'
@@ -19,6 +20,53 @@ export async function lookupUserIdByTokens(tokens: string[]): Promise<string | n
       [token],
     );
     if (signed[0]?.userId) return signed[0].userId;
+  }
+  return null;
+}
+
+async function userIdFromBetterAuth(
+  request: Request,
+  extraToken?: string | null,
+): Promise<string | null> {
+  try {
+    const { auth } = await import("./server");
+    const attempts: Headers[] = [];
+
+    const withExtra = new Headers(request.headers);
+    if (extraToken) withExtra.set("Authorization", `Bearer ${extraToken}`);
+    attempts.push(withExtra);
+
+    // A stale Authorization value must not hide a valid session cookie.
+    // iPhone Safari also sometimes omits Lax cookies on first-party POSTs.
+    const cookiesOnly = new Headers(request.headers);
+    cookiesOnly.delete("authorization");
+    cookiesOnly.delete("Authorization");
+    attempts.push(cookiesOnly);
+
+    const bearerValues = [
+      extraToken,
+      request.headers.get("authorization"),
+      request.headers.get("x-strut-session"),
+    ].filter((value): value is string => Boolean(value && value.trim()));
+
+    for (const raw of bearerValues) {
+      const token = raw.replace(/^Bearer\s+/i, "").trim();
+      if (!token) continue;
+      const bearerOnly = new Headers();
+      bearerOnly.set("Authorization", `Bearer ${token}`);
+      attempts.push(bearerOnly);
+    }
+
+    for (const headers of attempts) {
+      try {
+        const session = await auth.api.getSession({ headers });
+        if (session?.user?.id) return session.user.id;
+      } catch {
+        /* try the next header set */
+      }
+    }
+  } catch {
+    /* ignore */
   }
   return null;
 }
@@ -35,17 +83,7 @@ export async function userIdFromRequest(
     /* fall through */
   }
 
-  try {
-    const { auth } = await import("./server");
-    const headers = new Headers(request.headers);
-    if (extraToken) headers.set("Authorization", `Bearer ${extraToken}`);
-    const session = await auth.api.getSession({ headers });
-    if (session?.user?.id) return session.user.id;
-  } catch {
-    /* ignore */
-  }
-
-  return null;
+  return userIdFromBetterAuth(request, extraToken);
 }
 
 export async function sessionTokenForUser(userId: string): Promise<string | null> {

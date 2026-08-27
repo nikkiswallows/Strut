@@ -3,7 +3,7 @@ import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 import {
   durableSessionFromAuthToken,
   migrateProfile,
-  sessionCookie,
+  sessionHeaders,
 } from "@/lib/server/device-session.server";
 import { completePhoneLogin } from "@/lib/server/phone-login.server";
 
@@ -29,15 +29,11 @@ export const Route = createFileRoute("/api/phone/login")({
           );
           const durable = await durableSessionFromAuthToken(request, result.token);
           if (priorUser) await migrateProfile(priorUser, durable.userId);
-          const headers = new Headers({
-            "content-type": "application/json",
-            "cache-control": "no-store",
-          });
+          const headers = sessionHeaders(durable.token);
+          headers.set("content-type", "application/json");
           for (const cookie of result.cookies) {
             headers.append("set-cookie", cookie);
           }
-          headers.set("set-auth-token", durable.token);
-          headers.append("set-cookie", sessionCookie(durable.token));
           return new Response(
             JSON.stringify({
               e164: result.e164,

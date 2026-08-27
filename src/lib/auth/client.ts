@@ -229,7 +229,7 @@ export async function signOut(redirectTo = "/login"): Promise<void> {
   try {
     await fetch("/api/session/logout", {
       method: "POST",
-      credentials: "same-origin",
+      credentials: "include",
       cache: "no-store",
       headers: {
         accept: "application/json",

@@ -45,6 +45,15 @@ function headerHost(value: string | null): string | null {
   }
 }
 
+/** True when Origin is missing (same-origin) or matches this host. */
+export function isTrustedAppOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin || origin === "null") return true;
+  const here = requestHost(request);
+  const from = headerHost(origin);
+  return Boolean(here && from && here === from);
+}
+
 /** Throw `CrossSiteRequestError` for a scripted cross-site/sibling request. */
 export function assertSameSiteRequest(): void {
   const request = getRequest();

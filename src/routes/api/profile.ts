@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { isTrustedAppOrigin } from "@/lib/auth/isolation.server";
 import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 import { getSql } from "@/lib/db";
 import { requireSession, sessionHeaders } from "@/lib/server/device-session.server";
@@ -26,6 +27,9 @@ export const Route = createFileRoute("/api/profile")({
       },
       POST: async ({ request }) => {
         try {
+          if (!isTrustedAppOrigin(request)) {
+            return Response.json({ error: "Forbidden" }, { status: 403 });
+          }
           const input = (await request.json()) as ProfileBody;
           const { sessionToken, ...profileInput } = input;
           const session = await requireSession(request, sessionToken);

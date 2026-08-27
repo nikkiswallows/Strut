@@ -23,9 +23,9 @@ function emit(): void {
 function setCookie(token: string | null): void {
   if (typeof document === "undefined") return;
   if (token) {
-    document.cookie = `${COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+    document.cookie = `${COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=31536000; SameSite=None; Secure`;
   } else {
-    document.cookie = `${COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+    document.cookie = `${COOKIE}=; Path=/; Max-Age=0; SameSite=None; Secure`;
   }
 }
 

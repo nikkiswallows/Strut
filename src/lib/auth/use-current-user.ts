@@ -6,6 +6,7 @@ import {
   tokenFromAnywhere,
   writeLocalSession,
 } from "@/lib/local-session";
+import { sessionHeaders } from "@/lib/session-client";
 
 export type AppUser = {
   id: string;
@@ -35,15 +36,10 @@ function userFromLocal(): AppUser | null {
 async function recoverSessionFromServer(): Promise<void> {
   const existing = readLocalSession();
   const token = tokenFromAnywhere();
-  const headers: Record<string, string> = { accept: "application/json" };
-  if (token) {
-    headers.authorization = `Bearer ${token}`;
-    headers["x-strut-session"] = token;
-  }
   const res = await fetch("/api/session/token", {
-    credentials: "same-origin",
+    credentials: "include",
     cache: "no-store",
-    headers,
+    headers: sessionHeaders(token),
   });
   const payload = (await res.json().catch(() => null)) as {
     token?: string | null;
