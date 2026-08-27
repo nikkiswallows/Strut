@@ -211,7 +211,7 @@ export async function generateSeedReply(input: {
       text = await complete(messages, maxTokens);
     } catch (err) {
       console.error("[bot] attempt", attempt + 1, err);
-      if (attempt === 1) return "";
+      if (attempt === 1) return seed?.reply ?? "";
       continue;
     }
     if (!text) continue;
@@ -224,5 +224,9 @@ export async function generateSeedReply(input: {
     }
     return text;
   }
+  if (!text) return seed?.reply ?? "";
+  // if we got here and text was flagged too-similar on the final loop
+  // iteration, still return it rather than dropping the reply entirely;
+  // the caller will render it. the similarity guard is best-effort.
   return text;
 }

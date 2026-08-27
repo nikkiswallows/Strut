@@ -1,4 +1,4 @@
-import { getBearerToken } from "@/lib/auth/client";
+import { authEnabled, getBearerToken } from "@/lib/auth/client";
 import { markOnboarded, writeLocalSession } from "@/lib/local-session";
 import type { ProfileInput } from "@/lib/server/profiles";
 import type { Profile } from "@/lib/types";
@@ -49,6 +49,36 @@ function authHeaders(token: string | null): HeadersInit {
 }
 
 export async function fetchMyProfile(): Promise<Profile | null> {
+  // When auth is disabled (VITE_AUTH_ENABLED=false), return the dev user fallback
+  if (!authEnabled) return {
+    id: 0,
+    userId: "dev-user",
+    handle: "dev-user",
+    displayName: "Dev User",
+    age: null,
+    hideAge: false,
+    identities: ["T-Girl"],
+    pronouns: ["she/her"],
+    role: "Switch",
+    bio: "",
+    location: "",
+    lookingFor: ["Dates"],
+    photos: [],
+    interests: [],
+    heightCm: null,
+    lat: null,
+    lng: null,
+    isSeed: false,
+    lastActive: "",
+    onboarded: false,
+    createdAt: "",
+    likedByMe: undefined,
+    likesMe: undefined,
+    matched: undefined,
+    following: undefined,
+    likeCount: undefined,
+    distanceMiles: undefined,
+  };
   const token = getBearerToken();
   if (!token) return null;
   const res = await fetch("/api/profile", {

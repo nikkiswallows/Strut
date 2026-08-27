@@ -1,4 +1,4 @@
-import { getBearerToken } from "@/lib/auth/client";
+import { authEnabled, getBearerToken } from "@/lib/auth/client";
 
 export async function http<T>(path: string, json?: Record<string, unknown>): Promise<T> {
   const token = getBearerToken();
@@ -23,6 +23,7 @@ export async function http<T>(path: string, json?: Record<string, unknown>): Pro
 }
 
 export async function app<T>(op: string, data: Record<string, unknown> = {}) {
-  const payload = await http<{ data: T }>("/api/app", { op, ...data });
+  const token = getBearerToken();
+  const payload = await http<{ data: T }>("/api/app", { op, ...data, sessionToken: token });
   return payload.data;
 }
