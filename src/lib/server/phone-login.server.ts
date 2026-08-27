@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { getSql } from "@/lib/db";
+import { planEmailLogin } from "@/lib/auth/email-login-plan";
 import { publicOrigin } from "@/lib/auth/public-origin.server";
 import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
 import {
@@ -158,6 +160,66 @@ export async function completePhoneLogin(
   };
 }
 
+async function lookupEmailAccount(email: string): Promise<{
+  userId: string | null;
+  name: string | null;
+  hasPassword: boolean;
+  onboarded: boolean;
+}> {
+  const sql = await getSql();
+  const users = await sql.query<{ id: string; name: string | null }>(
+    `select id, name from "user" where lower(email) = $1 limit 1`,
+    [email],
+  );
+  const user = users[0];
+  if (!user) return { userId: null, name: null, hasPassword: false, onboarded: false };
+  const accounts = await sql.query<{ password: string | null }>(
+    `select password from account where "userId" = $1 and "providerId" = 'credential'`,
+    [user.id],
+  );
+  const profiles = await sql.query<{ onboarded: boolean }>(
+    `select onboarded from profiles where user_id = $1`,
+    [user.id],
+  );
+  return {
+    userId: user.id,
+    name: user.name,
+    hasPassword: accounts.some((row) => Boolean(row.password)),
+    onboarded: Boolean(profiles[0]?.onboarded),
+  };
+}
+
+async function hashCredentialPassword(password: string): Promise<string> {
+  const { auth } = await import("@/lib/auth/server");
+  const ctx = await auth.$context;
+  if (ctx.password && typeof ctx.password.hash === "function") {
+    return ctx.password.hash(password);
+  }
+  const { hashPassword } = await import("better-auth/crypto");
+  return hashPassword(password);
+}
+
+async function attachPassword(userId: string, password: string): Promise<void> {
+  const hash = await hashCredentialPassword(password);
+  const sql = await getSql();
+  const existing = await sql.query<{ id: string }>(
+    `select id from account where "userId" = $1 and "providerId" = 'credential' limit 1`,
+    [userId],
+  );
+  if (existing[0]) {
+    await sql.query(`update account set password = $1, "updatedAt" = now() where id = $2`, [
+      hash,
+      existing[0].id,
+    ]);
+    return;
+  }
+  await sql.query(
+    `insert into account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
+     values ($1, $2, 'credential', $3, $4, now(), now())`,
+    [randomUUID(), userId, userId, hash],
+  );
+}
+
 export async function completeEmailLogin(
   input: { email: string; password: string; name?: string; join: boolean },
   request: Request,
@@ -168,19 +230,45 @@ export async function completeEmailLogin(
   if (!email.includes("@")) throw new Error("Enter a valid email.");
   if (password.length < 8) throw new Error("Password must be at least 8 characters.");
 
-  if (input.join) {
-    try {
-      const signed = await betterAuthEmail(request, { email, password, name, signUp: true });
-      return { ...signed, isNew: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      if (/already|exists|registered/i.test(message)) {
-        const signed = await betterAuthEmail(request, { email, password, name, signUp: false });
-        return { ...signed, isNew: false };
-      }
-      throw err;
-    }
+  const account = await lookupEmailAccount(email);
+  const plan = planEmailLogin(input.join, {
+    exists: Boolean(account.userId),
+    hasPassword: account.hasPassword,
+    onboarded: account.onboarded,
+  });
+
+  if (plan === "unknown") {
+    throw new Error("No account with that email. Tap Create a profile.");
   }
-  const signed = await betterAuthEmail(request, { email, password, name, signUp: false });
-  return { ...signed, isNew: false };
+  if (plan === "needs-join") {
+    throw new Error("This email doesn’t have a password yet. Tap Create a profile and set one.");
+  }
+
+  if (plan === "signup") {
+    const signed = await betterAuthEmail(request, { email, password, name, signUp: true });
+    return { ...signed, isNew: true };
+  }
+
+  if (plan === "attach" && account.userId) {
+    await attachPassword(account.userId, password);
+    const signed = await betterAuthEmail(request, {
+      email,
+      password,
+      name: name || account.name || "Member",
+      signUp: false,
+    });
+    return { ...signed, isNew: !account.onboarded };
+  }
+
+  try {
+    const signed = await betterAuthEmail(request, {
+      email,
+      password,
+      name: name || account.name || "Member",
+      signUp: false,
+    });
+    return { ...signed, isNew: false };
+  } catch {
+    throw new Error("Invalid email or password");
+  }
 }

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  clearLocalSession,
   readLocalSession,
   subscribeLocalSession,
   tokenFromAnywhere,
@@ -56,9 +55,9 @@ async function recoverSessionFromServer(): Promise<void> {
     });
     return;
   }
-  if (res.ok && (existing || token) && !payload?.userId) {
-    clearLocalSession();
-  }
+  // Do not wipe a local session just because this GET missed cookies/token.
+  // iPhone Safari drops Lax cookies on some fetches; logging them out here is
+  // what stranded people on /login with no way back through Google.
 }
 
 export function useCurrentUserState(): CurrentUserState {
