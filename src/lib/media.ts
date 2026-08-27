@@ -55,7 +55,13 @@ export async function uploadPhotoBlob(
   const payload = (await res.json().catch(() => null)) as
     | { url?: string; error?: string }
     | null;
-  if (res.status === 401) throw new Error("Unauthorized");
+  if (res.status === 401) {
+    throw new Error(
+      "Your session wasn’t recognized. Sign in again, then retry the photo. " +
+        "(If it keeps happening, the server may be missing DATABASE_URL — " +
+        "sessions don’t persist between serverless requests without a real database.)",
+    );
+  }
   if (!res.ok || !payload?.url) {
     throw new Error(payload?.error || "Could not upload that photo.");
   }

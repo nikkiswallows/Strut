@@ -19,6 +19,8 @@ import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppLikesRouteImport } from './routes/_app/likes'
 import { Route as AppMeRouteImport } from './routes/_app/me'
 import { Route as ApiAppRouteImport } from './routes/api/app'
+import { Route as ApiConfigRouteImport } from './routes/api/config'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMediaRouteImport } from './routes/api/media'
 import { Route as ApiProfileRouteImport } from './routes/api/profile'
 import { Route as AuthCompleteRouteImport } from './routes/auth.complete'
@@ -81,6 +83,16 @@ const AppMeRoute = AppMeRouteImport.update({
 const ApiAppRoute = ApiAppRouteImport.update({
   id: '/api/app',
   path: '/api/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiConfigRoute = ApiConfigRouteImport.update({
+  id: '/api/config',
+  path: '/api/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMediaRoute = ApiMediaRouteImport.update({
@@ -164,6 +176,8 @@ export interface FileRoutesByFullPath {
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
   '/api/app': typeof ApiAppRoute
+  '/api/config': typeof ApiConfigRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/media': typeof ApiMediaRoute
   '/api/profile': typeof ApiProfileRoute
   '/auth/complete': typeof AuthCompleteRoute
@@ -188,6 +202,8 @@ export interface FileRoutesByTo {
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
   '/api/app': typeof ApiAppRoute
+  '/api/config': typeof ApiConfigRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/media': typeof ApiMediaRoute
   '/api/profile': typeof ApiProfileRoute
   '/auth/complete': typeof AuthCompleteRoute
@@ -215,6 +231,8 @@ export interface FileRoutesById {
   '/_app/likes': typeof AppLikesRoute
   '/_app/me': typeof AppMeRoute
   '/api/app': typeof ApiAppRoute
+  '/api/config': typeof ApiConfigRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/media': typeof ApiMediaRoute
   '/api/profile': typeof ApiProfileRoute
   '/auth/complete': typeof AuthCompleteRoute
@@ -242,6 +260,8 @@ export interface FileRouteTypes {
     | '/likes'
     | '/me'
     | '/api/app'
+    | '/api/config'
+    | '/api/health'
     | '/api/media'
     | '/api/profile'
     | '/auth/complete'
@@ -266,6 +286,8 @@ export interface FileRouteTypes {
     | '/likes'
     | '/me'
     | '/api/app'
+    | '/api/config'
+    | '/api/health'
     | '/api/media'
     | '/api/profile'
     | '/auth/complete'
@@ -292,6 +314,8 @@ export interface FileRouteTypes {
     | '/_app/likes'
     | '/_app/me'
     | '/api/app'
+    | '/api/config'
+    | '/api/health'
     | '/api/media'
     | '/api/profile'
     | '/auth/complete'
@@ -314,6 +338,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   ApiAppRoute: typeof ApiAppRoute
+  ApiConfigRoute: typeof ApiConfigRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   ApiMediaRoute: typeof ApiMediaRoute
   ApiProfileRoute: typeof ApiProfileRoute
   AuthCompleteRoute: typeof AuthCompleteRoute
@@ -397,6 +423,20 @@ declare module '@tanstack/react-router' {
       path: '/api/app'
       fullPath: '/api/app'
       preLoaderRoute: typeof ApiAppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/config': {
+      id: '/api/config'
+      path: '/api/config'
+      fullPath: '/api/config'
+      preLoaderRoute: typeof ApiConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/media': {
@@ -540,6 +580,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   ApiAppRoute: ApiAppRoute,
+  ApiConfigRoute: ApiConfigRoute,
+  ApiHealthRoute: ApiHealthRoute,
   ApiMediaRoute: ApiMediaRoute,
   ApiProfileRoute: ApiProfileRoute,
   AuthCompleteRoute: AuthCompleteRoute,

@@ -134,18 +134,27 @@ export const auth = betterAuth({
   database,
   trustedOrigins: (request?: Request) => buildTrustedOrigins(request),
 
-  // Standard, framework-managed session cookies: HttpOnly + Secure +
+  // Standard, framework-managed session cookies: HttpOnly + Secure (on HTTPS) +
   // SameSite=Lax, path=/. Lax is correct for a first-party SPA: cookies ride
   // along on same-site GET navigations and on same-origin fetch/XHR POSTs.
-  // (The earlier SameSite=None/dual-token workarounds existed only to serve an
-  // embedded cross-origin preview iframe, which is not a production surface.)
+  // Let Better Auth decide `secure`/prefix from the request protocol
+  // automatically (true on Vercel HTTPS, false on local http) — forcing it off
+  // the configured baseURL can mismatch preview aliases. (The earlier
+  // SameSite=None/dual-token workarounds existed only to serve an embedded
+  // cross-origin preview iframe, which is not a production surface.)
   advanced: {
-    useSecureCookies: baseUrl.startsWith("https://"),
     defaultCookieAttributes: {
       httpOnly: true,
-      secure: baseUrl.startsWith("https://"),
       sameSite: "lax",
       path: "/",
+    },
+    // Behind Vercel's proxy the client IP is forwarded in these headers;
+    // without them rate-limiting falls back to one shared bucket.
+    ipAddress: {
+      // Vercel forwards the client IP here; without it rate-limiting falls back
+      // to one shared bucket. (Do NOT set a broad trustedProxies range — use the
+      // real proxy CIDRs; Vercel sets these single-hop headers for us.)
+      ipAddressHeaders: ["x-real-ip", "x-vercel-forwarded-for", "x-forwarded-for"],
     },
   },
 

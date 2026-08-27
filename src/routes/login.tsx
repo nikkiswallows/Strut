@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Logo } from "@/components/logo";
 import { PhoneAuth } from "@/components/phone-auth";
@@ -10,6 +10,8 @@ import {
   signInSocial,
   signInWithEmail,
 } from "@/lib/auth/client";
+import { fetchRuntimeConfig } from "@/lib/auth/runtime-config";
+import type { PublicRuntimeConfig } from "@/lib/auth/runtime-config.server";
 import { useMembership } from "@/lib/auth/use-membership";
 import { HERO_STREET } from "@/lib/seed-data";
 
@@ -32,6 +34,16 @@ function Login() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [config, setConfig] = useState<PublicRuntimeConfig | null>(null);
+
+  useEffect(() => {
+    void fetchRuntimeConfig().then(setConfig);
+  }, []);
+
+  /** Social providers that actually have credentials wired in this deploy. */
+  const socials = SOCIAL_PROVIDERS.filter((p) =>
+    p.id === "google" ? config?.providers.google : config?.providers.x,
+  );
 
   if (phase === "loading") return <div className="min-h-dvh bg-bg" />;
   if (phase === "member") return <Navigate to="/discover" />;
@@ -151,7 +163,7 @@ function Login() {
                 </div>
 
             <div className="space-y-2">
-                {SOCIAL_PROVIDERS.map((p) => (
+                {socials.map((p) => (
                   <Button
                     key={p.id}
                     variant="outline"
@@ -169,6 +181,12 @@ function Login() {
                     Continue with {p.label}
                   </Button>
                 ))}
+                {config && socials.length === 0 ? (
+                  <p className="px-2 pt-1 text-center text-[11px] leading-relaxed text-subtle">
+                    Social sign-in isn’t wired on this deployment yet — use email
+                    or phone.
+                  </p>
+                ) : null}
                 <Button
                   variant="ghost"
                   className="h-12 w-full"
