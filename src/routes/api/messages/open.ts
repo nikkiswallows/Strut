@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
+import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 import { openChat } from "@/lib/server/chat.server";
 
 export const Route = createFileRoute("/api/messages/open")({
@@ -7,9 +7,10 @@ export const Route = createFileRoute("/api/messages/open")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const body = (await request.json()) as { otherUserId?: string; sessionToken?: string };
-          const userId = await userIdFromRequest(request, body.sessionToken);
-          if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+          const body = (await request.json()) as { otherUserId?: string };
+          const user = await getSessionUserFromRequest(request);
+          if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+          const userId = user.id;
           const opened = await openChat(userId, body.otherUserId ?? "");
           return Response.json(opened);
         } catch (err) {

@@ -48,13 +48,37 @@ npm run typecheck
 npm run build
 ```
 
+## Architecture & deploy
+
+Accounts and auth use self-hosted **Better Auth** at `/api/auth/*` with a single
+standard session (HttpOnly, Secure, SameSite=Lax cookie; bearer tokens available
+for future native apps):
+
+- **Email + password** and **Google / X** sign-in, plus **passwordless phone
+  OTP** (Tinder-style).
+- All routes resolve the user from the Better Auth session — no parallel token
+  tables, no localStorage tokens.
+- Postgres in production (`DATABASE_URL`), embedded PGlite locally; migrations in
+  `migrations/` apply automatically on deploy.
+- Photos upload through `/api/media` to **Vercel Blob** (one store is enough —
+  reads are CDN-served); profiles/feed store URLs only.
+
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** and copy **[`.env.example`](./.env.example)**
+for the full env-var list. Quick deploy checklist:
+
+1. Create a Postgres DB (e.g. Neon) and set `DATABASE_URL`.
+2. Set `BETTER_AUTH_SECRET` (`openssl rand -hex 32`) and `BETTER_AUTH_URL`.
+3. Create one Vercel Blob store and set `BLOB_READ_WRITE_TOKEN`.
+4. (Optional) Google/X OAuth clients — redirect to
+   `<APP_URL>/api/auth/callback/google` and `.../callback/twitter`.
+5. (Optional) Twilio for real SMS; without it the phone code is shown on screen.
+
 ## Notes
 
 - 18+ only
 - Seed photos in `public/photos/`
-- User photos upload through `/api/media` to Vercel Blob (`BLOB_READ_WRITE_TOKEN`). Profiles and feed store URLs only.
-- Auth is Better Auth (`/api/auth/*`)
+- Phone sign-in: add Twilio credentials (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+  `TWILIO_FROM_NUMBER`) for real texts; otherwise the code is shown on the verify
+  screen so you can finish sign-in.
 - Seed chats use the xAI API when `XAI_API_KEY` is present
 - Brand: black / ivory / gold. Queen of spades. Cinzel + Outfit.
-
-When you are ready to send real SMS codes, add Twilio credentials (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`). Until then, the code is shown on the verify screen so you can finish sign-in.

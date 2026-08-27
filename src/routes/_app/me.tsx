@@ -9,7 +9,7 @@ import { decreeFor, judgeRole } from "@/lib/bnwo";
 import { PhotoStrip } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
-import { signOut } from "@/lib/auth/client";
+import { signOutAndRedirect } from "@/lib/auth/client";
 import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
@@ -117,7 +117,7 @@ function Me() {
   async function logout() {
     clearOnboardingDraft();
     try {
-      await signOut("/login");
+      await signOutAndRedirect("/login");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-out failed. Try again.");
     }

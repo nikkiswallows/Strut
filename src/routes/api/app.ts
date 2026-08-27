@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { isTrustedAppOrigin } from "@/lib/auth/isolation.server";
-import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
+import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 import { addTagFor, listTagsFor } from "@/lib/server/catalog";
 import { getProfileForViewerUser, listDiscoverForUser } from "@/lib/server/profiles";
 import {
@@ -22,7 +22,6 @@ export const Route = createFileRoute("/api/app")({
           }
           const body = (await request.json()) as Record<string, unknown> & {
             op?: string;
-            sessionToken?: string;
           };
           const op = String(body.op ?? "");
           if (op === "tags") {
@@ -33,8 +32,9 @@ export const Route = createFileRoute("/api/app")({
             const data = await addTagFor(String(body.kind ?? ""), String(body.label ?? ""));
             return Response.json({ data }, { headers: { "cache-control": "no-store" } });
           }
-          const userId = await userIdFromRequest(request, body.sessionToken);
-          if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+          const authUser = await getSessionUserFromRequest(request);
+          if (!authUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
+          const userId = authUser.id;
           let data: unknown;
           switch (op) {
             case "discover":

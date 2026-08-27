@@ -1,11 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { userIdFromRequest } from "@/lib/auth/session-from-request.server";
-import {
-  durableSessionFromAuthToken,
-  migrateProfile,
-  sessionHeaders,
-} from "@/lib/server/device-session.server";
-import { completePhoneLogin } from "@/lib/server/phone-login.server";
+import { callAuth } from "@/lib/auth/forward.server";
+import { getSessionUserFromRequest } from "@/lib/auth/session.server";
+import { publicOrigin } from "@/lib/auth/public-origin.server";
+import { toE164, countryByIso, nationalDigits, isValidNational } from "@/lib/phone";
 
 export const Route = createFileRoute("/api/phone/login")({
   server: {
@@ -16,39 +13,61 @@ export const Route = createFileRoute("/api/phone/login")({
             iso?: string;
             national?: string;
             code?: string;
-            sessionToken?: string;
           };
-          const priorUser = await userIdFromRequest(request, body.sessionToken);
-          const result = await completePhoneLogin(
-            {
-              iso: body.iso ?? "",
-              national: body.national ?? "",
-              code: body.code ?? "",
-            },
+          const iso = body.iso?.trim().toUpperCase() ?? "";
+          const country = countryByIso(iso);
+          if (!country) throw new Error("Pick a country.");
+          const national = nationalDigits(iso, body.national ?? "");
+          if (!isValidNational(iso, national)) {
+            throw new Error("Enter a valid mobile number.");
+          }
+          const phoneNumber = toE164(iso, national);
+          const code = (body.code ?? "").replace(/\D/g, "");
+          if (code.length !== 6) throw new Error("Enter the 6-digit code.");
+
+          // Better Auth verifies the OTP, creates the user on first sign-in,
+          // and sets the session cookie — we stream its Set-Cookie straight back.
+          const res = await callAuth(
             request,
+            "/api/auth/phone-number/verify",
+            { phoneNumber, code },
+            publicOrigin(request),
           );
-          const durable = await durableSessionFromAuthToken(request, result.token);
-          if (priorUser) await migrateProfile(priorUser, durable.userId);
-          const headers = sessionHeaders(durable.token);
-          headers.set("content-type", "application/json");
-          for (const cookie of result.cookies) {
+          const json = (await res.json().catch(() => null)) as
+            | { message?: string; token?: string; user?: { id?: string } }
+            | null;
+          if (!res.ok) {
+            throw new Error(json?.message || "That code didn't work.");
+          }
+
+          // Build a response that carries Better Auth's session Set-Cookie
+          // headers plus a tidy body the UI understands.
+          const headers = new Headers({
+            "content-type": "application/json",
+            "cache-control": "no-store",
+          });
+          for (const cookie of res.headers.getSetCookie()) {
             headers.append("set-cookie", cookie);
           }
+          const sessionReq = new Request(request.url, { headers: request.headers });
+          const user = await getSessionUserFromRequest(sessionReq);
           return new Response(
             JSON.stringify({
-              e164: result.e164,
-              token: durable.token,
-              userId: durable.userId,
-              isNew: result.isNew,
+              ok: true,
+              e164: phoneNumber,
+              userId: user?.id ?? json?.user?.id ?? null,
             }),
             { status: 200, headers },
           );
         } catch (err) {
           const message = err instanceof Error ? err.message : "Could not verify that code.";
-          return new Response(JSON.stringify({ error: message }), {
-            status: 400,
-            headers: { "content-type": "application/json", "cache-control": "no-store" },
-          });
+          return Response.json(
+            { error: message },
+            {
+              status: 400,
+              headers: { "content-type": "application/json", "cache-control": "no-store" },
+            },
+          );
         }
       },
     },

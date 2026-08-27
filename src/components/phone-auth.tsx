@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { authClient, getBearerToken } from "@/lib/auth/client";
 import {
   COUNTRIES,
   countryByIso,
@@ -13,11 +12,7 @@ import {
   isValidNational,
   type Country,
 } from "@/lib/phone";
-import { captureAuthToken } from "@/lib/session-bearer";
-import { writeLocalSession } from "@/lib/local-session";
 import { cn } from "@/lib/utils";
-
-const BEARER_KEY = "grok-auth.bearer-token";
 
 type Phase = "number" | "code";
 
@@ -28,15 +23,6 @@ type SendResult = {
   resendIn: number;
   previewCode: string | null;
 };
-
-function attachSession(token: string) {
-  try {
-    sessionStorage.setItem(BEARER_KEY, token);
-    localStorage.setItem(BEARER_KEY, token);
-  } catch {
-    /* storage blocked */
-  }
-}
 
 export function PhoneAuth({
   join,
@@ -141,27 +127,17 @@ export function PhoneAuth({
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ iso, national, code: digits, sessionToken: getBearerToken() }),
+        body: JSON.stringify({ iso, national, code: digits }),
       });
       const payload = (await res.json().catch(() => null)) as {
-        token?: string;
         userId?: string;
-        isNew?: boolean;
         error?: string;
       } | null;
-      if (!res.ok) {
+      if (!res.ok || !payload?.userId) {
         throw new Error(payload?.error || "Could not verify that code.");
       }
-      captureAuthToken(payload, res);
-      if (payload?.token && payload.userId) {
-        writeLocalSession({ token: payload.token, userId: payload.userId, name: null });
-      }
-      if (payload?.token) attachSession(payload.token);
-      try {
-        await authClient.getSession();
-      } catch {
-        /* session store recovers on next fetch */
-      }
+      // The session cookie was set by the response; hard-navigate so the app
+      // re-bootstraps with the new session.
       window.location.replace("/auth/complete");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not verify that code.");

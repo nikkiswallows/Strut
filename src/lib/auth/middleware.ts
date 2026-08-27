@@ -1,57 +1,31 @@
 import { createMiddleware } from "@tanstack/react-start";
+import { assertSameSiteRequest } from "./isolation.server";
+import { getSessionUser, UnauthorizedError } from "./session.server";
 
 /**
- * Auth middleware for server functions — the standard way to get the caller's
- * verified user id. When deployed the session cookie is same-origin and rides
- * along automatically. In the live preview the client also forwards the bearer
- * token (partitioned cookies) via the `.client` hook below — call sites do not
- * thread it themselves.
+ * Auth middleware for TanStack Start server functions — the standard way to get
+ * the caller's verified user id. Server functions are same-origin POSTs, so the
+ * first-party session cookie is sent automatically; the optional bearer token
+ * (future native apps) is forwarded from the client hook.
  *
  *   import { createServerFn } from "@tanstack/react-start";
- *   import { getSql } from "@/lib/db";
  *   import { authMiddleware } from "@/lib/auth/middleware";
  *
- *   export const listTodos = createServerFn({ method: "GET" })
+ *   export const doThing = createServerFn({ method: "POST" })
  *     .middleware([authMiddleware])
  *     .handler(async ({ context }) => {
- *       const sql = await getSql();
- *       return sql`select * from todos where user_id = ${context.userId}`;
+ *       // context.userId is verified; scope every query by it.
  *     });
- *
- * Signed out with auth on (live preview included) -> throws `UnauthorizedError`
- * (see `verify.server.ts`). With auth disabled (`VITE_AUTH_ENABLED=false`, the
- * shipped default) it resolves the shared dev user — but throws instead when a
- * `DATABASE_URL` is also set, so an app without sign-in must not use this at
- * all. On the auth-on path, use it on every server function that touches
- * per-user data and scope every query by `context.userId`.
  */
 export const authMiddleware = createMiddleware({ type: "function" })
   .client(async ({ next }) => {
-    // Live preview (partitioned iframe): the session rides a bearer token, not a
-    // cookie, so forward it to the server. Null when deployed (cookie auth), so
-    // this is a no-op there.
-    const { getBearerToken } = await import("./client");
-    let token = getBearerToken() ?? undefined;
-    if (!token && typeof window !== "undefined") {
-      try {
-        const sid =
-          window.localStorage.getItem("strut.sid") || window.sessionStorage.getItem("strut.sid");
-        token = sid?.split("\t")[0] || undefined;
-      } catch {
-        /* ignore */
-      }
-    }
-    return next({ sendContext: { bearerToken: token } });
+    // Browsers rely on the HttpOnly cookie (nothing to forward). This hook is
+    // here so a future native/web build can attach a bearer token centrally.
+    return next({ sendContext: { bearerToken: undefined as string | undefined } });
   })
   .server(async ({ next, context }) => {
-    // ONLY import `*.server` modules here. This file is dual client/server
-    // (bearer hook on the client). A plain `./isolation` path was renamed to
-    // `isolation.server.ts` — keep this import in sync so image `tsc` resolves
-    // it, and so Vite does not ship `@tanstack/react-start/server` to the browser.
-    const { assertSameSiteRequest } = await import("./isolation.server");
-    const { requireUserId } = await import("./verify.server");
-    // Reject scripted cross-site/sibling requests before touching per-user data.
     assertSameSiteRequest();
-    const userId = await requireUserId(context.bearerToken);
-    return next({ context: { userId } });
+    const user = await getSessionUser(context.bearerToken);
+    if (!user) throw new UnauthorizedError();
+    return next({ context: { userId: user.id, user } });
   });

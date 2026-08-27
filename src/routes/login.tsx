@@ -6,14 +6,11 @@ import { PhoneAuth } from "@/components/phone-auth";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import {
-  GROK_PROVIDERS,
-  authClient,
-  getBearerToken,
-  signIn,
+  SOCIAL_PROVIDERS,
+  signInSocial,
+  signInWithEmail,
 } from "@/lib/auth/client";
 import { useMembership } from "@/lib/auth/use-membership";
-import { captureAuthToken } from "@/lib/session-bearer";
-import { writeLocalSession } from "@/lib/local-session";
 import { HERO_STREET } from "@/lib/seed-data";
 
 type Search = { mode?: "join" | "in" };
@@ -44,49 +41,24 @@ function Login() {
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await fetch("/api/email/login", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          name: name.trim() || email.split("@")[0],
-          join,
-          sessionToken: getBearerToken(),
-        }),
+      await signInWithEmail({
+        email: email.trim(),
+        password,
+        name: name.trim() || email.split("@")[0],
+        join,
       });
-      const payload = (await res.json().catch(() => null)) as {
-        token?: string;
-        userId?: string;
-        isNew?: boolean;
-        error?: string;
-      } | null;
-      if (!res.ok) {
-        throw new Error(payload?.error || "Could not sign in.");
-      }
-      captureAuthToken(payload, res);
-      if (payload?.token && payload.userId) {
-        writeLocalSession({
-          token: payload.token,
-          userId: payload.userId,
-          name: name.trim() || email.split("@")[0] || null,
-        });
-      }
-      try {
-        await authClient.getSession();
-      } catch {
-        /* session store recovers on next fetch */
-      }
+      // Session cookie is set by the response; hard-navigate to bootstrap it.
       window.location.replace("/auth/complete");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Something went wrong.";
-      if (/create a profile/i.test(raw) && !join) setJoin(true);
-      toast.error(
-        /invalid origin/i.test(raw)
-          ? "This page couldn't verify the sign-in. Refresh and try again."
-          : raw,
-      );
+      // Better Auth reports an existing-email signup as USER_ALREADY_EXISTS /
+      // user already exists — nudge the visitor toward sign-in.
+      if (/(already exists|already registered|user already)/i.test(raw) && join) {
+        setJoin(false);
+        toast.error("An account with that email exists. Sign in instead.");
+      } else {
+        toast.error(raw);
+      }
       setBusy(false);
     }
   }
@@ -179,16 +151,13 @@ function Login() {
                 </div>
 
             <div className="space-y-2">
-                {GROK_PROVIDERS.map((p) => (
+                {SOCIAL_PROVIDERS.map((p) => (
                   <Button
-                    key={p.providerId}
+                    key={p.id}
                     variant="outline"
                     className="h-12 w-full"
                     onClick={() => {
-                      void signIn(p.providerId, {
-                        callbackURL: "/auth/complete",
-                        errorCallbackURL: "/login",
-                      }).catch((err) => {
+                      void signInSocial(p.id, "/auth/complete").catch((err) => {
                         toast.error(
                           err instanceof Error
                             ? err.message
@@ -200,10 +169,6 @@ function Login() {
                     Continue with {p.label}
                   </Button>
                 ))}
-                <p className="pt-1 text-center text-[11px] leading-relaxed text-subtle">
-                  If Google or X show "invalid redirect", stay here and use email or
-                  phone. That session stays on this site.
-                </p>
                 <Button
                   variant="ghost"
                   className="h-12 w-full"
