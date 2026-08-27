@@ -7,10 +7,12 @@ import { PhotoEditor } from "@/components/photo-editor";
 import { PhotoStrip } from "@/components/photo-viewer";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
+import { signOut } from "@/lib/auth/client";
 import { UserButton } from "@/lib/auth/gates";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { queryClient } from "@/lib/query-client";
 import { app } from "@/lib/http";
+import { clearOnboardingDraft } from "@/lib/onboarding-draft";
 import { fetchMyProfile, postProfile } from "@/lib/profile-api";
 import {
   IDENTITIES,
@@ -110,6 +112,15 @@ function Me() {
     },
   });
 
+  async function logout() {
+    clearOnboardingDraft();
+    try {
+      await signOut("/login");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sign-out failed. Try again.");
+    }
+  }
+
   if (me.isPending || !p) {
     return <div className="h-96 animate-pulse rounded-xl bg-surface" />;
   }
@@ -172,6 +183,16 @@ function Me() {
           ) : null}
           <Button className="mt-6 w-full" onClick={() => setEditing(true)}>
             Edit profile
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2 w-full"
+            onClick={() => {
+              void logout();
+            }}
+          >
+            Log out
           </Button>
         </div>
       ) : (
@@ -262,28 +283,9 @@ function Me() {
             </Button>
             <Button type="submit" className="flex-1" disabled={save.isPending}>
               {save.isPending ? "Saving…" : "Save"}
-          <Button
-          type="button"
-          onClick={() => {
-    clearOnboardingDraft();
-    setDisplayName("")
-    setHandle("")
-    setAge("")
-    setHideAge(false)
-    setLocation("")
-    setIdentities([])
-    setPronouns([])
-    setRole("")
-    setLookingFor([])
-    setPhotos([])
-    setBio("")
-    setInterests([])
-    setHeightCm("")
-    toast.success("Logged out. Create a new profile.")
-  }
-          className="mr-2"
-          > Log out
-        </Button>
+            </Button>
+          </div>
+        </form>
       )}
     </div>
   );
