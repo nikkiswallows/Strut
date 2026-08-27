@@ -173,12 +173,12 @@ async function complete(
 ): Promise<string> {
   // No AI provider configured: signal the caller to use a canned reply.
   if (!aiConfigured()) throw new Error("no-key");
-  const raw = await chatComplete(messages, {
+  const result = await chatComplete(messages, {
     maxTokens,
     temperature: 1.05,
-    timeoutMs: 15_000,
+    timeoutMs: 20_000,
   });
-  return sanitize(raw);
+  return sanitize(result.text);
 }
 
 export async function generateSeedReply(input: {
