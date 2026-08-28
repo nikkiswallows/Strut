@@ -55,7 +55,10 @@ function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/25" />
         <div className="spade-veil pointer-events-none absolute inset-0" />
-        <Wordmark className="pointer-events-none absolute inset-x-0 top-[16%] text-center text-[22vw] leading-none text-accent/15 sm:text-[16vw]" />
+        <Wordmark
+          shimmer={false}
+          className="pointer-events-none absolute inset-x-0 top-[16%] text-center text-[22vw] leading-none text-accent/[0.07] select-none sm:text-[16vw]"
+        />
         <Crown className="pointer-events-none absolute top-[24%] right-[12%] size-16 text-accent/25 animate-float-slow sm:size-24" />
         <Spade className="pointer-events-none absolute bottom-[26%] left-[10%] size-14 text-accent/20 animate-float-slow sm:size-20" />
         <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-3xl flex-col justify-end px-6 pb-16 pt-28">

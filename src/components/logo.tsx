@@ -6,9 +6,15 @@ export function Mark({ className }: { className?: string }) {
   return <AppMark className={className} />;
 }
 
-export function Wordmark({ className }: { className?: string }) {
+export function Wordmark({ className, shimmer = true }: { className?: string; shimmer?: boolean }) {
   return (
-    <span className={cn("font-display font-bold tracking-[0.22em] uppercase leading-none shimmer-text", className)}>
+    <span
+      className={cn(
+        "font-display font-bold tracking-[0.22em] uppercase leading-none",
+        shimmer ? "shimmer-text" : "text-accent",
+        className,
+      )}
+    >
       {NAME}
     </span>
   );
