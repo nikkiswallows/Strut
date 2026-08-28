@@ -301,6 +301,20 @@ against the embedded Postgres (PGlite) to confirm the SQL runs.
 - `src/routes/_app/discover.tsx` — Deck/Grid toggle; deck mode uses the swipe deck + `deck`/`swipe` ops.
 - `src/routes/api/app.ts` — `deck` and `swipe` ops wired.
 
+**Third pass — native swipe UX + Add to Home Screen**
+- `src/components/swipe-deck.tsx` — rewritten for a native feel: the card **follows the
+  finger 1:1** (transform transition is disabled only while dragging, so it no longer lags),
+  a **fast flick decides** even under the pixel threshold (velocity detection), it **flies
+  out from where you released** (not from center), the next card sits underneath and scales
+  in, and decisions are swipe/button-safe.
+- `src/routes/_app/discover.tsx` — the **deck is now the default** view and fills the page
+  (`h-[calc(100dvh-11rem)]`) Tinder-style; grid is a toggle.
+- `src/components/install-prompt.tsx` — "Add Strut to your Home Screen" flow on the login
+  page: iOS Safari shows an **animated arrow pointing at the Share button** + a step-by-step
+  "Add to Home Screen" sheet; Android/desktop gets a real **Install Strut** button via
+  `beforeinstallprompt`. Hides automatically when already running the installed/PWA version
+  and respects a one-time dismissal.
+
 **Suggested next build list:** §4.3 (video on profiles), §4.5 (creator links + monetization),
 the 18+ age gate + reporting in §6, and the §4.1 note above about moving real-time to
 Redis pub/sub on a multi-instance deploy.

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { InstallPrompt } from "@/components/install-prompt";
 import { Logo } from "@/components/logo";
 import { PhoneAuth } from "@/components/phone-auth";
 import { Button } from "@/components/ui/button";
@@ -217,6 +218,7 @@ function Login() {
           </p>
         </div>
       </div>
+      <InstallPrompt />
     </div>
   );
 }

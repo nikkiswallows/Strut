@@ -33,7 +33,8 @@ function Discover() {
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [mode, setMode] = useState<"grid" | "deck">("grid");
+  // The swipe deck is the native, default experience (Tinder-style full page).
+  const [mode, setMode] = useState<"grid" | "deck">("deck");
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const queryKey = ["discover", tab, miles, lookingFor, role, q, ethnicity] as const;
@@ -248,30 +249,36 @@ function Discover() {
       ) : null}
 
       {mode === "deck" ? (
-        deck.isError && deckRows.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-muted">Could not load the deck.</p>
-            <button
-              type="button"
-              onClick={() => void deck.refetch()}
-              className="mt-4 h-11 rounded-full bg-elevated px-5 text-sm text-fg transition-transform duration-150 ease-out active:scale-[0.96]"
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
-          <SwipeDeck
-            key={`${tab}|${miles}|${lookingFor}|${role}|${ethnicity}|${q}`}
-            profiles={deckRows}
-            onSwipe={(profile, direction) => swipe.mutate({ targetId: profile.userId, direction })}
-            onNeedMore={() => {
-              if (deck.hasNextPage && !deck.isFetchingNextPage) void deck.fetchNextPage();
-            }}
-            loadingMore={deck.isFetchingNextPage}
-            hasMore={Boolean(deck.hasNextPage)}
-            emptyLabel="No one to kneel for yet. Widen it."
-          />
-        )
+        <div className="-mx-4 lg:-mx-0">
+          {deck.isError && deckRows.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="text-muted">Could not load the deck.</p>
+              <button
+                type="button"
+                onClick={() => void deck.refetch()}
+                className="mt-4 h-11 rounded-full bg-elevated px-5 text-sm text-fg transition-transform duration-150 ease-out active:scale-[0.96]"
+              >
+                Try again
+              </button>
+            </div>
+          ) : deck.isPending && deckRows.length === 0 ? (
+            <div className="h-[70vh] animate-pulse rounded-3xl bg-surface" />
+          ) : (
+            <div className="h-[calc(100dvh-11rem)] sm:h-[62vh]">
+              <SwipeDeck
+                key={`${tab}|${miles}|${lookingFor}|${role}|${ethnicity}|${q}`}
+                profiles={deckRows}
+                onSwipe={(profile, direction) => swipe.mutate({ targetId: profile.userId, direction })}
+                onNeedMore={() => {
+                  if (deck.hasNextPage && !deck.isFetchingNextPage) void deck.fetchNextPage();
+                }}
+                loadingMore={deck.isFetchingNextPage}
+                hasMore={Boolean(deck.hasNextPage)}
+                emptyLabel="No one to kneel for yet. Widen it."
+              />
+            </div>
+          )}
+        </div>
       ) : profiles.isError && !rows.length && /unauthorized/i.test(profiles.error instanceof Error ? profiles.error.message : "") ? (
         <Navigate to="/login" />
       ) : profiles.isError && !rows.length ? (

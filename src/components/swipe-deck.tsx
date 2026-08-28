@@ -1,17 +1,19 @@
 import { Heart, RotateCcw, X } from "lucide-react";
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { formatMiles } from "@/lib/geo";
 import { badgeFor } from "@/lib/bnwo";
 import { asPhotoList, identityLine, shownAge, type Profile } from "@/lib/types";
 import { Photo } from "./photo";
 
-const SWIPE_THRESHOLD = 90; // px of horizontal drag to trigger a decision
-
 /**
- * A Tinder-style one-card-at-a-time deck. Swipe right → like, left → pass
- * (drag or buttons / arrow keys). Cards advance with a quick fly-out, and the
- * parent is asked for more when it runs low. `key` from the parent should change
- * when the filter set changes so the deck restarts cleanly.
+ * A Tinder-style one-card-at-a-time deck.
+ *
+ * Interaction is tuned to feel native:
+ *  - the card follows the finger 1:1 (no transition during a drag),
+ *  - a fast flick decides even if it never crosses the pixel threshold,
+ *  - the card flies out from where it was released, not from center,
+ *  - the next card sits underneath and scales in as you drag across,
+ *  - decisions are double-safe: an in-drag release and a button tap both work.
  */
 export function SwipeDeck({
   profiles,
@@ -29,48 +31,93 @@ export function SwipeDeck({
   emptyLabel: string;
 }) {
   const [index, setIndex] = useState(0);
-  const [drag, setDrag] = useState<{ x: number; active: boolean; done?: "left" | "right" }>({
-    x: 0,
-    active: false,
-  });
+  // x is the live horizontal offset (0 = rest). settled = the card will animate
+  // back to rest; gone = the card is flying out toward a decision.
+  const [x, setX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [gone, setGone] = useState<"left" | "right" | null>(null);
+
   const startX = useRef(0);
+  const startY = useRef(0);
+  const draggingRef = useRef(false);
+  const velocityRef = useRef(0);
+  const lastX = useRef(0);
+  const lastTime = useRef(0);
 
   const current = useMemo(() => profiles[index] ?? null, [profiles, index]);
+  const nextCard = useMemo(() => profiles[index + 1] ?? null, [profiles, index]);
+
   const photos = current ? asPhotoList(current.photos) : [];
+  // Use the last photo so the top card reads "full"; fall back to first.
   const photo = photos[photos.length - 1] ?? photos[0];
   const age = current ? shownAge(current) : null;
   const badge = current ? badgeFor(current) : null;
   const distance = current ? formatMiles(current.distanceMiles) : null;
 
-  const reset = () => setDrag({ x: 0, active: false });
-
-  function decide(direction: "like" | "pass") {
-    if (!current) return;
-    setDrag({ x: 0, active: false, done: direction === "like" ? "right" : "left" });
-    setIndex((i) => i + 1);
-    onSwipe(current, direction);
-    if (index + 1 >= profiles.length - 2) onNeedMore();
-    // clear the fly-out after the next card settles
-    setTimeout(reset, 260);
-  }
+  const decide = useCallback(
+    (direction: "like" | "pass", velocity = 0) => {
+      if (!current) return;
+      setGone(direction === "like" ? "right" : "left");
+      setDragging(false);
+      draggingRef.current = false;
+      setIndex((i) => i + 1);
+      onSwipe(current, direction);
+      if (index + 1 >= profiles.length - 2) onNeedMore();
+      // After the fly-out, settle back to rest for the next card.
+      window.setTimeout(() => {
+        setGone(null);
+        setX(0);
+        setDragging(false);
+      }, 240);
+      void velocity;
+    },
+    [current, index, profiles.length, onSwipe, onNeedMore],
+  );
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (!current) return;
     startX.current = e.clientX;
-    setDrag({ x: 0, active: true });
+    startY.current = e.clientY;
+    lastX.current = e.clientX;
+    lastTime.current = performance.now();
+    velocityRef.current = 0;
+    draggingRef.current = true;
+    setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   }
+
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
-    if (!drag.active || !current) return;
-    setDrag((d) => ({ ...d, x: e.clientX - startX.current }));
-  }
-  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
-    if (!drag.active || !current) return;
+    if (!draggingRef.current || !current) return;
+    const now = performance.now();
     const dx = e.clientX - startX.current;
-    if (dx > SWIPE_THRESHOLD) decide("like");
-    else if (dx < -SWIPE_THRESHOLD) decide("pass");
-    else reset();
+    const dy = e.clientY - startY.current;
+    // Velocity: horizontal px per ms over the last sample.
+    const dt = Math.max(1, now - lastTime.current);
+    velocityRef.current = (e.clientX - lastX.current) / dt;
+    lastX.current = e.clientX;
+    lastTime.current = now;
+    setX(dx);
+    e.preventDefault();
+    void dy;
   }
+
+  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!draggingRef.current || !current) return;
+    draggingRef.current = false;
+    setDragging(false);
+    const dx = e.clientX - startX.current;
+    const vx = velocityRef.current;
+    // Decide on threshold OR velocity (a fast flick flies a short drag out).
+    if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) decide("like", vx);
+    else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) decide("pass", vx);
+    else {
+      setGone(null);
+      setX(0);
+    }
+  }
+
+  // Reset the deck position whenever the card set itself changes (e.g. filters).
+  const key = current ? `${current.userId}-${index}` : "empty";
 
   if (index >= profiles.length) {
     return (
@@ -92,26 +139,64 @@ export function SwipeDeck({
     );
   }
 
-  const rotate = drag.x / 22;
-  const likeOpacity = Math.max(0, Math.min(1, drag.x / SWIPE_THRESHOLD));
-  const passOpacity = Math.max(0, Math.min(1, -drag.x / SWIPE_THRESHOLD));
+  const rotate = x / 18;
+  const likeOpacity = Math.max(0, Math.min(1, x / SWIPE_THRESHOLD));
+  const passOpacity = Math.max(0, Math.min(1, -x / SWIPE_THRESHOLD));
+  // Scale feedback: the card shrinks slightly as you drag away; the next card
+  // grows in underneath so the stack looks alive.
+  const scale = 1 - Math.min(0.12, Math.abs(x) / 1400);
+  const underScale = 0.94 + Math.min(0.06, Math.abs(x) / 2400);
+
+  // Two different transform "modes":
+  //   - dragging: follow the finger exactly, NO transition (native feel).
+  //   - gone:     animate the fly-out off-screen with a short ease.
+  //   - rest/settle: animate back to center.
+  const isGone = gone !== null;
+  const cardTransform =
+    isGone && gone
+      ? `translate3d(${gone === "right" ? 620 : -620}px, 0, 0) rotate(${gone === "right" ? 24 : -24}deg)`
+      : `translate3d(${x}px, 0, 0) rotate(${rotate}deg) scale(${scale})`;
 
   return (
-    <div className="relative mx-auto max-w-sm">
+    <div className="relative mx-auto h-full w-full max-w-md">
+      {/* Underneath card (next in the deck) */}
       <div
-        key={current ? `${current.userId}-${index}` : "empty"}
-        className="relative aspect-[4/5] touch-none select-none overflow-hidden rounded-3xl bg-surface transition-transform duration-200 ease-out"
+        key={nextCard ? `under-${nextCard.userId}` : "under-empty"}
+        className="absolute inset-0 rounded-3xl bg-surface"
         style={{
-          transform: drag.done
-            ? `translateX(${drag.done === "right" ? 420 : -420}px) rotate(${
-                drag.done === "right" ? 18 : -18
-              }deg)`
-            : `translate(${drag.x}px, 0) rotate(${rotate}deg)`,
+          transform: `scale(${underScale})`,
+          transition: "transform 180ms ease-out",
+        }}
+      >
+        {nextCard ? (
+          <Photo
+            src={asPhotoList(nextCard.photos)[0]}
+            alt={nextCard.displayName}
+            name={nextCard.displayName}
+            className="absolute inset-0 size-full rounded-3xl object-cover opacity-80"
+          />
+        ) : null}
+      </div>
+
+      {/* Top card */}
+      <div
+        key={key}
+        className="absolute inset-0 touch-none select-none overflow-hidden rounded-3xl bg-surface"
+        style={{
+          transform: cardTransform,
+          // No transition while the finger is down — this is what makes the card
+          // follow 1:1 instead of lagging behind. Only animate on fly-out/settle.
+          transition: dragging && !isGone ? "none" : "transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+          willChange: "transform",
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={() => drag.active && reset()}
+        onPointerCancel={() => {
+          draggingRef.current = false;
+          setDragging(false);
+          setX(0);
+        }}
       >
         <Photo
           src={photo}
@@ -125,7 +210,6 @@ export function SwipeDeck({
             {badge}
           </span>
         ) : null}
-        {/* decision labels */}
         <div
           className="absolute top-8 right-4 rounded-xl border-2 border-[#3fb96b] px-3 py-1 text-lg font-bold tracking-widest text-[#3fb96b]"
           style={{ opacity: likeOpacity, transform: "rotate(12deg)" }}
@@ -138,20 +222,23 @@ export function SwipeDeck({
         >
           Pass
         </div>
-        <div className="absolute inset-x-0 bottom-0 z-[2] p-5">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] p-5">
           <p className="font-display text-4xl leading-tight text-fg">
             {current?.displayName}
             {age ? <span className="ml-2 font-sans text-xl text-muted">{age}</span> : null}
           </p>
           <p className="mt-1 truncate text-sm text-muted">
-            {[current && identityLine(current), current?.role, distance, current?.location?.split(",")[0], current?.bio]
+            {[current && identityLine(current), current?.role, distance, current?.location?.split(",")[0]]
               .filter(Boolean)
               .join(" · ")}
           </p>
+          {current?.bio ? (
+            <p className="mt-1 line-clamp-2 text-sm text-subtle">{current.bio}</p>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-6">
+      <div className="absolute inset-x-0 bottom-4 z-[4] flex items-center justify-center gap-6">
         <button
           type="button"
           aria-label="Pass"
@@ -165,7 +252,8 @@ export function SwipeDeck({
           aria-label="Undo"
           onClick={() => {
             setIndex((i) => Math.max(0, i - 1));
-            reset();
+            setGone(null);
+            setX(0);
           }}
           className="grid size-10 place-items-center rounded-full border border-border bg-surface text-subtle transition-transform duration-150 ease-out active:scale-[0.9]"
         >
@@ -183,3 +271,6 @@ export function SwipeDeck({
     </div>
   );
 }
+
+const SWIPE_THRESHOLD = 72;
+const VELOCITY_THRESHOLD = 0.55; // px/ms — a quick flick triggers a decision
