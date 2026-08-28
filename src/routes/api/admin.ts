@@ -86,6 +86,7 @@ export const Route = createFileRoute("/api/admin")({
             {
               signedIn: Boolean(user),
               isAdmin: isAdminUser(user),
+              id: isAdminUser(user) ? user!.id : null,
               email: isAdminUser(user) ? user!.email : null,
               name: isAdminUser(user) ? user!.name : null,
             },

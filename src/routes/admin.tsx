@@ -87,6 +87,7 @@ type AdminState = {
 type WhoAmI = {
   signedIn: boolean;
   isAdmin: boolean;
+  id: string | null;
   email: string | null;
   name: string | null;
 };
@@ -289,7 +290,7 @@ function AdminConsole({ who }: { who: WhoAmI }) {
       {tab === "generate" ? (
         <GenerateTab jobs={jobs} horde={state.data?.horde ?? null} onChanged={refresh} />
       ) : (
-        <ProfilesTab profiles={profiles} meId={null} onChanged={refresh} />
+        <ProfilesTab profiles={profiles} meId={who.id} onChanged={refresh} />
       )}
     </Shell>
   );
