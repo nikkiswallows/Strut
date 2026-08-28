@@ -29,9 +29,6 @@ function Thread() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [thread.data?.messages.length, thread.isFetching, waitingBot]);
 
-  // Live updates: connect to the conversation's SSE stream and refetch on any
-  // frame. This is a fast path — if the stream drops, the existing poll/send
-  // logic still covers it, so a missed frame never leaves the thread stale.
   useEffect(() => {
     if (!Number.isFinite(convId)) return;
     const stream = openConversationStream(convId, () => {
@@ -41,10 +38,6 @@ function Thread() {
     return () => stream.close();
   }, [convId]);
 
-  // Poll the bot-reply job while a seed match is "typing". Fast providers
-  // resolve on the first check; the uncensored async worker (AI Horde) can take
-  // a while, so we keep polling until it lands (or time out and stop showing the
-  // indicator — the reply will still appear on next load).
   useEffect(() => {
     if (!waitingBot) return;
     let cancelled = false;
@@ -61,11 +54,9 @@ function Thread() {
           return;
         }
       } catch {
-        // transient — keep polling
+        // transient
       }
       if (cancelled) return;
-      // ~2 minutes max (Horde queues can be slow); then stop the indicator so
-      // the thread never looks stuck. The reply still lands on next load/refresh.
       if (tries >= 24) {
         setWaitingBot(false);
         return;
@@ -79,8 +70,6 @@ function Thread() {
     };
   }, [waitingBot, convId]);
 
-  // When opening a seed thread that already has a reply pending (e.g. user left
-  // while the Horde job was queued), resume waiting/polling.
   const isSeedThread = thread.data?.other.isSeed === true;
   useEffect(() => {
     if (!isSeedThread) return;
@@ -109,13 +98,11 @@ function Thread() {
         setWaitingBot(true);
         try {
           const r = await postBotReply(convId);
-          // Fast path already replied; the poll effect picks up "pending".
           if (r.status === "replied") {
             await queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
             await queryClient.invalidateQueries({ queryKey: ["conversations"] });
             setWaitingBot(false);
           }
-          // status === "pending" -> leave waitingBot true; poll effect handles it.
         } catch {
           setWaitingBot(false);
         }
@@ -133,11 +120,11 @@ function Thread() {
   }
 
   return (
-    <div className="flex h-dvh flex-col lg:h-[calc(100dvh-5rem)]">
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3 lg:px-0 lg:pb-3 lg:pt-0">
+    <div className="flex h-[100dvh] flex-col bg-bg lg:h-[calc(100dvh-5rem)] lg:rounded-2xl lg:border lg:border-border">
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-bg/90 px-4 backdrop-blur-md lg:px-4">
         <Link
           to="/inbox"
-          className="grid size-11 place-items-center rounded-lg hover:bg-elevated lg:hidden"
+          className="grid size-10 place-items-center rounded-full bg-elevated text-muted transition-transform duration-150 active:scale-95 lg:hidden"
         >
           <ArrowLeft className="size-4" />
         </Link>
@@ -152,7 +139,8 @@ function Thread() {
           </div>
         </Link>
       </div>
-      <div className="hide-scrollbar flex-1 space-y-2 overflow-y-auto px-4 py-4 lg:px-0">
+
+      <div className="hide-scrollbar flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 py-4 lg:px-4">
         {data.messages.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted">
             On your knees in the DMs. Beg, offer cleanup, say the cage size.
@@ -162,7 +150,7 @@ function Thread() {
           <div key={m.id} className={cn("flex", m.mine ? "justify-end" : "justify-start")}>
             <p
               className={cn(
-                "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                "max-w-[82%] rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed",
                 m.mine ? "rounded-br-md bg-accent text-accent-fg" : "rounded-bl-md bg-elevated text-fg",
               )}
             >
@@ -172,15 +160,16 @@ function Thread() {
         ))}
         {waitingBot ? (
           <div className="flex justify-start">
-            <p className="rounded-2xl rounded-bl-md bg-elevated px-3.5 py-2 text-sm text-subtle">
+            <p className="rounded-2xl rounded-bl-md bg-elevated px-3.5 py-2.5 text-[15px] text-subtle">
               {data.other.displayName} is writing…
             </p>
           </div>
         ) : null}
         <div ref={endRef} />
       </div>
+
       <form
-        className="flex gap-2 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:px-0"
+        className="sticky bottom-0 flex shrink-0 gap-2 border-t border-border bg-bg px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:rounded-b-2xl"
         onSubmit={(e) => {
           e.preventDefault();
           if (body.trim() && !send.isPending) send.mutate();
@@ -191,8 +180,12 @@ function Thread() {
           onChange={(e) => setBody(e.target.value)}
           placeholder="Serve. Beg. Confess."
           disabled={send.isPending}
+          className="text-[16px]"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
         />
-        <Button type="submit" disabled={!body.trim() || send.isPending}>
+        <Button type="submit" disabled={!body.trim() || send.isPending} className="h-11 shrink-0 rounded-full px-5">
           {send.isPending ? "…" : "Send"}
         </Button>
       </form>

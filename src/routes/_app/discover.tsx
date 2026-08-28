@@ -40,7 +40,6 @@ function Discover() {
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  // The swipe deck is the native, default experience (Tinder-style full page).
   const [mode, setMode] = useState<"grid" | "deck">("deck");
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +67,6 @@ function Discover() {
   );
   const hasNext = Boolean(profiles.hasNextPage);
 
-  // Auto-load the next page when the sentinel scrolls into view.
   useEffect(() => {
     if (!hasNext || profiles.isFetchingNextPage) return;
     const el = sentinelRef.current;
@@ -119,8 +117,6 @@ function Discover() {
     },
   });
 
-  // Swipe deck: same filters, but the deck only ever surfaces profiles the
-  // viewer hasn't decided on yet (like or pass, server-side).
   const deckQueryKey = ["deck", tab, miles, lookingFor, role, q, ethnicity] as const;
   const deck = useInfiniteQuery({
     queryKey: deckQueryKey,
@@ -149,8 +145,6 @@ function Discover() {
     mutationFn: ({ targetId, direction }: { targetId: string; direction: "like" | "pass" }) =>
       app<{ ok: true; matched: boolean }>("swipe", { targetId, direction }),
     onSuccess: (res, { direction, targetId }) => {
-      // The deck advances its own internal index; just keep the match feed and
-      // grid fresh. Liking a card never resets the deck below.
       void queryClient.invalidateQueries({ queryKey: ["likes"] });
       void queryClient.invalidateQueries({ queryKey: ["discover"] });
       void queryClient.invalidateQueries({ queryKey: ["glory"] });
@@ -167,9 +161,6 @@ function Discover() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  // Undo is a real server write: it clears the recorded decision AND the
-  // mirrored like. Without it the member sees a card they have already liked
-  // and the other party keeps a match that was meant to be withdrawn.
   const undo = useMutation({
     mutationFn: ({ targetId }: { targetId: string }) =>
       app<{ ok: true; undone: boolean }>("undo", { targetId }),
@@ -188,14 +179,17 @@ function Discover() {
   );
 
   return (
-    <div>
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-xs tracking-[0.28em] text-accent uppercase">BNWO · Kings first</p>
-          <h1 className="font-display text-5xl leading-[0.9]">The order</h1>
-          <p className="mt-1 text-sm text-muted">Bulls. Sissies. Wives. Cucks. Whitebois already on Bottom.</p>
+    <div className="flex min-h-[calc(100dvh-8rem)] flex-col">
+      {/* Header block — compact on mobile so tabs don't get clipped */}
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] tracking-[0.28em] text-accent uppercase">BNWO · Kings first</p>
+          <h1 className="font-display text-[2.6rem] leading-[0.9] sm:text-5xl">The order</h1>
+          <p className="mt-1 max-w-[32ch] text-[13px] leading-snug text-muted sm:text-sm">
+            Bulls. Sissies. Wives. Cucks. Whitebois already on Bottom.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <div className="flex rounded-full bg-elevated p-1">
             <button
               type="button"
@@ -223,7 +217,7 @@ function Discover() {
           <button
             type="button"
             onClick={() => setFiltersOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-elevated px-4 text-sm text-muted transition-transform duration-150 ease-out hover:text-fg active:scale-[0.96]"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-elevated px-4 text-[13px] text-muted transition-transform duration-150 ease-out hover:text-fg active:scale-[0.96] sm:h-11 sm:text-sm"
           >
             <SlidersHorizontal className="size-4" />
             {milesLabel}
@@ -250,8 +244,9 @@ function Discover() {
         />
       </form>
 
-      <div className="sticky top-14 z-10 -mx-4 mb-4 border-b border-border bg-bg/95 px-4 backdrop-blur-md lg:top-0">
-        <div className="hide-scrollbar flex gap-1 overflow-x-auto">
+      {/* Sticky tabs — top-14 matches header h-14, safe for iOS */}
+      <div className="sticky top-14 z-10 -mx-4 mb-3 border-b border-border bg-bg/95 px-4 backdrop-blur-md lg:top-0">
+        <div className="hide-scrollbar flex gap-1 overflow-x-auto py-0.5">
           {DISCOVER_TABS.map((item) => {
             const active = tab === item.id;
             return (
@@ -260,7 +255,7 @@ function Discover() {
                 type="button"
                 onClick={() => setTab(item.id)}
                 className={cn(
-                  "relative h-12 shrink-0 px-3.5 text-sm font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.96]",
+                  "relative h-11 shrink-0 px-3.5 text-[13px] font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.96] sm:h-12 sm:text-sm",
                   active ? "text-fg" : "text-subtle hover:text-muted",
                 )}
               >
@@ -282,7 +277,7 @@ function Discover() {
       ) : null}
 
       {mode === "deck" ? (
-        <div className="-mx-4 lg:-mx-0">
+        <div className="flex flex-1 flex-col -mx-4 lg:-mx-0">
           {deck.isError && deckRows.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-muted">Could not load the deck.</p>
@@ -295,21 +290,24 @@ function Discover() {
               </button>
             </div>
           ) : deck.isPending && deckRows.length === 0 ? (
-            <div className="h-[70vh] animate-pulse rounded-3xl bg-surface" />
+            <div className="h-[64vh] min-h-[480px] animate-pulse rounded-3xl bg-surface" />
           ) : (
-            <div className="h-[calc(100dvh-11rem)] sm:h-[62vh]">
-              <SwipeDeck
-                key={`${tab}|${miles}|${lookingFor}|${role}|${ethnicity}|${q}`}
-                profiles={deckRows}
-                onSwipe={(profile, direction) => swipe.mutate({ targetId: profile.userId, direction })}
-                onUndo={(profile) => undo.mutate({ targetId: profile.userId })}
-                onNeedMore={() => {
-                  if (deck.hasNextPage && !deck.isFetchingNextPage) void deck.fetchNextPage();
-                }}
-                loadingMore={deck.isFetchingNextPage}
-                hasMore={Boolean(deck.hasNextPage)}
-                emptyLabel="No one to kneel for yet. Widen it."
-              />
+            <div className="relative flex flex-1 flex-col">
+              {/* Deck height is bounded so action buttons never hide behind bottom nav */}
+              <div className="h-[calc(100dvh-16rem)] min-h-[520px] sm:h-[min(68vh,680px)]">
+                <SwipeDeck
+                  key={`${tab}|${miles}|${lookingFor}|${role}|${ethnicity}|${q}`}
+                  profiles={deckRows}
+                  onSwipe={(profile, direction) => swipe.mutate({ targetId: profile.userId, direction })}
+                  onUndo={(profile) => undo.mutate({ targetId: profile.userId })}
+                  onNeedMore={() => {
+                    if (deck.hasNextPage && !deck.isFetchingNextPage) void deck.fetchNextPage();
+                  }}
+                  loadingMore={deck.isFetchingNextPage}
+                  hasMore={Boolean(deck.hasNextPage)}
+                  emptyLabel="No one to kneel for yet. Widen it."
+                />
+              </div>
             </div>
           )}
         </div>
@@ -333,9 +331,7 @@ function Discover() {
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <p className="py-16 text-center text-muted">
-          {discoverEmpty(tab)}
-        </p>
+        <p className="py-16 text-center text-muted">{discoverEmpty(tab)}</p>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 stagger-in">

@@ -95,7 +95,7 @@ export function AppShell() {
       <div className="lg:pl-64">
         <header
           className={cn(
-            "sticky top-0 z-20 flex items-center justify-between border-b border-border bg-bg/90 px-4 py-3 backdrop-blur-md lg:hidden",
+            "sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-bg/90 px-4 backdrop-blur-md lg:hidden",
             inThread && "hidden",
           )}
         >
@@ -108,8 +108,9 @@ export function AppShell() {
         </header>
         <main
           className={cn(
-            "mx-auto min-h-[calc(100dvh-7.5rem)] w-full max-w-5xl px-4 pb-24 pt-4 lg:min-h-dvh lg:px-8 lg:pb-10 lg:pt-8",
-            inThread && "min-h-dvh px-0 pb-0 pt-0 lg:px-8 lg:pt-8",
+            "mx-auto w-full max-w-5xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 lg:min-h-dvh lg:px-8 lg:pb-10 lg:pt-8",
+            !inThread && "min-h-[calc(100dvh-3.5rem)]",
+            inThread && "min-h-dvh px-0 pb-0 pt-0 lg:min-h-dvh lg:px-8 lg:pt-8",
           )}
         >
           <Outlet />

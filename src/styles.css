@@ -456,3 +456,38 @@
   transition: stroke-dashoffset 600ms var(--ease-out);
   filter: drop-shadow(0 0 6px rgb(216 175 78 / 0.6));
 }
+
+/* ── Native app feel + iOS zoom prevention ──────────────────────────────── */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+  body {
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* iOS Safari auto-zooms any input <16px on focus — force 16px on mobile */
+@media screen and (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Prevent double-tap zoom on buttons, keep it app-like */
+button,
+a {
+  touch-action: manipulation;
+}
+
+/* Safe area for the deck */
+.deck-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BbcChip, Crown, Heart, Lips, Spade } from "./graphics";
+import { Bbc, Crown, Heart, Lips, Spade } from "./graphics";
 
 /**
  * BNWO confetti — no library, no emoji. Gold spades, crowns, hearts, lips and
@@ -79,7 +79,18 @@ function Glyph({ kind, size, gold }: { kind: Piece["kind"]; size: number; gold: 
     case "lips":
       return <span style={style} className={cls}><Lips className="size-full" /></span>;
     case "bbc":
-      return <span style={{ width: size * 1.5, height: size, filter: style.filter }} className={cls}><BbcChip className="size-full" /></span>;
+      return (
+        <span
+          style={{
+            width: size * 0.85,
+            height: size * 1.35,
+            filter: style.filter,
+          }}
+          className={cls}
+        >
+          <Bbc className="size-full" />
+        </span>
+      );
     case "coin":
       return (
         <span

@@ -85,7 +85,7 @@ export function Key({ className }: IconProps) {
   );
 }
 
-/** BBC monogram chip — the three letters set in the display serif, inside a slab. */
+/** BBC monogram chip — the three letters set in the display serif, inside a slab. Kept for legacy. */
 export function BbcChip({ className }: IconProps) {
   return (
     <svg viewBox="0 0 48 32" className={cn("text-accent", className)} aria-hidden>
@@ -102,6 +102,29 @@ export function BbcChip({ className }: IconProps) {
       >
         BBC
       </text>
+    </svg>
+  );
+}
+
+/**
+ * BBC — actual graphic, not just letters. A gold spade-topped scepter:
+ * spade = glans/crown, shaft + twin base. Reads as BBC at confetti size,
+ * stays tasteful (no photoreal texture, no explicit detail) and on-brand.
+ * This is what the match confetti uses.
+ */
+export function Bbc({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 40" className={cn("text-accent", className)} fill="currentColor" aria-hidden>
+      {/* spade tip = glans */}
+      <path d="M12 1.5C8.2 6.2 4.8 8.8 4.8 12.2c0 2.3 1.7 4 3.9 4 .6 0 1.2-.1 1.7-.4-.3.9-.8 1.9-1.5 2.7h6.2c-.7-.8-1.2-1.8-1.5-2.7.5.3 1.1.4 1.7.4 2.2 0 3.9-1.7 3.9-4C19.2 8.8 15.8 6.2 12 1.5Z" />
+      {/* shaft */}
+      <rect x="9.6" y="18.2" width="4.8" height="13.2" rx="2.4" />
+      {/* twin base — abstract, soft */}
+      <g opacity="0.95">
+        <circle cx="8.6" cy="34.2" r="3.6" />
+        <circle cx="15.4" cy="34.2" r="3.6" />
+        <rect x="8.6" y="31" width="6.8" height="3.5" rx="1.2" />
+      </g>
     </svg>
   );
 }

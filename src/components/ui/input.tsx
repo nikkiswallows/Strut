@@ -11,7 +11,8 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
     <input
       ref={ref}
       className={cn(
-        "h-11 w-full rounded-lg border border-border bg-elevated px-3.5 text-sm text-fg placeholder:text-subtle outline-none transition-colors duration-150 focus:border-accent/70 focus:ring-2 focus:ring-accent/25",
+        // 16px on mobile prevents iOS Safari auto-zoom on focus — feels native
+        "h-11 w-full rounded-lg border border-border bg-elevated px-3.5 text-[16px] text-fg placeholder:text-subtle outline-none transition-colors duration-150 focus:border-accent/70 focus:ring-2 focus:ring-accent/25 sm:text-sm",
         className,
       )}
       {...props}
@@ -27,7 +28,7 @@ export const Textarea = forwardRef<
   <textarea
     ref={ref}
     className={cn(
-      "min-h-28 w-full rounded-lg border border-border bg-elevated px-3.5 py-3 text-sm text-fg placeholder:text-subtle outline-none transition-colors duration-150 focus:border-accent/70 focus:ring-2 focus:ring-accent/25",
+      "min-h-28 w-full rounded-lg border border-border bg-elevated px-3.5 py-3 text-[16px] text-fg placeholder:text-subtle outline-none transition-colors duration-150 focus:border-accent/70 focus:ring-2 focus:ring-accent/25 sm:text-sm",
       className,
     )}
     {...props}
