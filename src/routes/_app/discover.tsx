@@ -185,7 +185,7 @@ function Discover() {
         // Deck mode claims the full viewport (below the app header) so the deck
         // can flex-fill the leftover space and the action buttons stay above
         // the bottom nav. Grid mode keeps the normal scrollable min-height.
-        mode === "deck" ? "h-[calc(100dvh-4.5rem)] lg:h-auto" : "min-h-[calc(100dvh-8rem)]",
+        mode === "deck" ? "h-[calc(100dvh-4.5rem-env(safe-area-inset-top))] lg:h-auto" : "min-h-[calc(100dvh-8rem)]",
       )}
     >
       {/* Header block — compact on mobile so tabs don't get clipped */}
@@ -252,8 +252,8 @@ function Discover() {
         />
       </form>
 
-      {/* Sticky tabs — top-14 matches header h-14, safe for iOS */}
-      <div className="sticky top-14 z-10 -mx-4 mb-3 border-b border-border bg-bg/95 px-4 backdrop-blur-md lg:top-0">
+      {/* Sticky tabs — offset matches the header height plus the iOS status bar */}
+      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 mb-3 border-b border-border bg-bg/95 px-4 backdrop-blur-md lg:top-0">
         <div className="hide-scrollbar flex gap-1 overflow-x-auto py-0.5">
           {DISCOVER_TABS.map((item) => {
             const active = tab === item.id;
@@ -309,6 +309,9 @@ function Discover() {
                   profiles={deckRows}
                   onSwipe={(profile, direction) => swipe.mutate({ targetId: profile.userId, direction })}
                   onUndo={(profile) => undo.mutate({ targetId: profile.userId })}
+                  onOpenProfile={(profile) =>
+                    void navigate({ to: "/u/$handle", params: { handle: profile.handle } })
+                  }
                   onNeedMore={() => {
                     if (deck.hasNextPage && !deck.isFetchingNextPage) void deck.fetchNextPage();
                   }}

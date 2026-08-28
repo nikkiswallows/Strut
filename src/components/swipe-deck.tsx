@@ -14,10 +14,14 @@ import { cn } from "@/lib/utils";
 import { Photo } from "./photo";
 import { BadgePill, Spade } from "./graphics";
 
+/** Movement below this is a tap, not a drag. */
+const TAP_SLOP = 12;
+
 export function SwipeDeck({
   profiles,
   onSwipe,
   onUndo,
+  onOpenProfile,
   onNeedMore,
   loadingMore,
   hasMore,
@@ -26,6 +30,7 @@ export function SwipeDeck({
   profiles: Profile[];
   onSwipe: (profile: Profile, direction: "like" | "pass") => void;
   onUndo?: (profile: Profile) => void;
+  onOpenProfile?: (profile: Profile) => void;
   onNeedMore: () => void;
   loadingMore: boolean;
   hasMore: boolean;
@@ -35,14 +40,18 @@ export function SwipeDeck({
   const [x, setX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [gone, setGone] = useState<"left" | "right" | null>(null);
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const [photoDir, setPhotoDir] = useState<1 | -1>(1);
 
   const startX = useRef(0);
   const startY = useRef(0);
+  const movedRef = useRef(false);
   const draggingRef = useRef(false);
   const velocityRef = useRef(0);
   const lastX = useRef(0);
   const lastTime = useRef(0);
   const settleTimer = useRef<number | null>(null);
+  const infoRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(
     () => () => {
@@ -54,11 +63,18 @@ export function SwipeDeck({
   const current = useMemo(() => profiles[index] ?? null, [profiles, index]);
   const nextCard = useMemo(() => profiles[index + 1] ?? null, [profiles, index]);
 
+  // New card on top — start from its first photo.
+  const currentId = current?.userId;
+  useEffect(() => {
+    setPhotoIdx(0);
+    setPhotoDir(1);
+  }, [currentId]);
+
   const photos = current ? asPhotoList(current.photos) : [];
   const blurs = current ? asPhotoList(current.photoBlurs) : [];
-  const photoIndex = photos.length - 1 >= 0 ? photos.length - 1 : 0;
-  const photo = photos[photoIndex];
-  const photoBlur = blurs[photoIndex] ?? null;
+  const safePhotoIdx = photos.length ? Math.min(photoIdx, photos.length - 1) : 0;
+  const photo = photos[safePhotoIdx];
+  const photoBlur = blurs[safePhotoIdx] ?? null;
   const age = current ? shownAge(current) : null;
   const badge = current ? badgeFor(current) : null;
   const distance = current ? formatMiles(current.distanceMiles) : null;
@@ -82,6 +98,15 @@ export function SwipeDeck({
     [current, index, profiles.length, onSwipe, onNeedMore],
   );
 
+  const cyclePhoto = useCallback(
+    (dir: 1 | -1) => {
+      if (photos.length < 2) return;
+      setPhotoDir(dir);
+      setPhotoIdx((i) => (i + dir + photos.length) % photos.length);
+    },
+    [photos.length],
+  );
+
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (!current) return;
     startX.current = e.clientX;
@@ -89,6 +114,7 @@ export function SwipeDeck({
     lastX.current = e.clientX;
     lastTime.current = performance.now();
     velocityRef.current = 0;
+    movedRef.current = false;
     draggingRef.current = true;
     setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -99,13 +125,13 @@ export function SwipeDeck({
     const now = performance.now();
     const dx = e.clientX - startX.current;
     const dy = e.clientY - startY.current;
+    if (Math.abs(dx) > TAP_SLOP || Math.abs(dy) > TAP_SLOP) movedRef.current = true;
     const dt = Math.max(1, now - lastTime.current);
     velocityRef.current = (e.clientX - lastX.current) / dt;
     lastX.current = e.clientX;
     lastTime.current = now;
     setX(dx);
     e.preventDefault();
-    void dy;
   }
 
   function onPointerUp(e: ReactPointerEvent<HTMLDivElement>) {
@@ -114,6 +140,23 @@ export function SwipeDeck({
     setDragging(false);
     const dx = e.clientX - startX.current;
     const vx = velocityRef.current;
+
+    if (!movedRef.current) {
+      // A tap, not a swipe. Bio/info area opens the profile; the photo's
+      // left/right halves flip through the rest of their shots.
+      setGone(null);
+      setX(0);
+      const info = infoRef.current?.getBoundingClientRect();
+      if (info && e.clientY >= info.top && current) {
+        onOpenProfile?.(current);
+        return;
+      }
+      const rect = e.currentTarget.getBoundingClientRect();
+      if (photos.length > 1) cyclePhoto(e.clientX < rect.left + rect.width / 2 ? -1 : 1);
+      else if (current) onOpenProfile?.(current);
+      return;
+    }
+
     if (dx > SWIPE_THRESHOLD || vx > VELOCITY_THRESHOLD) decide("like", vx);
     else if (dx < -SWIPE_THRESHOLD || vx < -VELOCITY_THRESHOLD) decide("pass", vx);
     else {
@@ -157,85 +200,112 @@ export function SwipeDeck({
       : `translate3d(${x}px, 0, 0) rotate(${rotate}deg) scale(${scale})`;
 
   return (
-    <div className="relative mx-auto h-full w-full max-w-md">
-      <div
-        key={nextCard ? `under-${nextCard.userId}` : "under-empty"}
-        className="absolute inset-0 rounded-3xl bg-surface"
-        style={{
-          transform: `scale(${underScale})`,
-          transition: "transform 180ms ease-out",
-        }}
-      >
-        {nextCard ? (
-          <Photo
-            src={asPhotoList(nextCard.photos)[0]}
-            blurSrc={asPhotoList(nextCard.photoBlurs)[0] ?? null}
-            alt={nextCard.displayName}
-            name={nextCard.displayName}
-            discreet={Boolean(nextCard.discreet)}
-            className="absolute inset-0 size-full rounded-3xl object-cover opacity-80"
-          />
-        ) : null}
-      </div>
-
-      <div
-        key={key}
-        className="absolute inset-0 touch-none select-none overflow-hidden rounded-3xl bg-surface"
-        style={{
-          transform: cardTransform,
-          transition: dragging && !isGone ? "none" : "transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-          willChange: "transform",
-        }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => {
-          draggingRef.current = false;
-          setDragging(false);
-          setX(0);
-        }}
-      >
-        <Photo
-          src={photo}
-          blurSrc={photoBlur}
-          alt={current?.displayName ?? ""}
-          name={current?.displayName ?? ""}
-          discreet={Boolean(current?.discreet)}
-          className="absolute inset-0 size-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/20 to-transparent" />
-        {badge ? (
-          <BadgePill badge={badge} className="top-4 left-4 px-2.5 py-1 text-[10px]" iconClassName="size-3.5" />
-        ) : null}
+    <div className="mx-auto flex h-full w-full max-w-md flex-col">
+      <div className="relative min-h-0 flex-1">
         <div
-          className="absolute top-10 right-3 rounded-xl border-4 border-accent px-3 py-1 font-display text-2xl font-bold tracking-widest text-accent"
-          style={{ opacity: likeOpacity, transform: "rotate(12deg)", textShadow: "0 0 18px rgba(216,175,78,.6)" }}
+          key={nextCard ? `under-${nextCard.userId}` : "under-empty"}
+          className="absolute inset-0 rounded-3xl bg-surface"
+          style={{
+            transform: `scale(${underScale})`,
+            transition: "transform 180ms ease-out",
+          }}
         >
-          KNEEL
-        </div>
-        <div
-          className="absolute top-10 left-3 rounded-xl border-4 border-[#c0492f] px-3 py-1 font-display text-2xl font-bold tracking-widest text-[#c0492f]"
-          style={{ opacity: passOpacity, transform: "rotate(-12deg)" }}
-        >
-          PASS
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] p-5 pb-20">
-          <p className="font-display text-[2.1rem] leading-tight text-fg sm:text-4xl">
-            {current?.displayName}
-            {age ? <span className="ml-2 font-sans text-lg text-muted sm:text-xl">{age}</span> : null}
-          </p>
-          <p className="mt-1 truncate text-[13px] text-muted sm:text-sm">
-            {[current && identityLine(current), current?.role, distance, current?.location?.split(",")[0]]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-          {current?.bio ? (
-            <p className="mt-1 line-clamp-2 text-[13px] text-subtle sm:text-sm">{current.bio}</p>
+          {nextCard ? (
+            <Photo
+              src={asPhotoList(nextCard.photos)[0]}
+              blurSrc={asPhotoList(nextCard.photoBlurs)[0] ?? null}
+              alt={nextCard.displayName}
+              name={nextCard.displayName}
+              discreet={Boolean(nextCard.discreet)}
+              className="absolute inset-0 size-full rounded-3xl object-cover opacity-80"
+            />
           ) : null}
         </div>
+
+        <div
+          key={key}
+          className="absolute inset-0 touch-none select-none overflow-hidden rounded-3xl bg-surface"
+          style={{
+            transform: cardTransform,
+            transition: dragging && !isGone ? "none" : "transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+            willChange: "transform",
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={() => {
+            draggingRef.current = false;
+            setDragging(false);
+            setX(0);
+          }}
+        >
+          <Photo
+            key={`shot-${safePhotoIdx}-${photoDir}`}
+            src={photo}
+            blurSrc={photoBlur}
+            alt={current?.displayName ?? ""}
+            name={current?.displayName ?? ""}
+            discreet={Boolean(current?.discreet)}
+            className={cn(
+              "absolute inset-0 size-full object-cover",
+              photos.length > 1 && (photoDir === 1 ? "animate-photo-next" : "animate-photo-prev"),
+            )}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/20 to-transparent" />
+
+          {photos.length > 1 ? (
+            <>
+              <div className="pointer-events-none absolute inset-x-3 top-3 z-[3] flex gap-1">
+                {photos.map((_, i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      "h-1 flex-1 rounded-full transition-colors duration-200",
+                      i === safePhotoIdx ? "bg-fg" : "bg-fg/30",
+                    )}
+                  />
+                ))}
+              </div>
+              <p className="pointer-events-none absolute top-5 right-3 z-[3] rounded-full bg-bg/55 px-2 py-0.5 text-[11px] text-fg backdrop-blur-sm">
+                {safePhotoIdx + 1}/{photos.length}
+              </p>
+            </>
+          ) : null}
+
+          {badge ? (
+            <BadgePill badge={badge} className="top-8 left-4 px-2.5 py-1 text-[10px]" iconClassName="size-3.5" />
+          ) : null}
+          <div
+            className="absolute top-14 right-3 rounded-xl border-4 border-accent px-3 py-1 font-display text-2xl font-bold tracking-widest text-accent"
+            style={{ opacity: likeOpacity, transform: "rotate(12deg)", textShadow: "0 0 18px rgba(216,175,78,.6)" }}
+          >
+            KNEEL
+          </div>
+          <div
+            className="absolute top-14 left-3 rounded-xl border-4 border-[#c0492f] px-3 py-1 font-display text-2xl font-bold tracking-widest text-[#c0492f]"
+            style={{ opacity: passOpacity, transform: "rotate(-12deg)" }}
+          >
+            PASS
+          </div>
+          <div ref={infoRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] p-5">
+            <p className="font-display text-[2.1rem] leading-tight text-fg sm:text-4xl">
+              {current?.displayName}
+              {age ? <span className="ml-2 font-sans text-lg text-muted sm:text-xl">{age}</span> : null}
+            </p>
+            <p className="mt-1 truncate text-[13px] text-muted sm:text-sm">
+              {[current && identityLine(current), current?.role, distance, current?.location?.split(",")[0]]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+            {current?.bio ? (
+              <p className="mt-1 line-clamp-2 text-[13px] text-subtle sm:text-sm">{current.bio}</p>
+            ) : null}
+            <p className="mt-1.5 text-[10px] tracking-[0.18em] text-accent/70 uppercase">Tap for the full profile</p>
+          </div>
+        </div>
       </div>
 
-      <div className="absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[4] flex items-center justify-center gap-5 sm:bottom-4 sm:gap-6">
+      <div className="flex shrink-0 items-center justify-center gap-5 pt-3 pb-1 sm:gap-6">
         <button
           type="button"
           aria-label="Pass"

@@ -131,240 +131,241 @@ export function Bbc({ className }: IconProps) {
 }
 
 /* ── Realistic confetti pieces ─────────────────────────────────────────────
- * These are the hand-drawn "figure" pieces for the match confetti: an
- * anatomically-proportioned BBC and a chastity cage, rendered with gradients
- * so they read as realistic at any size (they are tinted fills, not
- * currentColor). `tone` selects the palette: three skin tones for the BBC,
- * steel or gold for the cage. ids are uniquified per instance so several
- * pieces can be on screen at once.
+ * Hand-drawn "figure" pieces for the match confetti: an anatomically
+ * proportioned BBC and a bar-style chastity cage, shaded with gradients so
+ * they read clearly at confetti size. `tone` selects the palette: three skin
+ * tones for the BBC, steel or gold for the cage. Gradient ids are uniquified
+ * per instance so many pieces can be on screen at once.
  */
 
 const COCK_TONES = [
   {
-    skin: [
-      { o: 0, c: "#2a160c" },
-      { o: 0.28, c: "#4a2c1a" },
-      { o: 0.55, c: "#6b4226" },
-      { o: 0.78, c: "#7d5230" },
-      { o: 1, c: "#452818" },
-    ],
-    glans: [
-      { o: 0, c: "#8a5a33" },
-      { o: 0.55, c: "#6b4226" },
-      { o: 1, c: "#4a2c1a" },
-    ],
+    // deep ebony
+    shaft: ["#2a150a", "#432310", "#5c341b", "#6b3f22", "#452510", "#241106"],
+    glans: ["#361a0c", "#523017", "#5f381e", "#2e160a"],
+    ballA: ["#5c351c", "#432310", "#241106"],
+    ballB: ["#54301a", "#3d2010", "#200f06"],
+    vein: "#26100a",
+    veinHi: "#7a4c2b",
+    hi: "#84552f",
+    sheen: "#a06c42",
   },
   {
-    skin: [
-      { o: 0, c: "#4a2c17" },
-      { o: 0.28, c: "#6f4526" },
-      { o: 0.55, c: "#8a5a33" },
-      { o: 0.78, c: "#9c6a3e" },
-      { o: 1, c: "#5c3a20" },
-    ],
-    glans: [
-      { o: 0, c: "#a5754a" },
-      { o: 0.55, c: "#8a5a33" },
-      { o: 1, c: "#5c3a20" },
-    ],
+    // chocolate
+    shaft: ["#3d2212", "#5c3319", "#7a4a26", "#8a5730", "#5f3519", "#361d0e"],
+    glans: ["#4a2413", "#6d3d20", "#7d4a29", "#42200f"],
+    ballA: ["#7a4a28", "#5c3418", "#33190b"],
+    ballB: ["#71431f", "#542f14", "#2e1609"],
+    vein: "#33180a",
+    veinHi: "#96613a",
+    hi: "#a5714a",
+    sheen: "#c58a55",
   },
   {
-    skin: [
-      { o: 0, c: "#33190d" },
-      { o: 0.28, c: "#5c3a20" },
-      { o: 0.55, c: "#7a4b28" },
-      { o: 0.78, c: "#8a5832" },
-      { o: 1, c: "#4a2c1a" },
-    ],
-    glans: [
-      { o: 0, c: "#a06c3f" },
-      { o: 0.55, c: "#81542f" },
-      { o: 1, c: "#5c3a20" },
-    ],
+    // warm mahogany
+    shaft: ["#4a2818", "#6e3f22", "#8f5a30", "#a2683a", "#71431f", "#402012"],
+    glans: ["#5a2f18", "#7c4826", "#8e5630", "#4c2814"],
+    ballA: ["#8a5730", "#6b3d1e", "#3d2010"],
+    ballB: ["#7f4e28", "#623718", "#361b0c"],
+    vein: "#3a1c0c",
+    veinHi: "#ab7448",
+    hi: "#b97f4f",
+    sheen: "#d29a63",
   },
 ] as const;
 
-/** A realistic BBC — flared corona, glans, tapered shaft, bulging balls. */
+const SHAFT_OFFSETS = [0, 0.22, 0.45, 0.62, 0.8, 1] as const;
+const GLANS_OFFSETS = [0, 0.4, 0.6, 1] as const;
+const BALL_OFFSETS = [0, 0.6, 1] as const;
+
+/** A realistic BBC — flared glans, curved tapered shaft, full balls. */
 export function Cock({ className, tone = 0 }: IconProps & { tone?: 0 | 1 | 2 }) {
   const gid = useId().replace(/:/g, "");
   const t = COCK_TONES[tone] ?? COCK_TONES[0]!;
   return (
-    <svg viewBox="0 0 36 60" className={cn(className)} aria-hidden>
+    <svg viewBox="0 0 44 92" className={cn(className)} aria-hidden>
       <defs>
         <linearGradient id={`cskin-${gid}`} x1="0" y1="0" x2="1" y2="0">
-          {t.skin.map((s, i) => (
-            <stop key={i} offset={s.o} stopColor={s.c} />
+          {t.shaft.map((c, i) => (
+            <stop key={i} offset={SHAFT_OFFSETS[i]} stopColor={c} />
           ))}
         </linearGradient>
-        <radialGradient id={`cglans-${gid}`} cx="0.5" cy="0.26" r="0.8">
-          {t.glans.map((s, i) => (
-            <stop key={i} offset={s.o} stopColor={s.c} />
+        <linearGradient id={`cglans-${gid}`} x1="0" y1="0" x2="1" y2="0">
+          {t.glans.map((c, i) => (
+            <stop key={i} offset={GLANS_OFFSETS[i]} stopColor={c} />
+          ))}
+        </linearGradient>
+        <radialGradient id={`cballa-${gid}`} cx="0.38" cy="0.32" r="0.85">
+          {t.ballA.map((c, i) => (
+            <stop key={i} offset={BALL_OFFSETS[i]} stopColor={c} />
+          ))}
+        </radialGradient>
+        <radialGradient id={`cballb-${gid}`} cx="0.42" cy="0.3" r="0.85">
+          {t.ballB.map((c, i) => (
+            <stop key={i} offset={BALL_OFFSETS[i]} stopColor={c} />
           ))}
         </radialGradient>
       </defs>
-      {/* silhouette */}
+
+      {/* balls (behind shaft) */}
+      <ellipse cx="13.5" cy="76" rx="11" ry="13" fill={`url(#cballa-${gid})`} />
+      <ellipse cx="29.5" cy="77.5" rx="10.5" ry="12" fill={`url(#cballb-${gid})`} />
+      <path d="M21.6 67 C22.3 71.5 22.5 78 21.9 85.5" stroke={t.vein} strokeWidth="1.1" fill="none" opacity="0.6" strokeLinecap="round" />
+      <path d="M8 72 C10 74.5 9.5 79 11 82" stroke={t.vein} strokeWidth="0.7" fill="none" opacity="0.45" />
+      <path d="M33 73 C31.7 76 32.5 80 31 83" stroke={t.vein} strokeWidth="0.7" fill="none" opacity="0.45" />
+
+      {/* shaft */}
       <path
         fill={`url(#cskin-${gid})`}
-        d="M18 2C22.8 2.6 25.6 5.6 25.6 9.4C25.6 11.6 24.8 12.8 23.4 13.6C26.6 14.6 27.8 16.4 27.8 18.2C27.8 19.8 26.6 20.9 24.8 21.3C24.6 26 24.3 33 24 40C23.9 43.6 23 45.8 21.4 47C27 47.8 28.4 51.8 25.8 54.6C24.2 55.9 21.6 56 19.4 55C18.7 54.6 18 54.1 18 53.4C18 54.1 17.3 54.6 16.6 55C14.4 56 11.8 55.9 10.2 54.6C7.6 51.8 9 47.8 14.6 47C13 45.8 12.1 43.6 12 40C11.7 33 11.4 26 11.2 21.3C9.4 20.9 8.2 19.8 8.2 18.2C8.2 16.4 9.4 14.6 12.6 13.6C11.2 12.8 10.4 11.6 10.4 9.4C10.4 5.6 13.2 2.6 18 2Z"
+        d="M13.8 21.5 C13 30 12.6 44 13 56 C13.2 62 13.6 66.5 14.2 69.5 C16.5 71.5 27.5 71.5 29.8 69.5 C30.4 66.5 30.9 62 31.1 56 C31.5 44 31 30 30.1 21.5 C25.5 19.6 18.4 19.6 13.8 21.5 Z"
       />
-      {/* glans cap */}
+
+      {/* corona under-shadow */}
+      <path
+        d="M12.9 21.4 C17 23.6 27 23.6 31 21.4 C30.6 23 29.8 23.8 28.6 24.3 C24.6 25.8 19.4 25.8 15.4 24.3 C14.2 23.8 13.3 23 12.9 21.4 Z"
+        fill="#200e05"
+        opacity="0.55"
+      />
+
+      {/* glans — helmet, flared wider than the shaft */}
       <path
         fill={`url(#cglans-${gid})`}
-        opacity="0.92"
-        d="M10.4 9.4C10.4 5.6 13.2 2.6 18 2C22.8 2.6 25.6 5.6 25.6 9.4C25.6 11.4 24.9 12.5 23.6 13.3C20.6 11.9 15.4 11.9 12.4 13.3C11.1 12.5 10.4 11.4 10.4 9.4Z"
+        d="M22 1.6 C26.6 1.6 30.4 5.2 31.6 10.2 C32.4 13.6 32.6 17.4 31.9 20.3 C31.5 21.9 30.3 22.6 28.6 22.1 C24.5 20.9 19.5 20.9 15.4 22.1 C13.7 22.6 12.5 21.9 12.1 20.3 C11.4 17.4 11.6 13.6 12.4 10.2 C13.6 5.2 17.4 1.6 22 1.6 Z"
       />
-      {/* corona rim */}
+      {/* meatus */}
+      <path d="M22 3.4 C22.35 4.6 22.35 6.2 22 7.6" stroke="#1d0d05" strokeWidth="0.9" fill="none" opacity="0.75" strokeLinecap="round" />
+      {/* glans sheen */}
+      <ellipse cx="17.8" cy="7.4" rx="2.6" ry="4.2" fill={t.sheen} opacity="0.28" transform="rotate(-16 17.8 7.4)" />
+
+      {/* dorsal vein with branch */}
       <path
-        d="M10.6 14.2 C13.2 15.9 22.8 15.9 25.4 14.2"
-        stroke="#33190d"
+        d="M18.6 25.5 C17.4 31 19.2 36.5 18 42.5 C17.2 47.5 18.4 53.5 17.6 59.5 C17.3 62.5 17.8 65.5 18.2 67.5"
+        stroke={t.vein}
         strokeWidth="1.2"
         fill="none"
-        opacity="0.7"
-        strokeLinecap="round"
-      />
-      {/* veins */}
-      <path
-        d="M23 22 C23.3 28 22.9 34 22.4 38.5"
-        stroke="#33190d"
-        strokeWidth="0.9"
-        fill="none"
-        opacity="0.5"
+        opacity="0.38"
         strokeLinecap="round"
       />
       <path
-        d="M13.2 23.5 C12.9 29 13.1 33 13.5 36.5"
-        stroke="#33190d"
-        strokeWidth="0.8"
+        d="M19.2 25.8 C18 31.3 19.8 36.8 18.6 42.8 C17.8 47.8 19 53.8 18.2 59.8"
+        stroke={t.veinHi}
+        strokeWidth="0.55"
         fill="none"
         opacity="0.4"
         strokeLinecap="round"
       />
-      {/* ball shading */}
-      <path
-        d="M25.8 54.6 C24.2 55.9 21.6 56 19.4 55 C21.9 52.6 23.6 49.6 24.4 47.6 C26.9 48.9 27.3 51.9 25.8 54.6 Z"
-        fill="#2a160c"
-        opacity="0.55"
-      />
-      <path
-        d="M10.2 54.6 C8.2 51.9 8.8 49 11.3 47.9 C12.4 50.5 13.6 52.7 15 54.4 C14.1 55.2 12.3 55.6 10.2 54.6 Z"
-        fill="#2a160c"
-        opacity="0.45"
-      />
-      {/* glans shine */}
-      <ellipse
-        cx="16.4"
-        cy="5.8"
-        rx="2.2"
-        ry="1.4"
-        fill="#ffffff"
-        opacity="0.2"
-        transform="rotate(-18 16.4 5.8)"
-      />
+      <path d="M17.9 41 C20.5 44 21.5 48.5 21.2 52" stroke={t.vein} strokeWidth="0.85" fill="none" opacity="0.32" strokeLinecap="round" />
+      <path d="M27.4 28 C28.4 34 27.6 42 28.2 50 C28.5 54 28 58 27.6 61.5" stroke={t.vein} strokeWidth="0.9" fill="none" opacity="0.3" strokeLinecap="round" />
+
+      {/* shaft highlight */}
+      <path d="M15.6 26 C14.9 36 14.7 52 15.4 65" stroke={t.hi} strokeWidth="1.6" fill="none" opacity="0.35" strokeLinecap="round" />
+
+      {/* shadow where shaft meets balls */}
+      <path d="M14.2 69.3 C17 71.4 27 71.4 29.8 69.3 C28.5 72 15.6 72 14.2 69.3 Z" fill="#1c0c04" opacity="0.6" />
+
+      {/* ball highlights */}
+      <ellipse cx="10.5" cy="71.5" rx="3.4" ry="2.4" fill={t.sheen} opacity="0.26" transform="rotate(-24 10.5 71.5)" />
+      <ellipse cx="27.6" cy="73" rx="2.8" ry="2" fill={t.sheen} opacity="0.24" transform="rotate(18 27.6 73)" />
     </svg>
   );
 }
 
 const CAGE_TONES = [
   {
-    tube: [
-      { o: 0, c: "#8f9aa4" },
-      { o: 0.3, c: "#d6dde3" },
-      { o: 0.55, c: "#eef2f5" },
-      { o: 0.8, c: "#aeb8c1" },
-      { o: 1, c: "#7d8891" },
-    ],
-    ring: [
-      { o: 0, c: "#dde3e8" },
-      { o: 0.5, c: "#9aa4ad" },
-      { o: 1, c: "#6f7981" },
-    ],
-    slit: "#232a30",
-    keyhole: "#20262b",
-    highlight: "#ffffff",
+    // polished steel + brass lock
+    bar: ["#f4f7fa", "#c8d1d8", "#939fa9", "#6a757d", "#a2adb5"],
+    ring: ["#eef2f5", "#a8b2ba", "#5d666d"],
+    lock: ["#e8c76a", "#c9a244", "#8a6a24"],
+    shackle: "#aeb7be",
+    keyhole: "#3a2c0d",
+    interior: "#171c20",
+    hi: "#ffffff",
   },
   {
-    tube: [
-      { o: 0, c: "#8a6d2a" },
-      { o: 0.3, c: "#d9b64f" },
-      { o: 0.55, c: "#f2d98a" },
-      { o: 0.8, c: "#c9a24a" },
-      { o: 1, c: "#7d5f22" },
-    ],
-    ring: [
-      { o: 0, c: "#e8cd7a" },
-      { o: 0.5, c: "#c9a24a" },
-      { o: 1, c: "#8a6d2a" },
-    ],
-    slit: "#3a2f14",
+    // gold
+    bar: ["#f7e7ae", "#e3c46a", "#c39c3e", "#8f6f26", "#d4b258"],
+    ring: ["#f2e0a0", "#cfa94e", "#8a6d2a"],
+    lock: ["#f2d98a", "#c9a24a", "#8a6d2a"],
+    shackle: "#c9ab52",
     keyhole: "#2a2410",
-    highlight: "#fff6d8",
+    interior: "#1c160a",
+    hi: "#fff6d8",
   },
 ] as const;
 
-/** A realistic chastity cage — base ring, perforated tube, tip slot, padlock. */
+const BAR_OFFSETS = [0, 0.35, 0.6, 0.85, 1] as const;
+const RING_OFFSETS = [0, 0.5, 1] as const;
+
+/** A realistic chastity cage — base ring, curved bar cage, brass padlock. */
 export function ChastityCage({ className, tone = 0 }: IconProps & { tone?: 0 | 1 }) {
   const gid = useId().replace(/:/g, "");
   const t = CAGE_TONES[tone] ?? CAGE_TONES[0]!;
   return (
-    <svg viewBox="0 0 52 44" className={cn(className)} aria-hidden>
+    <svg viewBox="0 0 64 46" className={cn(className)} aria-hidden>
       <defs>
-        <linearGradient id={`ctube-${gid}`} x1="0" y1="0" x2="1" y2="0">
-          {t.tube.map((s, i) => (
-            <stop key={i} offset={s.o} stopColor={s.c} />
+        <linearGradient id={`cgbar-${gid}`} x1="0" y1="0" x2="0" y2="1">
+          {t.bar.map((c, i) => (
+            <stop key={i} offset={BAR_OFFSETS[i]} stopColor={c} />
           ))}
         </linearGradient>
-        <linearGradient id={`cring-${gid}`} x1="0" y1="0" x2="0" y2="1">
-          {t.ring.map((s, i) => (
-            <stop key={i} offset={s.o} stopColor={s.c} />
+        <linearGradient id={`cgring-${gid}`} x1="0" y1="0" x2="1" y2="1">
+          {t.ring.map((c, i) => (
+            <stop key={i} offset={RING_OFFSETS[i]} stopColor={c} />
+          ))}
+        </linearGradient>
+        <linearGradient id={`cglock-${gid}`} x1="0" y1="0" x2="0" y2="1">
+          {t.lock.map((c, i) => (
+            <stop key={i} offset={RING_OFFSETS[i]} stopColor={c} />
           ))}
         </linearGradient>
       </defs>
+
+      {/* dark interior so the cage reads as an enclosure */}
+      <path
+        d="M22 12.5 C34 9.5 46 11 54.5 17.5 C59.5 21 59.7 26.5 55 30 C46 35.5 34 36.5 22 33.5 C20 30 20 16 22 12.5 Z"
+        fill={t.interior}
+        opacity="0.55"
+      />
+
       {/* base ring */}
-      <circle cx="13" cy="22" r="10" fill="none" stroke={`url(#cring-${gid})`} strokeWidth="4.6" />
-      {/* cage tube */}
-      <path
-        fill={`url(#ctube-${gid})`}
-        d="M23 13.2C30 11.6 38 12 43.5 14C46.4 15 48 16.9 48.6 19.1C49.2 21.3 48.6 23.4 46.9 24.7C45.6 25.6 44 26 42.8 25.7C36.5 27.3 28.5 27.6 23 27.2C23 27.2 23 13.2 23 13.2Z"
-      />
-      {/* tube highlight */}
-      <path
-        d="M24 15.4 C30 13.9 37.6 14.2 43 16.1"
-        stroke={t.highlight}
-        strokeWidth="1.4"
+      <ellipse cx="14" cy="23" rx="12.5" ry="14.5" fill="none" stroke={`url(#cgring-${gid})`} strokeWidth="5.4" />
+      <ellipse
+        cx="14"
+        cy="23"
+        rx="12.5"
+        ry="14.5"
         fill="none"
-        opacity="0.4"
-        strokeLinecap="round"
+        stroke={t.hi}
+        strokeWidth="1.1"
+        opacity="0.55"
+        strokeDasharray="14 60"
+        strokeDashoffset="-6"
       />
-      {/* perforations */}
-      <g stroke={t.slit} strokeWidth="1.5" strokeLinecap="round" opacity="0.9">
-        <path d="M26.2 16.4 C26 20 26 23.4 26.4 25.6" />
-        <path d="M29.8 16.1 C29.5 19.8 29.5 23.2 30 25.8" />
-        <path d="M33.4 16 C33.1 19.9 33.1 23.3 33.6 26" />
-        <path d="M37 16.2 C36.7 20 36.8 23.3 37.2 26" />
-        <path d="M40.4 16.8 C40.1 20.3 40.2 23.4 40.6 25.4" />
-      </g>
-      {/* tip opening */}
-      <ellipse cx="46.3" cy="19.9" rx="1.15" ry="3.4" fill={t.slit} opacity="0.85" />
+
+      {/* circumferential rings */}
+      <ellipse cx="29" cy="23" rx="2.6" ry="10.3" fill="none" stroke={`url(#cgbar-${gid})`} strokeWidth="2" transform="rotate(4 29 23)" />
+      <ellipse cx="39" cy="23.2" rx="2.4" ry="9.9" fill="none" stroke={`url(#cgbar-${gid})`} strokeWidth="2" transform="rotate(8 39 23.2)" />
+      <ellipse cx="48.5" cy="23.4" rx="2.2" ry="8.6" fill="none" stroke={`url(#cgbar-${gid})`} strokeWidth="2" transform="rotate(12 48.5 23.4)" />
+
+      {/* longitudinal bars */}
+      <path d="M22 12.5 C34 9.5 46 11 54.5 17.5" stroke={`url(#cgbar-${gid})`} strokeWidth="3.6" fill="none" strokeLinecap="round" />
+      <path d="M22 33.5 C34 36.5 46 35.5 55 30" stroke={`url(#cgbar-${gid})`} strokeWidth="3.6" fill="none" strokeLinecap="round" />
+      <path d="M23.5 24.5 C35 26.8 46 26.2 56.2 23.8" stroke={`url(#cgbar-${gid})`} strokeWidth="3" fill="none" strokeLinecap="round" />
+      {/* rounded closed tip */}
+      <path d="M54.5 17.5 C59.5 21 59.7 26.5 55 30" stroke={`url(#cgbar-${gid})`} strokeWidth="3.4" fill="none" strokeLinecap="round" />
+
+      {/* bar highlights */}
+      <path d="M24 12.2 C33 10 43 10.8 51 15.5" stroke={t.hi} strokeWidth="0.9" fill="none" opacity="0.5" strokeLinecap="round" />
+      <path d="M25.5 24.8 C35 26.6 45 26.1 54 24" stroke={t.hi} strokeWidth="0.7" fill="none" opacity="0.4" strokeLinecap="round" />
+
+      {/* padlock at the ring/cage junction */}
       <path
-        d="M46.3 16.5 L46.3 23.3"
-        stroke={t.highlight}
-        strokeWidth="0.8"
-        strokeLinecap="round"
+        d="M21.2 7.6 C21.2 4.4 26.8 4.4 26.8 7.6 L26.8 10.6 L24.9 10.6 L24.9 8 C24.9 6.4 23.1 6.4 23.1 8 L23.1 10.6 L21.2 10.6 Z"
+        fill={t.shackle}
       />
-      {/* lock shackle */}
-      <path
-        d="M8.6 27.4 V23.6 a4.4 4.4 0 0 1 8.8 0 v3.8"
-        stroke={`url(#cring-${gid})`}
-        strokeWidth="2.3"
-        fill="none"
-        strokeLinecap="round"
-      />
-      {/* lock body */}
-      <rect x="6.8" y="27.2" width="12.4" height="8.8" rx="2" fill={`url(#cring-${gid})`} />
-      <rect x="6.8" y="27.2" width="12.4" height="3.4" rx="1.6" fill={t.highlight} opacity="0.18" />
-      {/* keyhole */}
-      <circle cx="13" cy="31" r="1.5" fill={t.keyhole} />
-      <rect x="12.45" y="31.6" width="1.1" height="2.6" rx="0.55" fill={t.keyhole} />
+      <rect x="19.6" y="10.2" width="8.8" height="7.6" rx="1.8" fill={`url(#cglock-${gid})`} />
+      <circle cx="24" cy="13.2" r="1.25" fill={t.keyhole} />
+      <rect x="23.55" y="13.7" width="0.9" height="2.3" rx="0.45" fill={t.keyhole} />
     </svg>
   );
 }

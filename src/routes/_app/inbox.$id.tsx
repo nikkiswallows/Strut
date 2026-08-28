@@ -121,7 +121,7 @@ function Thread() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-bg lg:h-[calc(100dvh-5rem)] lg:rounded-2xl lg:border lg:border-border">
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-bg/90 px-4 backdrop-blur-md lg:px-4">
+      <div className="flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-3 border-b border-border bg-bg/90 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:h-14 lg:pt-0 lg:px-4">
         <Link
           to="/inbox"
           className="grid size-10 place-items-center rounded-full bg-elevated text-muted transition-transform duration-150 active:scale-95 lg:hidden"

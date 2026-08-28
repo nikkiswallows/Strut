@@ -49,7 +49,7 @@ export function MatchCelebration({
         type="button"
         aria-label="Close celebration"
         onClick={onClose}
-        className="absolute top-5 right-5 z-[71] grid size-11 place-items-center rounded-full bg-elevated/80 text-muted transition-transform duration-150 active:scale-90"
+        className="absolute top-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))] right-5 z-[71] grid size-11 place-items-center rounded-full bg-elevated/80 text-muted transition-transform duration-150 active:scale-90"
       >
         <X className="size-5" />
       </button>
@@ -91,7 +91,7 @@ export function MatchCelebration({
             />
           </div>
           <div className="relative z-10 grid size-16 place-items-center rounded-full btn-gold animate-heartbeat">
-            <Spade className="size-8" />
+            <Spade className="size-8 text-accent-fg" />
           </div>
         </div>
 
