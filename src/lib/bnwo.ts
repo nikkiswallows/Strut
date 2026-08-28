@@ -1,4 +1,4 @@
-export const KNEELERS = ["whiteboi", "sissy", "fag", "crossdresser", "femboy"] as const;
+export const KNEELERS = ["whiteboi", "sissy", "faggot", "fag", "crossdresser", "femboy"] as const;
 export const CUCKS = ["cuck"] as const;
 export const KINGS = ["bull"] as const;
 export const WIVES = ["hotwife"] as const;
@@ -76,7 +76,7 @@ export function judgeRole(identities: string[], role: string): RoleVerdict {
 
 export function decreeFor(identities: string[]): string | null {
   if (isKneeler(identities)) {
-    return "Whitebois, sissies, fags, CDs, femboys: Bottom only. BBC is the top. You are the hole.";
+    return "Whitebois, sissies, faggots, CDs, femboys: Bottom only. BBC is the top. You are the hole.";
   }
   if (isCuck(identities)) {
     return "Cucks don't fuck. She takes Black. You watch, you lock, you clean. Bottom or Side.";
@@ -149,7 +149,7 @@ export function badgeFor(profile: { identities?: string[]; interests?: string[] 
   if (ids.includes("hotwife") || ints.includes("qos")) return "QOS";
   if (ids.includes("cuck") || ids.includes("couple")) return "CUCK";
   if (ids.includes("sissy")) return "SISSY";
-  if (ids.includes("fag")) return "FAG";
+  if (ids.includes("faggot") || ids.includes("fag")) return "FAG";
   if (ids.includes("whiteboi")) return "WHITEBOI";
   if (ints.includes("bnwo") || ints.includes("bbc")) return "BNWO";
   return null;

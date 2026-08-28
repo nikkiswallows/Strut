@@ -153,7 +153,7 @@ export async function gloryFor(userId: string): Promise<GloryBoard> {
       where (c.user_a = $1 or c.user_b = $1)
         and exists (
           select 1 from jsonb_array_elements_text(coalesce(k.identities,'[]'::jsonb)) as v(ident)
-          where lower(v.ident) in ('sissy','fag','whiteboi','crossdresser','femboy')
+          where lower(v.ident) in ('sissy','faggot','fag','whiteboi','crossdresser','femboy')
         )`,
     [userId],
   );
@@ -279,7 +279,7 @@ export async function claimServeFor(
   const sql = await getSql();
   const me = await getMyProfile(sql, userId);
   if (!me || !isKneeler(normIds(me.identities))) {
-    throw new Error("Serve claims are for sissies, fags, whitebois, CDs and femboys.");
+    throw new Error("Serve claims are for sissies, faggots, whitebois, CDs and femboys.");
   }
   const target = await getMyProfile(sql, bullId);
   if (!target || !isKing(normIds(target.identities))) {

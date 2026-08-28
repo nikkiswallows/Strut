@@ -445,7 +445,7 @@ export function badgeGraphic(badge: string | null): { Icon: (p: IconProps) => Re
     case "SISSY":
       return { Icon: Lips, label: "Sissy" };
     case "FAG":
-      return { Icon: Flame, label: "Fag" };
+      return { Icon: Flame, label: "Faggot" };
     case "WHITEBOI":
       return { Icon: Lock, label: "Whiteboi" };
     case "BNWO":
