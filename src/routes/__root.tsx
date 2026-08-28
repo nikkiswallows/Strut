@@ -6,6 +6,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
 import { AgeGate } from "@/components/age-gate";
 import { queryClient } from "@/lib/query-client";
 import appCss from "../styles.css?url";
@@ -70,6 +71,10 @@ function RootDocument() {
             }}
           />
         </QueryClientProvider>
+        {/* Vercel Web Analytics. Client-only (renders nothing during SSR),
+            auto-tracks SPA route changes, and outside a Vercel deployment it
+            just logs debug events instead of sending — safe in dev/preview. */}
+        <Analytics />
         <Scripts />
       </body>
     </html>
