@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
@@ -220,30 +220,59 @@ function AdminConsole({ who }: { who: WhoAmI }) {
 
   const jobs = useMemo(() => state.data?.jobs ?? [], [state.data]);
   const profiles = state.data?.profiles ?? [];
-  const pending = jobs.some((j) => j.status === "drafting");
+
+  /**
+   * A STABLE key for "which jobs are still generating".
+   *
+   * This matters more than it looks. The effect below used to depend on the
+   * `jobs` array itself, which is a new reference after every refetch — so each
+   * refresh tore the effect down, re-ran it, immediately fired another poll,
+   * which refreshed, which produced a new array… a tight loop that hammered the
+   * AI Horde until it returned 429 and the job was marked failed. Depending on
+   * a joined string of ids means the effect only restarts when the set of
+   * pending jobs actually changes.
+   */
+  const pendingIds = jobs
+    .filter((j) => j.status === "drafting")
+    .map((j) => j.id)
+    .sort((a, b) => a - b)
+    .join(",");
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "state"] });
+  const ticking = useRef(false);
 
   // Horde is a queue: drafts advance on its schedule, not ours. Poll each
   // pending job individually — the poll call is what actually ADVANCES the job
   // server-side, so a plain list refetch would never move anything along.
   useEffect(() => {
-    if (!pending) return;
+    if (!pendingIds) return;
     let cancelled = false;
+    const ids = pendingIds.split(",").map(Number);
+
     const tick = async () => {
-      for (const job of jobs.filter((j) => j.status === "drafting")) {
-        if (cancelled) return;
-        await adminPost<SeedJob>({ op: "job", jobId: job.id }).catch(() => null);
+      // Never let two passes overlap: a slow poll must not stack up behind the
+      // interval and turn one request per 8 s into a burst.
+      if (ticking.current || cancelled) return;
+      ticking.current = true;
+      try {
+        for (const id of ids) {
+          if (cancelled) return;
+          await adminPost<SeedJob>({ op: "job", jobId: id }).catch(() => null);
+        }
+        if (!cancelled) refresh();
+      } finally {
+        ticking.current = false;
       }
-      if (!cancelled) void refresh();
     };
+
+    const t = setInterval(() => void tick(), 8000);
     void tick();
-    const t = setInterval(() => void tick(), 7000);
     return () => {
       cancelled = true;
       clearInterval(t);
     };
-  }, [pending, jobs]);
+    // Intentionally keyed on `pendingIds` alone — see the comment above it.
+  }, [pendingIds]);
 
   async function logout() {
     await authClient.signOut().catch(() => {});
@@ -513,16 +542,16 @@ function JobCard({ job, onChanged }: { job: SeedJob; onChanged: () => void }) {
               </div>
             )}
           </div>
-          {job.draft && (
+          {job.status !== "approved" && (
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant={job.status === "failed" ? "primary" : "outline"}
               className="w-full"
               disabled={busy}
               onClick={() => act.mutate("retryImage")}
             >
-              Re-roll photo
+              {job.draft ? "Re-roll photo" : "Retry"}
             </Button>
           )}
         </div>
@@ -693,6 +722,13 @@ function JobCard({ job, onChanged }: { job: SeedJob; onChanged: () => void }) {
       {!ready && job.status === "drafting" && (
         <p className="mt-2 text-xs text-subtle">
           Approve unlocks once the photo lands. Edit the fields meanwhile — your changes are kept.
+        </p>
+      )}
+      {job.status === "failed" && (
+        <p className="mt-2 text-xs text-subtle">
+          The persona and any draft are kept.{" "}
+          {job.draft ? "Re-roll photo" : "Retry"} picks up where this left off — nothing needs
+          retyping.
         </p>
       )}
     </li>

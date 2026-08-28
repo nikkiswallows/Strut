@@ -1134,3 +1134,21 @@ password as source literals, because the operator cannot set environment
 variables on their hosting side. **On a public repository these are public
 credentials.** Env vars override them; the console shows a standing red banner
 while they are in use. Rotate both when testing finishes.
+
+### Follow-up — the "status 429" failure (2026-08-27, later)
+
+A generated profile failed at the image step with `status 429`. The 429 was a
+symptom; four separate defects lined up behind it.
+
+| Sev | Bug |
+|---|---|
+| **P0** | The console's polling effect depended on the `jobs` array — a new reference after every refetch. Each refresh tore the effect down, re-ran it, fired another poll immediately, refreshed again: a tight loop that hammered the Horde until it rate-limited us. Now keyed on a joined string of pending ids, with an overlap guard. |
+| **P0** | Any non-OK status while polling was treated as a **permanent** job failure. A 429 says nothing about the job — it is still queued. 408/425/429/5xx now keep the job pending, plus a process-wide cool-off honouring `Retry-After` and a per-job 5 s floor in `pollSeedJob()`. Verified with 41 back-to-back polls: all 200, one network call, job unharmed. |
+| **P1** | Reasoning models spend the entire 512-token budget on `<think>` and never reach the JSON (measured on Skyfall-31B). The assistant turn is now prefilled with `{`, and `stripThinking()` removes any block that still appears. |
+| **P1** | **"white sissy bottom … wants a Black bull to own her" produced identity `Bull`, role `Bottom`.** An incoherent card filed into the Kings tab — the one cohort the product cannot afford to pollute. `selfSegment()` cuts the persona before the desire clause, hints rank by position not table order, and a coherence pass drops identities contradicting the settled role. |
+| **P2** | Truncated JSON was only "repaired" by closing open braces, which leaves `…, "interes"}` — still invalid. `jsonCandidates()` also trims back to each of the last six top-level commas. When nothing parses at all, the prose becomes the bio and the fields are inferred, rather than dead-ending a generation that cost real queue time. |
+| **P2** | Structured output at temperature 1.05 produced valid JSON full of word salad ("gym sulfita sista"). Seed generation now runs at 0.85. |
+
+Pure persona/parsing logic moved out of the `.server` module into
+`src/lib/seed-persona.ts` with **13 regression tests**
+(`src/lib/seed-persona.test.ts`), every case taken from real observed output.

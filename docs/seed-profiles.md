@@ -97,7 +97,16 @@ makes the tool reliable rather than a dice roll:
 
 Explicit role words in the persona (`top`, `dom`, `bottom`, `sub`, `switch`,
 `vers`, `side`) override identity inference — the operator's words beat the
-rules, and the rules beat the model. Pronouns, "looking for" and interests are
+rules, and the rules beat the model.
+
+**Only the self-describing half of the persona sets identity.** "white sissy
+bottom, 27, San Diego, obedient, **wants a Black bull to own her**" produced a
+profile with identity `Bull` and role `Bottom` — incoherent, and filed into the
+Kings tab, the one cohort the product cannot afford to pollute. `selfSegment()`
+cuts the persona at the first desire verb (`wants`, `looking for`, `seeking`,
+`collects`, `owns`, `into`, `only sees`, …), hints are ranked by **position**
+rather than by table order, and a final coherence pass drops identities that
+contradict the settled role. The primary (first) identity decides the role. Pronouns, "looking for" and interests are
 back-filled from the same table when the model leaves them empty or invents
 values outside the app's vocabularies (`src/lib/types.ts`).
 
@@ -186,7 +195,48 @@ Juggernaut XL) and `IMG_BAD` excludes the anime families outright. A byte-size
 floor of 6 KB catches any blank frame that still gets through and surfaces it as
 "the worker returned a blank frame — re-roll the photo".
 
+**A 429 must never kill a job.** The Horde rate-limits per IP, and the client
+used to treat any non-OK status while polling as a permanent failure — so one
+`429` marked a job `failed` even though it was still queued and about to
+succeed. Now 408/425/429/5xx keep the job pending, a `429` starts a
+process-wide cool-off (honouring `Retry-After`, 15 s floor, 120 s cap) during
+which no Horde request is even attempted, and a per-job 5-second floor in
+`pollSeedJob()` means extra polls are served from the database.
+
+The 429 came from the console itself. The polling effect depended on the `jobs`
+array, which is a fresh reference after every refetch: each refresh tore the
+effect down, re-ran it, immediately fired another poll, refreshed again — a
+tight loop. It now keys on a joined string of pending job ids and guards against
+overlapping passes. Verified by firing **41 rapid polls in a row**: all 200, one
+network call, job unharmed.
+
+**Reasoning models eat the whole output budget.** Several of the strongest
+uncensored text models on the Horde think out loud. With a 512-token ceiling
+that monologue *is* the entire reply — measured: Skyfall-31B spent all 512
+tokens deliberating about a persona and never emitted a character of JSON. Two
+defences: the assistant turn is **prefilled with `{`** so the model continues
+inside the object rather than starting to deliberate, and `stripThinking()`
+removes any `<think>` block that still appears, including unterminated ones.
+
+**Temperature matters for structured output.** At the chat default of 1.05 the
+generator emitted valid JSON containing word salad — "gym sulfita sista",
+"SLOW jeans". Seed generation runs at **0.85**.
+
+**Truncation is recoverable.** `jsonCandidates()` emits several repairs
+best-first: the complete object, the object with open braces closed, then the
+object trimmed back to each of the last six top-level commas. That last one
+matters — closing `…, "interes` naively yields `…, "interes"}`, still invalid,
+while trimming to the previous comma recovers every field before it. If nothing
+parses, the model's prose becomes the bio and every field is inferred from the
+persona, with a warning on the card. A generation that cost real queue time is
+never thrown away.
+
 **Rate limits.** 30 generations/hour and 600 admin mutations/hour, per admin.
+
+**Tests.** `src/lib/seed-persona.test.ts` covers the persona rules and the
+tolerant parser — 13 cases, every one of them a failure actually observed
+against live Horde output. Run with `npm test` (needs Node ≥ 22.12 for
+`--experimental-strip-types`).
 
 ---
 

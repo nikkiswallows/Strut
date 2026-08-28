@@ -40,10 +40,19 @@ export function hordeKeyed(): boolean {
   return apiKey() !== "0000000000";
 }
 
-/** The Horde account behind the current key — used by the admin console. */
-export async function hordeAccount(): Promise<
-  { username: string; kudos: number; concurrency: number } | null
-> {
+type HordeAccount = { username: string; kudos: number; concurrency: number };
+let accountCache: { at: number; value: HordeAccount | null } | null = null;
+
+/**
+ * The Horde account behind the current key — used by the admin console.
+ *
+ * Cached for a minute. This used to fire on every console refresh, which during
+ * a generation meant one extra Horde request per poll, for information that
+ * changes on the order of minutes.
+ */
+export async function hordeAccount(): Promise<HordeAccount | null> {
+  if (accountCache && Date.now() - accountCache.at < 60_000) return accountCache.value;
+  if (hordeCoolingDown() > 0) return accountCache?.value ?? null;
   try {
     const res = await fetch(`${API_BASE}/find_user`, {
       headers: { apikey: apiKey(), "Client-Agent": CLIENT_AGENT },
@@ -56,13 +65,15 @@ export async function hordeAccount(): Promise<
       concurrency?: number;
     };
     if (!j.username) return null;
-    return {
+    const value: HordeAccount = {
       username: j.username,
       kudos: Math.round(Number(j.kudos ?? 0)),
       concurrency: Number(j.concurrency ?? 0),
     };
+    accountCache = { at: Date.now(), value };
+    return value;
   } catch {
-    return null;
+    return accountCache?.value ?? null;
   }
 }
 
@@ -133,15 +144,56 @@ async function resolveModels(): Promise<string[]> {
   return merged.length ? merged.slice(0, 8) : live.slice(0, 5).map((m) => m.name);
 }
 
-/** Wrap chat messages into a ChatML prompt (most Horde RP models use this). */
-function toChatML(messages: { role: "system" | "user" | "assistant"; content: string }[]): string {
+/**
+ * Wrap chat messages into a ChatML prompt (most Horde RP models use this).
+ *
+ * `prefill` seeds the start of the assistant's turn. That is the reliable way to
+ * stop a reasoning model from spending its whole output budget on a `<think>`
+ * monologue: begin the reply for it (`{`) and it continues from there instead of
+ * deliberating. Measured — Skyfall-31B burned all 512 tokens reasoning about a
+ * persona and never reached the JSON.
+ */
+function toChatML(
+  messages: { role: "system" | "user" | "assistant"; content: string }[],
+  prefill = "",
+): string {
   let prompt = "";
   for (const m of messages) {
     const role = m.role === "assistant" ? "assistant" : m.role;
     prompt += `<|im_start|>${role}\n${m.content}<|im_end|>\n`;
   }
-  prompt += `<|im_start|>assistant\n`;
+  prompt += `<|im_start|>assistant\n${prefill}`;
   return prompt;
+}
+
+/**
+ * HTTP statuses that mean "ask again later", not "this job is dead".
+ *
+ * The Horde rate-limits per IP. A 429 while polling says nothing about the job
+ * — it is still queued on a volunteer GPU — so treating it as a failure (which
+ * this client used to do) throws away a generation that was about to succeed
+ * and burns the kudos that paid for it. Same for gateway/5xx blips.
+ */
+const TRANSIENT_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+/**
+ * Global cool-off shared by every Horde call in the process.
+ *
+ * When the network says 429 it means "you, this IP, are asking too often" — so
+ * the correct response is to stop asking for a while, across ALL jobs, not to
+ * back off one job while five others keep hammering. `Retry-After` is honoured
+ * when present, otherwise a 15 s floor.
+ */
+let cooldownUntil = 0;
+
+export function hordeCoolingDown(): number {
+  return Math.max(0, cooldownUntil - Date.now());
+}
+
+function noteRateLimit(res: Response): void {
+  const header = Number(res.headers.get("retry-after"));
+  const waitMs = Number.isFinite(header) && header > 0 ? header * 1000 : 15_000;
+  cooldownUntil = Math.max(cooldownUntil, Date.now() + Math.min(waitMs, 120_000));
 }
 
 export type HordeSubmit = { hordeId: string } | { error: string };
@@ -149,8 +201,12 @@ export type HordeSubmit = { hordeId: string } | { error: string };
 /** Submit an async text-generation job. Returns the Horde job id. */
 export async function hordeSubmit(
   messages: { role: "system" | "user" | "assistant"; content: string }[],
-  opts: { maxLength?: number } = {},
+  opts: { maxLength?: number; prefill?: string; temperature?: number } = {},
 ): Promise<HordeSubmit> {
+  const cooling = hordeCoolingDown();
+  if (cooling > 0) {
+    return { error: `the Horde rate-limited us — try again in ${Math.ceil(cooling / 1000)}s` };
+  }
   const models = await resolveModels();
   if (!models.length) return { error: "no horde models available" };
   try {
@@ -162,11 +218,14 @@ export async function hordeSubmit(
         "Client-Agent": CLIENT_AGENT,
       },
       body: JSON.stringify({
-        prompt: toChatML(messages),
+        prompt: toChatML(messages, opts.prefill),
         params: {
           max_context_length: 2048,
           max_length: opts.maxLength ?? 220,
-          temperature: 1.05,
+          // 1.05 suits chat replies. Structured output needs a cooler head:
+          // at 1.05 the seed generator produced word salad ("gym sulfita
+          // sista", "SLOW jeans") inside otherwise-valid JSON.
+          temperature: opts.temperature ?? 1.05,
           rep_penalty: 1.12,
           stop_sequence: ["<|im_end|>", "\nUser:", "\nuser:"],
         },
@@ -177,6 +236,7 @@ export async function hordeSubmit(
     });
     const data = (await res.json()) as { id?: string; message?: string };
     if (!res.ok || !data.id) {
+      if (res.status === 429) noteRateLimit(res);
       return { error: `horde submit ${res.status}: ${data.message ?? res.statusText}` };
     }
     return { hordeId: data.id };
@@ -192,6 +252,9 @@ export type HordeStatus =
 
 /** Poll a submitted job. Returns pending info or the finished text. */
 export async function hordeCheck(hordeId: string): Promise<HordeStatus> {
+  // Cooling off after a 429: do not spend the request, and do not report a
+  // failure — the job is untouched and still queued.
+  if (hordeCoolingDown() > 0) return { done: false, queuePosition: -1, processing: 0 };
   try {
     const res = await fetch(`${API_BASE}/generate/text/status/${hordeId}`, {
       headers: { apikey: apiKey(), "Client-Agent": CLIENT_AGENT },
@@ -200,6 +263,11 @@ export async function hordeCheck(hordeId: string): Promise<HordeStatus> {
     if (!res.ok) {
       // 404 = expired/unknown job; treat as failure so we fall back.
       if (res.status === 404) return { failed: true, error: "job not found (expired)" };
+      if (TRANSIENT_STATUS.has(res.status)) {
+        if (res.status === 429) noteRateLimit(res);
+        // Stay pending: the job is still on the network, we just asked too soon.
+        return { done: false, queuePosition: -1, processing: 0 };
+      }
       return { failed: true, error: `status ${res.status}` };
     }
     const j = (await res.json()) as {
@@ -324,6 +392,10 @@ export async function hordeSubmitImage(
     seed?: string;
   } = {},
 ): Promise<HordeImageSubmit> {
+  const cooling = hordeCoolingDown();
+  if (cooling > 0) {
+    return { error: `the Horde rate-limited us — try again in ${Math.ceil(cooling / 1000)}s` };
+  }
   const models = opts.models?.length ? opts.models : (await hordeImageModels()).map((m) => m.name);
   if (!models.length) return { error: "no horde image models online" };
 
@@ -372,6 +444,7 @@ export async function hordeSubmitImage(
       errors?: Record<string, string>;
     };
     if (!res.ok || !data.id) {
+      if (res.status === 429) noteRateLimit(res);
       const detail = data.errors ? JSON.stringify(data.errors) : (data.message ?? res.statusText);
       return { error: `horde image submit ${res.status}: ${detail}` };
     }
@@ -388,6 +461,9 @@ export type HordeImageStatus =
 
 /** Poll an image job. `censored` is surfaced, never swallowed. */
 export async function hordeCheckImage(hordeId: string): Promise<HordeImageStatus> {
+  if (hordeCoolingDown() > 0) {
+    return { done: false, queuePosition: -1, waitTime: 0, processing: 0 };
+  }
   try {
     const res = await fetch(`${API_BASE}/generate/status/${hordeId}`, {
       headers: { apikey: apiKey(), "Client-Agent": CLIENT_AGENT },
@@ -395,6 +471,10 @@ export async function hordeCheckImage(hordeId: string): Promise<HordeImageStatus
     });
     if (!res.ok) {
       if (res.status === 404) return { failed: true, error: "job not found (expired)" };
+      if (TRANSIENT_STATUS.has(res.status)) {
+        if (res.status === 429) noteRateLimit(res);
+        return { done: false, queuePosition: -1, waitTime: 0, processing: 0 };
+      }
       return { failed: true, error: `status ${res.status}` };
     }
     const j = (await res.json()) as {

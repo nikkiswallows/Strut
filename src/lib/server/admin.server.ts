@@ -27,6 +27,7 @@ import { storePhotoObject } from "@/lib/server/media.server";
 import {
   hordeCheck,
   hordeCheckImage,
+  hordeCoolingDown,
   hordeSubmit,
   hordeSubmitImage,
 } from "@/lib/server/horde.server";
@@ -38,6 +39,16 @@ import {
   PRONOUNS,
   ROLES,
 } from "@/lib/types";
+import {
+  coerceDraft,
+  JSON_PREFILL,
+  parseDraft,
+  pickFrom,
+  type SeedDraft,
+} from "@/lib/seed-persona";
+
+export type { SeedDraft };
+export { coerceDraft, parseDraft, selfSegment } from "@/lib/seed-persona";
 
 export {
   adminEmails,
@@ -54,23 +65,6 @@ export function assertActor(actorId: string | null | undefined): string {
   if (!actorId) throw new ForbiddenError("Not an admin.");
   return actorId;
 }
-
-/* ── shape of a generated persona ────────────────────────────────────────── */
-
-export type SeedDraft = {
-  handle: string;
-  displayName: string;
-  age: number;
-  identities: string[];
-  pronouns: string[];
-  role: string;
-  ethnicity: string;
-  lookingFor: string[];
-  interests: string[];
-  location: string;
-  heightCm: number | null;
-  bio: string;
-};
 
 export type SeedJob = {
   id: number;
@@ -98,6 +92,26 @@ type Row = Record<string, unknown>;
 
 /** Per-job transient queue info; not worth a column, useful in the UI. */
 const progress = new Map<number, { queuePosition: number; waitTime: number; stage: string }>();
+
+/**
+ * Server-side floor on how often ONE job may touch the Horde.
+ *
+ * The console polls, but the console is not the authority on politeness: a
+ * second browser tab, a refresh loop or a React effect with an unstable
+ * dependency array (which is exactly what produced the first 429 here) can all
+ * multiply the client's intended rate. This throttle is the backstop — extra
+ * polls return the row straight from the database and never reach the network.
+ */
+const MIN_HORDE_POLL_MS = 5_000;
+const lastHordePoll = new Map<number, number>();
+
+function mayPollHorde(jobId: number): boolean {
+  if (hordeCoolingDown() > 0) return false;
+  const now = Date.now();
+  if ((lastHordePoll.get(jobId) ?? 0) + MIN_HORDE_POLL_MS > now) return false;
+  lastHordePoll.set(jobId, now);
+  return true;
+}
 
 function toJob(r: Row): SeedJob {
   const id = Number(r.id);
@@ -130,130 +144,6 @@ function toJob(r: Row): SeedJob {
             ? "image"
             : "text",
   };
-}
-
-/* ── deterministic persona logic ─────────────────────────────────────────── */
-
-/**
- * The app's own role semantics, encoded once.
- *
- * `bnwo.ts` treats Bull as the king role; the whole product is built on that
- * asymmetry. Leaving it to the language model produced sissies marked "Top"
- * roughly one generation in four, which then land in the wrong discover tab and
- * make the deck read as noise. So the model's answer is a *hint* and these
- * rules are the decision.
- */
-const TOP_IDENTITIES = new Set(["Bull", "Man", "Admirer"]);
-const BOTTOM_IDENTITIES = new Set([
-  "Sissy",
-  "Whiteboi",
-  "Femboy",
-  "Crossdresser",
-  "T-Girl",
-  "Trans woman",
-  "Cuck",
-  "Non-binary femme",
-]);
-const SWITCH_IDENTITIES = new Set(["Couple", "Group", "Genderfluid", "Questioning"]);
-
-/** Keyword → identity. First match wins, so order is significance order. */
-const IDENTITY_HINTS: [RegExp, string][] = [
-  [/\bbull\b|\bbbc\b|\bblack (?:king|man|top|dom)\b|\bkings?\b/i, "Bull"],
-  [/\bsissy|sissies\b/i, "Sissy"],
-  [/\bwhite ?boi|whiteboy|beta (?:male|boy)\b/i, "Whiteboi"],
-  [/\bfemboy\b/i, "Femboy"],
-  [/\bcross ?dress|\bcd\b/i, "Crossdresser"],
-  [/\bt-?girl|tgirl\b/i, "T-Girl"],
-  [/\btrans ?(?:woman|femme|girl)\b/i, "Trans woman"],
-  [/\bhot ?wife\b/i, "Hotwife"],
-  [/\bcuck(?:old)?(?:ress)?\b/i, "Cuck"],
-  [/\bqueen|\bwife\b|\bwoman\b|\bgirl\b/i, "Woman"],
-  [/\bcouple\b/i, "Couple"],
-  [/\bgroup\b/i, "Group"],
-  [/\badmirer|\bwatcher\b/i, "Admirer"],
-  [/\bnon-?binary\b/i, "Non-binary femme"],
-  [/\bgender ?fluid\b/i, "Genderfluid"],
-  [/\bcurious|questioning\b/i, "Questioning"],
-  [/\bman\b|\bguy\b|\bmale\b/i, "Man"],
-];
-
-const ETHNICITY_HINTS: [RegExp, string][] = [
-  [/\bblack\b|\bbbc\b|\bbull\b|\bafrican\b|\bebony\b/i, "Black"],
-  [/\bwhite\b|\bcaucasian\b|\bsissy\b|\bwhite ?boi\b|\bsnow ?bunny\b/i, "White"],
-  [/\blatina?\b|\bhispanic\b|\bmexican\b|\bcolombian\b/i, "Latina"],
-  [/\basian\b|\bfilipin|\bkorean\b|\bjapanese\b|\bthai\b/i, "Asian"],
-  [/\bmiddle ?eastern\b|\barab\b|\bpersian\b/i, "Middle Eastern"],
-  [/\bindigenous\b|\bnative\b/i, "Indigenous"],
-  [/\bmixed\b|\bbiracial\b/i, "Mixed"],
-];
-
-function firstHint(text: string, table: [RegExp, string][]): string | null {
-  for (const [re, value] of table) if (re.test(text)) return value;
-  return null;
-}
-
-/** Explicit role words in the persona always beat identity inference. */
-function explicitRole(text: string): string | null {
-  if (/\bswitch(?:es|y)?\b|\bvers\b/i.test(text)) return "Switch";
-  if (/\bbottoms?\b|\bsub(?:missive|by)?\b|\bpillow princess\b|\bbreedable\b/i.test(text)) {
-    return "Bottom";
-  }
-  if (/\btops?\b|\bdom(?:inant|me)?\b|\bdaddy\b|\balpha\b/i.test(text)) return "Top";
-  if (/\bside\b/i.test(text)) return "Side";
-  return null;
-}
-
-function inferRole(identities: string[], persona: string, modelRole: string): string {
-  const explicit = explicitRole(persona);
-  if (explicit) return explicit;
-  if (identities.some((i) => TOP_IDENTITIES.has(i))) return "Top";
-  if (identities.some((i) => BOTTOM_IDENTITIES.has(i))) return "Bottom";
-  if (identities.some((i) => SWITCH_IDENTITIES.has(i))) return "Switch";
-  if ((ROLES as readonly string[]).includes(modelRole)) return modelRole;
-  return "Switch";
-}
-
-/** Pronouns that match the identity when the model omitted or invented them. */
-function inferPronouns(identities: string[]): string[] {
-  if (identities.some((i) => TOP_IDENTITIES.has(i))) return ["he/him"];
-  if (identities.some((i) => ["Sissy", "T-Girl", "Trans woman", "Hotwife", "Woman"].includes(i))) {
-    return ["she/her"];
-  }
-  if (identities.includes("Femboy") || identities.includes("Crossdresser")) return ["he/they"];
-  if (identities.includes("Non-binary femme") || identities.includes("Genderfluid")) {
-    return ["they/them"];
-  }
-  return ["he/him"];
-}
-
-/** A "looking for" set that is coherent with the role, when the model's isn't. */
-function inferLookingFor(role: string, identities: string[]): string[] {
-  if (role === "Top" || identities.includes("Bull")) return ["Now", "Dates", "To be bred"];
-  if (identities.includes("Hotwife")) return ["Bulls", "BBC", "Hotwife nights"];
-  if (identities.includes("Cuck")) return ["Cuckold", "Cleanup", "Bulls"];
-  return ["BBC", "Bulls", "To serve"];
-}
-
-/** Interests that read as on-theme rather than as an empty profile. */
-function inferInterests(role: string, identities: string[]): string[] {
-  if (identities.includes("Bull") || role === "Top") {
-    return ["BNWO", "Fitness", "Interracial", "Breeding", "Nights out"];
-  }
-  if (identities.includes("Hotwife")) return ["QOS", "BBC", "Hotwife", "Lingerie", "Nights out"];
-  if (identities.includes("Cuck")) return ["Cuckold", "Cleanup", "BNWO", "Interracial"];
-  return ["BNWO", "Feminization", "Lingerie", "Chastity", "Heels"];
-}
-
-const HEIGHT_RE = /\b(\d)\s*(?:'|ft|feet)\s*(\d{1,2})?\b|\b(1[4-9]\d|2[0-2]\d)\s*cm\b/i;
-
-function inferHeight(text: string): number | null {
-  const m = HEIGHT_RE.exec(text);
-  if (!m) return null;
-  if (m[3]) return Number(m[3]);
-  const feet = Number(m[1]);
-  const inches = Number(m[2] ?? 0);
-  const cm = Math.round((feet * 12 + inches) * 2.54);
-  return cm >= 130 && cm <= 225 ? cm : null;
 }
 
 /* ── prompt construction ─────────────────────────────────────────────────── */
@@ -295,7 +185,12 @@ Allowed interests: ${INTERESTS.join(", ")}
 Pick 1-3 identities, 1-2 pronouns, exactly 1 role, exactly 1 ethnicity, 2-4 lookingFor, 4-6 interests.
 The bio must be LONG and DETAILED: what they look like, what they do on a weeknight, what they
 want here, how they want to be approached, and one concrete personal detail nobody else would write.
-No hashtags, no emoji, no quotation marks inside the bio. JSON only.`;
+No hashtags, no emoji, no quotation marks inside the bio.
+
+/no_think
+Do NOT think out loud. Do NOT explain your choices. Do NOT write anything before
+or after the object. Your entire reply is one JSON object, starting with { and
+ending with }.`;
 }
 
 /**
@@ -349,6 +244,7 @@ export async function startSeedJob(
       { role: "system", content: systemPrompt() },
       { role: "user", content: `Persona: ${persona}\n\nJSON:` },
     ],
+    // Prefill the assistant turn with the opening brace — see toChatML.
     // 512 is a HARD ceiling, not a preference: above it the Horde refuses the
     // job unless the account already holds the full kudos cost up front
     //   "for requests over 512 tokens, the client needs to already have the
@@ -356,7 +252,7 @@ export async function startSeedJob(
     // At 512 or below the cost is deferred and a low-balance account still gets
     // served. 512 tokens is comfortably enough for the structural fields plus a
     // 6-9 sentence bio, which is why the bio is the LAST key in the object.
-    { maxLength: 512 },
+    { maxLength: 512, prefill: JSON_PREFILL, temperature: 0.85 },
   );
   if ("error" in submitted) return { error: submitted.error };
 
@@ -386,6 +282,10 @@ export async function pollSeedJob(
 
   const status = String(row.status);
 
+  // Everything below talks to the network. When we are not allowed to, hand
+  // back the stored row: the caller sees the same job, one poll later.
+  if (!mayPollHorde(jobId)) return toJob(row);
+
   if (status === "drafting" && row.text_horde_id && !row.image_horde_id) {
     const t = await hordeCheck(String(row.text_horde_id));
     if ("failed" in t) {
@@ -394,14 +294,22 @@ export async function pollSeedJob(
         [jobId, t.error.slice(0, 400)],
       );
     } else if ("done" in t && t.done) {
-      const draft = parseDraft(t.text, String(row.persona));
-      if (!draft) {
+      const parsed = parseDraft(t.text, String(row.persona));
+      if (!parsed) {
         await sql.query(
-          `update seed_jobs set status='failed', error='model did not return usable JSON', updated_at=now() where id=$1`,
+          `update seed_jobs set status='failed', error='the model returned nothing usable — hit Retry', updated_at=now() where id=$1`,
           [jobId],
         );
       } else {
-        await queueImage(jobId, String(row.persona), draft, t.model);
+        await queueImage(
+          jobId,
+          String(row.persona),
+          parsed.draft,
+          t.model,
+          parsed.fromProse
+            ? "Heads up: the model wrote prose instead of structured fields, so the bio is its text and every other field was inferred from your persona. Check them before approving."
+            : null,
+        );
       }
     } else {
       progress.set(jobId, {
@@ -431,7 +339,7 @@ export async function pollSeedJob(
       } else {
         await sql.query(
           `update seed_jobs set image_url=$2, image_model=$3, status='awaiting_review',
-           error=null, image_censored=false, updated_at=now() where id=$1`,
+           image_censored=false, updated_at=now() where id=$1`,
           [jobId, stored.url, i.model],
         );
       }
@@ -496,6 +404,7 @@ async function queueImage(
   persona: string,
   draft: SeedDraft,
   textModel: string,
+  note: string | null = null,
 ): Promise<void> {
   const sql = await getSql();
   const prompt = imagePromptFor(persona, draft);
@@ -518,12 +427,20 @@ async function queueImage(
   }
   await sql.query(
     `update seed_jobs set draft=$2, text_model=$3, image_horde_id=$4,
-     image_prompt=$5, error=null, updated_at=now() where id=$1`,
-    [jobId, JSON.stringify(draft), textModel, img.hordeId, prompt],
+     image_prompt=$5, error=$6, updated_at=now() where id=$1`,
+    [jobId, JSON.stringify(draft), textModel, img.hordeId, prompt, note],
   );
 }
 
-/** Re-queue just the photo for a draft whose image failed or was censored. */
+/**
+ * Retry a job. Re-queues the photo when a draft exists, and re-runs the whole
+ * generation from the persona when it does not.
+ *
+ * A failed job used to be a dead end unless it happened to have a draft, which
+ * meant a transient network blip during the TEXT phase cost the operator the
+ * job and forced them to retype the persona. The persona is stored; there is no
+ * reason not to reuse it.
+ */
 export async function retrySeedImage(
   actorId: string,
   jobId: number,
@@ -533,8 +450,36 @@ export async function retrySeedImage(
   const rows = await sql.query<Row>(`select * from seed_jobs where id = $1`, [jobId]);
   const row = rows[0];
   if (!row) return { error: "No such job." };
+  if (String(row.status) === "approved") return { error: "Already approved." };
+
+  // Let the retry through immediately — the throttle exists to stop automatic
+  // polling stampedes, not deliberate operator actions.
+  lastHordePoll.delete(jobId);
+  const cooling = hordeCoolingDown();
+  if (cooling > 0) {
+    return { error: `The Horde rate-limited us. Try again in ${Math.ceil(cooling / 1000)}s.` };
+  }
+
   const draft = ((row.draft_edited as SeedDraft | null) ?? (row.draft as SeedDraft | null)) ?? null;
-  if (!draft) return { error: "There is no draft to illustrate yet." };
+
+  if (!draft) {
+    // No draft: start over from the persona rather than dead-ending the job.
+    const submitted = await hordeSubmit(
+      [
+        { role: "system", content: systemPrompt() },
+        { role: "user", content: `Persona: ${String(row.persona)}\n\nJSON:` },
+      ],
+      { maxLength: 512, prefill: JSON_PREFILL, temperature: 0.85 },
+    );
+    if ("error" in submitted) return { error: submitted.error };
+    await sql.query(
+      `update seed_jobs set text_horde_id=$2, image_horde_id=null, image_url=null,
+       status='drafting', error=null, updated_at=now() where id=$1`,
+      [jobId, submitted.hordeId],
+    );
+    return { ok: true };
+  }
+
   await sql.query(
     `update seed_jobs set image_url=null, image_horde_id=null, status='drafting',
      error=null, updated_at=now() where id=$1`,
@@ -542,150 +487,6 @@ export async function retrySeedImage(
   );
   await queueImage(jobId, String(row.persona), draft, String(row.text_model ?? "horde"));
   return { ok: true };
-}
-
-/* ── parsing / coercion ──────────────────────────────────────────────────── */
-
-/**
- * Extract the JSON object from a model reply.
- *
- * Small models pad output with preamble despite instructions, and a long bio
- * plus a hard token limit means the object is sometimes cut off mid-string. So:
- * scan for the outermost braces, and if that will not parse, close the string
- * and the object and try once more. Recovering a truncated bio is far better
- * than throwing away a generation that cost real queue time.
- */
-export function parseDraft(text: string, persona: string): SeedDraft | null {
-  const start = text.indexOf("{");
-  if (start < 0) return null;
-  const candidates = [text.slice(start, text.lastIndexOf("}") + 1), repairJson(text.slice(start))];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    try {
-      return coerceDraft(JSON.parse(candidate) as Record<string, unknown>, persona);
-    } catch {
-      /* try the next candidate */
-    }
-  }
-  return null;
-}
-
-/** Close an unterminated string / array / object so a truncated reply parses. */
-function repairJson(raw: string): string | null {
-  let out = "";
-  let inString = false;
-  let escaped = false;
-  const stack: string[] = [];
-  for (const ch of raw) {
-    out += ch;
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (ch === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (ch === "{" || ch === "[") stack.push(ch);
-    if (ch === "}" || ch === "]") stack.pop();
-  }
-  if (!stack.length && !inString) return null;
-  if (inString) out += '"';
-  // Drop a dangling `"key":` with no value before closing.
-  out = out.replace(/,\s*"[^"]*"\s*:\s*$/, "").replace(/,\s*$/, "");
-  while (stack.length) out += stack.pop() === "{" ? "}" : "]";
-  return out;
-}
-
-function pickFrom(v: unknown, allowed: readonly string[], max: number): string[] {
-  const list = Array.isArray(v) ? v : typeof v === "string" ? [v] : [];
-  const byLower = new Map(allowed.map((a) => [a.toLowerCase(), a]));
-  const out: string[] = [];
-  for (const raw of list) {
-    if (typeof raw !== "string") continue;
-    const hit = byLower.get(raw.trim().toLowerCase());
-    if (hit && !out.includes(hit)) out.push(hit);
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
-/**
- * Turn whatever the model said into a valid, coherent draft.
- *
- * This is the layer that makes the tool reliable. Anything the model got wrong,
- * omitted, or invented is replaced by a rule derived from the persona text.
- */
-export function coerceDraft(raw: Record<string, unknown>, persona: string): SeedDraft {
-  const str = (v: unknown, max: number) =>
-    (typeof v === "string" ? v : "").replace(/\s+/g, " ").trim().slice(0, max);
-
-  const hay = `${persona} ${str(raw.bio, 2000)} ${(Array.isArray(raw.identities) ? raw.identities : []).join(" ")}`;
-
-  let identities = pickFrom(raw.identities, IDENTITIES, 3);
-  if (!identities.length) {
-    const hinted = firstHint(hay, IDENTITY_HINTS);
-    identities = hinted ? [hinted] : ["Questioning"];
-  } else {
-    // The persona wins on the primary identity — the operator typed it.
-    const hinted = firstHint(persona, IDENTITY_HINTS);
-    if (hinted && !identities.includes(hinted)) identities = [hinted, ...identities].slice(0, 3);
-  }
-
-  const role = inferRole(identities, persona, str(raw.role, 20));
-
-  const pronouns = pickFrom(raw.pronouns, PRONOUNS, 2);
-  const ethnicity =
-    pickFrom(raw.ethnicity, ETHNICITIES, 1)[0] ??
-    firstHint(hay, ETHNICITY_HINTS) ??
-    (identities.includes("Bull") ? "Black" : "White");
-
-  const lookingFor = pickFrom(raw.lookingFor, LOOKING_FOR, 4);
-  const interests = pickFrom(raw.interests, INTERESTS, 6);
-
-  const ageRaw = Number(raw.age);
-  const age = Number.isFinite(ageRaw) ? Math.min(65, Math.max(18, Math.round(ageRaw))) : 30;
-
-  const heightRaw = Number(raw.heightCm);
-  const heightCm =
-    Number.isFinite(heightRaw) && heightRaw >= 130 && heightRaw <= 225
-      ? Math.round(heightRaw)
-      // Models routinely write the height into the bio prose and leave the
-      // field null, so scan both.
-      : inferHeight(persona) ?? inferHeight(str(raw.bio, 2000));
-
-  const displayName = str(raw.displayName, 40) || "Member";
-  const handle =
-    str(raw.handle, 40)
-      .toLowerCase()
-      .replace(/[^a-z0-9_]/g, "")
-      .slice(0, 24) ||
-    `${displayName.toLowerCase().replace(/[^a-z0-9]/g, "")}${Math.floor(Math.random() * 900 + 100)}`.slice(
-      0,
-      24,
-    );
-
-  return {
-    handle,
-    displayName,
-    age,
-    identities,
-    pronouns: pronouns.length ? pronouns : inferPronouns(identities),
-    role,
-    ethnicity,
-    lookingFor: lookingFor.length ? lookingFor : inferLookingFor(role, identities),
-    interests: interests.length >= 2 ? interests : inferInterests(role, identities),
-    location: str(raw.location, 60) || "Los Angeles, CA",
-    heightCm,
-    // 1800 chars: enough for a genuinely long bio, short of anything that would
-    // blow out a profile card.
-    bio: str(raw.bio, 1800),
-  };
 }
 
 /* ── step 2b: operator edits the draft ───────────────────────────────────── */
