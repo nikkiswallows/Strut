@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -29,8 +29,90 @@ function fmtHours(h: number): string {
   return `${Math.floor(h / 24)}d ${Math.floor(h % 24)}h`;
 }
 
+/** Anchor for the cage timer card, so cage-driven orders can point at it. */
+const CAGE_ANCHOR = "glory-cage";
+
+/**
+ * Where an uncompleted order sends you. Every card that still has a tier to
+ * earn is a doorway to the surface where the number moves: `to` navigates,
+ * `cage: true` scrolls to the cage timer on this page, and `hint` explains
+ * the play when the destination alone doesn't make it obvious.
+ */
+type Pursuit = {
+  label: string;
+  to?: "/me" | "/discover" | "/feed" | "/likes" | "/inbox";
+  cage?: boolean;
+  hint?: string;
+};
+
+const PURSUITS: Record<string, Pursuit> = {
+  "first-kneel": { label: "Finish your profile", to: "/me" },
+  claimed: { label: "Work the deck", to: "/discover" },
+  voice: { label: "Post in the Room", to: "/feed" },
+  devout: {
+    label: "Open a DM",
+    to: "/likes",
+    hint: "Open a conversation with one of your matches — every first message counts.",
+  },
+  "kneeler-card": {
+    label: "Wear the spade",
+    to: "/me",
+    hint: "Edit your profile and add the spade (QOS / BNWO) to your interests.",
+  },
+  "bull-stable": { label: "Claim in the deck", to: "/discover" },
+  "bull-worshipped": {
+    label: "Be seen",
+    to: "/feed",
+    hint: "Kneelers open your DMs — stay visible. Post in the Room and they come to you.",
+  },
+  "bull-empire": { label: "Expand the empire", to: "/discover" },
+  "kneeler-serve": {
+    label: "Message a king",
+    to: "/likes",
+    hint: "Open a DM with a bull you matched. Outreach is worship.",
+  },
+  "kneeler-claimed": { label: "Catch a king's eye", to: "/discover" },
+  "kneeler-serve-bulls": {
+    label: "Claim a serve",
+    to: "/likes",
+    hint: "Served a king? Open his profile and claim it — only his approval scores it.",
+  },
+  "kneeler-locks": {
+    label: "Take the cage",
+    cage: true,
+    hint: "Use the cage timer on this page — every completed lock counts one.",
+  },
+  "wife-bred": { label: "Take a king", to: "/discover" },
+  "wife-night": {
+    label: "Open his DMs",
+    to: "/likes",
+    hint: "Open a conversation with a bull you matched. Schedule the husband.",
+  },
+  "cuck-watch": {
+    label: "Find her a bull",
+    to: "/discover",
+    hint: "Arrange it: kings matched from this account count. Then hold the phone.",
+  },
+  "cuck-locked": {
+    label: "Serve the lock",
+    cage: true,
+    hint: "Lock up with the cage timer on this page — hours only count while caged.",
+  },
+  "chastity-streak": {
+    label: "Lock up",
+    cage: true,
+    hint: "Start a lock with the cage timer on this page. Hours in the cage add up here.",
+  },
+  "chastity-current": {
+    label: "Stay locked",
+    cage: true,
+    hint: "Start (and keep) a lock with the cage timer on this page — this tracks your current one.",
+  },
+};
+
 function Glory() {
   const glory = useQuery({ queryKey: ["glory"], queryFn: fetchGlory });
+  const navigate = useNavigate();
   const [pledge, setPledge] = useState(72);
 
   const start = useMutation({
@@ -115,7 +197,10 @@ function Glory() {
           busy={start.isPending || release.isPending}
         />
       ) : (
-        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface/60 p-4 text-sm text-muted">
+        <div
+          id={CAGE_ANCHOR}
+          className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface/60 p-4 text-sm text-muted"
+        >
           <Cage className="size-7 shrink-0 text-accent/70" />
           <p>
             Add <span className="text-fg">Chastity</span> to your interests (or check sissy /
@@ -154,14 +239,37 @@ function Glory() {
                 const tierLabel =
                   state.earnedTier >= 0 ? def.tiers[state.earnedTier]!.label : "Locked";
                 const nextLabel = state.nextTier !== null ? def.tiers[state.nextTier]!.label : null;
+                const pursuit = PURSUITS[def.id];
+                // Maxed orders are trophies; everything still in progress is a door.
+                const clickable = state.nextTier !== null && !!pursuit;
+                const pursue = () => {
+                  if (!clickable || !pursuit) return;
+                  if (pursuit.hint) toast(pursuit.hint);
+                  if (pursuit.cage) {
+                    document
+                      .getElementById(CAGE_ANCHOR)
+                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    return;
+                  }
+                  if (pursuit.to) void navigate({ to: pursuit.to });
+                };
                 return (
-                  <div
+                  <button
                     key={def.id}
+                    type="button"
+                    onClick={pursue}
+                    disabled={!clickable}
+                    aria-label={
+                      clickable ? `${def.name} — ${pursuit!.label}` : def.name
+                    }
                     className={cn(
-                      "relative overflow-hidden rounded-2xl border p-4 transition-all duration-200",
+                      "relative overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200",
                       earned
                         ? "gold-card"
                         : "border-border bg-surface/60 opacity-80",
+                      clickable
+                        ? "cursor-pointer hover:border-accent/50 hover:opacity-100 active:scale-[0.99]"
+                        : "cursor-default",
                     )}
                   >
                     {earned ? (
@@ -214,7 +322,12 @@ function Glory() {
                         )}
                       </p>
                     </div>
-                  </div>
+                    {clickable ? (
+                      <p className="relative mt-2 text-[11px] font-medium tracking-[0.14em] text-accent uppercase">
+                        {pursuit!.label} →
+                      </p>
+                    ) : null}
+                  </button>
                 );
               })}
             </div>
@@ -260,7 +373,7 @@ function LockCard({
   const display = lock ? fmtHours(lock.elapsedHours) : "0h";
 
   return (
-    <div className="mt-4 overflow-hidden rounded-3xl gold-card p-6 animate-fade-up">
+    <div id={CAGE_ANCHOR} className="mt-4 overflow-hidden rounded-3xl gold-card p-6 animate-fade-up">
       <div className="flex items-center gap-5">
         {/* Ring */}
         <div className="relative grid size-24 shrink-0 place-items-center">
