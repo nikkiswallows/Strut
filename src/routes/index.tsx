@@ -52,7 +52,6 @@ function Home() {
           className="absolute inset-0 size-full object-cover object-[center_18%]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/25" />
-        <div className="hypno-disc pointer-events-none absolute left-1/2 top-[18%] size-[70vw] -translate-x-1/2 rounded-full opacity-70 mix-blend-screen" />
         <div className="spade-veil pointer-events-none absolute inset-0" />
         <Wordmark className="pointer-events-none absolute inset-x-0 top-[16%] text-center text-[20vw] leading-none text-accent/15 sm:text-[16vw]" />
         <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-3xl flex-col justify-end px-6 pb-16 pt-28">

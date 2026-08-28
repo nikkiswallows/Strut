@@ -1,17 +1,20 @@
 import { GripVertical, Star, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { uploadPhotoFile } from "@/lib/media";
+import { alignBlurs, uploadPhotoFile } from "@/lib/media";
 import { cn, moveItem } from "@/lib/utils";
 import { Photo } from "./photo";
 
 export function PhotoEditor({
   photos,
+  blurs = [],
   onChange,
   max = 8,
 }: {
   photos: string[];
-  onChange: (next: string[]) => void;
+  /** Discreet placeholders, index-aligned with `photos`. */
+  blurs?: string[];
+  onChange: (nextPhotos: string[], nextBlurs: string[]) => void;
   max?: number;
 }) {
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -19,38 +22,57 @@ export function PhotoEditor({
   const start = useRef<{ index: number; x: number; y: number; moved: boolean } | null>(null);
   const main = photos[0];
 
+  function commit(nextPhotos: string[], nextBlurs: string[]) {
+    // Trim the placeholder array to the photo count so the two can never drift.
+    onChange(nextPhotos, alignBlurs(nextPhotos, nextBlurs));
+  }
+
   function promote(index: number) {
     if (index <= 0) return;
-    onChange(moveItem(photos, index, 0));
+    commit(moveItem(photos, index, 0), moveItem(alignBlurs(photos, blurs), index, 0));
   }
 
   function remove(index: number) {
-    onChange(photos.filter((_, i) => i !== index));
+    commit(
+      photos.filter((_, i) => i !== index),
+      alignBlurs(photos, blurs).filter((_, i) => i !== index),
+    );
   }
 
   function reorder(from: number, to: number) {
     if (from === to || from < 0 || to < 0) return;
-    onChange(moveItem(photos, from, to));
+    commit(
+      moveItem(photos, from, to),
+      moveItem(alignBlurs(photos, blurs), from, to),
+    );
   }
 
   async function onFiles(list: FileList | null) {
     if (!list) return;
-    const next = [...photos];
-    for (const file of Array.from(list).slice(0, max - next.length)) {
+    const nextPhotos = [...photos];
+    const nextBlurs = [...alignBlurs(photos, blurs)];
+    for (const file of Array.from(list).slice(0, max - nextPhotos.length)) {
       try {
-        next.push(await uploadPhotoFile(file));
+        const uploaded = await uploadPhotoFile(file);
+        nextPhotos.push(uploaded.url);
+        nextBlurs.push(uploaded.blur);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Could not upload that photo.");
       }
     }
-    onChange(next.slice(0, max));
+    commit(nextPhotos.slice(0, max), nextBlurs.slice(0, max));
   }
 
   return (
     <div className="space-y-3">
       <div className="relative overflow-hidden rounded-xl bg-surface">
         <div className="relative aspect-[3/4] sm:aspect-[4/5]">
-          <Photo src={main} alt="Main photo" className="absolute inset-0 size-full" />
+          <Photo
+            src={main}
+            blurSrc={alignBlurs(photos, blurs)[0] ?? null}
+            alt="Main photo"
+            className="absolute inset-0 size-full"
+          />
           {main ? (
             <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-bg/70 px-2.5 py-1 text-[10px] font-medium tracking-wide text-fg uppercase backdrop-blur-sm">
               <Star className="size-3 fill-current" />
@@ -107,7 +129,12 @@ export function PhotoEditor({
               i === 0 ? "ring-2 ring-fg/80" : "",
             )}
           >
-            <Photo src={src} alt="" className="size-full pointer-events-none" />
+            <Photo
+              src={src}
+              blurSrc={alignBlurs(photos, blurs)[i] ?? null}
+              alt=""
+              className="size-full pointer-events-none"
+            />
             <span className="pointer-events-none absolute top-1 left-1 text-fg/80">
               <GripVertical className="size-3.5" />
             </span>

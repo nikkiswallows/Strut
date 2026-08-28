@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { forbiddenUnlessTrustedOrigin } from "@/lib/auth/isolation.server";
 import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 import { replyAsSeed } from "@/lib/server/chat.server";
 import { rateLimit, sweepRateBuckets } from "@/lib/server/rate-limit";
@@ -7,6 +8,8 @@ export const Route = createFileRoute("/api/messages/reply")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+          const forbidden = forbiddenUnlessTrustedOrigin(request);
+          if (forbidden) return forbidden;
         try {
           const body = (await request.json()) as { conversationId?: number };
           const user = await getSessionUserFromRequest(request);

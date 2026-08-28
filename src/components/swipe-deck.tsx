@@ -1,5 +1,12 @@
 import { Heart, RotateCcw, X } from "lucide-react";
-import { useCallback, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { formatMiles } from "@/lib/geo";
 import { badgeFor } from "@/lib/bnwo";
 import { asPhotoList, identityLine, shownAge, type Profile } from "@/lib/types";
@@ -18,6 +25,7 @@ import { Photo } from "./photo";
 export function SwipeDeck({
   profiles,
   onSwipe,
+  onUndo,
   onNeedMore,
   loadingMore,
   hasMore,
@@ -25,6 +33,13 @@ export function SwipeDeck({
 }: {
   profiles: Profile[];
   onSwipe: (profile: Profile, direction: "like" | "pass") => void;
+  /**
+   * Undo the previous decision. Must call back to the server: the decision was
+   * already recorded (and, for a like, already mirrored into `likes`), so
+   * rewinding the local index alone would show a card the member has in fact
+   * already liked — and swiping again would produce a false match.
+   */
+  onUndo?: (profile: Profile) => void;
   onNeedMore: () => void;
   loadingMore: boolean;
   hasMore: boolean;
@@ -43,13 +58,26 @@ export function SwipeDeck({
   const velocityRef = useRef(0);
   const lastX = useRef(0);
   const lastTime = useRef(0);
+  // Held so the fly-out timer can be cancelled on unmount: a pending
+  // setTimeout that fires after teardown tries to setState on a dead component.
+  const settleTimer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+    },
+    [],
+  );
 
   const current = useMemo(() => profiles[index] ?? null, [profiles, index]);
   const nextCard = useMemo(() => profiles[index + 1] ?? null, [profiles, index]);
 
   const photos = current ? asPhotoList(current.photos) : [];
+  const blurs = current ? asPhotoList(current.photoBlurs) : [];
   // Use the last photo so the top card reads "full"; fall back to first.
-  const photo = photos[photos.length - 1] ?? photos[0];
+  const photoIndex = photos.length - 1 >= 0 ? photos.length - 1 : 0;
+  const photo = photos[photoIndex];
+  const photoBlur = blurs[photoIndex] ?? null;
   const age = current ? shownAge(current) : null;
   const badge = current ? badgeFor(current) : null;
   const distance = current ? formatMiles(current.distanceMiles) : null;
@@ -64,7 +92,7 @@ export function SwipeDeck({
       onSwipe(current, direction);
       if (index + 1 >= profiles.length - 2) onNeedMore();
       // After the fly-out, settle back to rest for the next card.
-      window.setTimeout(() => {
+      settleTimer.current = window.setTimeout(() => {
         setGone(null);
         setX(0);
         setDragging(false);
@@ -171,6 +199,7 @@ export function SwipeDeck({
         {nextCard ? (
           <Photo
             src={asPhotoList(nextCard.photos)[0]}
+            blurSrc={asPhotoList(nextCard.photoBlurs)[0] ?? null}
             alt={nextCard.displayName}
             name={nextCard.displayName}
             discreet={Boolean(nextCard.discreet)}
@@ -201,6 +230,7 @@ export function SwipeDeck({
       >
         <Photo
           src={photo}
+          blurSrc={photoBlur}
           alt={current?.displayName ?? ""}
           name={current?.displayName ?? ""}
           discreet={Boolean(current?.discreet)}
@@ -252,11 +282,16 @@ export function SwipeDeck({
         <button
           type="button"
           aria-label="Undo"
-          onClick={() => {
-            setIndex((i) => Math.max(0, i - 1));
-            setGone(null);
-            setX(0);
-          }}
+            onClick={() => {
+              // The card at index - 1 is the one just decided on. Tell the
+              // server first so the deck and the database agree; the local
+              // rewind alone is what made Undo lie.
+              const previous = profiles[index - 1];
+              if (previous) onUndo?.(previous);
+              setIndex((i) => Math.max(0, i - 1));
+              setGone(null);
+              setX(0);
+            }}
           className="grid size-10 place-items-center rounded-full border border-border bg-surface text-subtle transition-transform duration-150 ease-out active:scale-[0.9]"
         >
           <RotateCcw className="size-4" />

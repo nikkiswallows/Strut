@@ -55,19 +55,34 @@ export const Route = createFileRoute("/api/messages/stream")({
       GET: async ({ request }) => {
         const user = await getSessionUserFromRequest(request);
         if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+        const url = new URL(request.url);
+        const conversationId = Number(url.searchParams.get("conversationId"));
+        // Validate everything BEFORE taking a slot.
+        //
+        // The slot used to be acquired first and then released only on the
+        // happy path: a malformed conversation id or a conversation the caller
+        // doesn't own would consume one of their four streams and never give it
+        // back until the 30-minute stale window expired. Four bad requests were
+        // enough to kill live chat for that user.
+        if (!Number.isInteger(conversationId) || conversationId <= 0) {
+          return Response.json({ error: "Missing conversation." }, { status: 400 });
+        }
+
         if (!acquireStream(user.id)) {
           return Response.json(
             { error: "Too many live connections." },
             { status: 429 },
           );
         }
-
-        const userId = user.id;
-        const url = new URL(request.url);
-        const conversationId = Number(url.searchParams.get("conversationId"));
-        if (!Number.isFinite(conversationId)) {
-          return Response.json({ error: "Missing conversation." }, { status: 400 });
-        }
+        // From here on, every exit path must release.
+        let streamHeld = true;
+        const release = () => {
+          if (streamHeld) {
+            streamHeld = false;
+            releaseStream(user.id);
+          }
+        };
 
         // Authorize + confirm the caller belongs to this conversation.
         const sql = await getSql();
@@ -77,10 +92,12 @@ export const Route = createFileRoute("/api/messages/stream")({
         );
         const row = conv[0];
         if (!row || (row.user_a !== user.id && row.user_b !== user.id)) {
+          release();
           return Response.json({ error: "Forbidden" }, { status: 403 });
         }
         const channel = `conv:${conversationId}`;
 
+        const userId = user.id;
         let listener: ((e: RealtimeEvent) => void) | null = null;
         let heartbeat: ReturnType<typeof setInterval> | null = null;
 
@@ -107,7 +124,7 @@ export const Route = createFileRoute("/api/messages/stream")({
           cancel() {
             if (heartbeat) clearInterval(heartbeat);
             if (listener) subscribeToNothing(channel, listener);
-            releaseStream(userId);
+            release();
           },
         });
 

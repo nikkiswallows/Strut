@@ -94,9 +94,20 @@ export const INTERESTS = [
   "Kneeling",
 ] as const;
 
+/**
+ * Deck tabs.
+ *
+ * `kings` used to match ["Man", "Admirer", "Bull"], but the app's own role rules
+ * (`bnwo.ts`) only treat "Bull" as a king. That meant the Kings tab — the
+ * scarcest, highest-value cohort, and the reason everyone else joins — was
+ * populated with anyone who ticked "Man", including submissive men looking for
+ * a Top. Precision beats recall on the tab that defines the product, so kings
+ * now matches Bull alone and everyone else gets their own tab.
+ */
 export const DISCOVER_TABS = [
   { id: "nearby", label: "Nearby", match: [] as string[] },
-  { id: "kings", label: "Kings", match: ["Man", "Admirer", "Bull"] },
+  { id: "kings", label: "Kings", match: ["Bull"] },
+  { id: "men", label: "Men", match: ["Man", "Admirer"] },
   { id: "sissies", label: "Sissies", match: ["Sissy"] },
   { id: "whitebois", label: "Whitebois", match: ["Whiteboi"] },
   { id: "trans", label: "Trans", match: ["T-Girl", "Trans woman"] },
@@ -139,6 +150,10 @@ export type Profile = {
   lastActive: string;
   onboarded: boolean;
   createdAt: string;
+  /** ISO `YYYY-MM-DD`. Required to create a profile; immutable afterward. */
+  birthDate: string | null;
+  /** Tiny data-URI blur placeholders, aligned index-wise with `photos`. */
+  photoBlurs: string[];
   likedByMe?: boolean;
   likesMe?: boolean;
   matched?: boolean;

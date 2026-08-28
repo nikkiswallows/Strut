@@ -8,6 +8,7 @@ import { Logo } from "@/components/logo";
 import { PhotoEditor } from "@/components/photo-editor";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
+import { checkBirthDate } from "@/lib/age";
 import { BIO_PLACEHOLDER, decreeFor, judgeRole } from "@/lib/bnwo";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useMembership } from "@/lib/auth/use-membership";
@@ -62,6 +63,8 @@ function Onboarding() {
   const [role, setRole] = useState("Switch");
   const [lookingFor, setLookingFor] = useState<string[]>(["Dates"]);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoBlurs, setPhotoBlurs] = useState<string[]>([]);
+  const [birthDate, setBirthDate] = useState("");
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [heightCm, setHeightCm] = useState("");
@@ -86,6 +89,8 @@ function Onboarding() {
       setRole(me.data.role ?? draft?.role ?? "Switch");
       setLookingFor(me.data.lookingFor.length ? me.data.lookingFor : draft?.lookingFor?.length ? draft.lookingFor : ["Dates"]);
       setPhotos(me.data.photos.length ? me.data.photos : draft?.photos ?? []);
+      setPhotoBlurs(me.data.photoBlurs?.length ? me.data.photoBlurs : (me.data.photos.length ? [] : (draft?.photoBlurs ?? [])));
+      setBirthDate(me.data.birthDate ?? draft?.birthDate ?? "");
       setBio(me.data.bio || draft?.bio || "");
       setInterests(me.data.interests.length ? me.data.interests : draft?.interests ?? []);
       setHeightCm(me.data.heightCm ? String(me.data.heightCm) : draft?.heightCm ?? "");
@@ -100,6 +105,8 @@ function Onboarding() {
       setRole(draft.role);
       setLookingFor(draft.lookingFor.length ? draft.lookingFor : ["Dates"]);
       setPhotos(draft.photos);
+      setPhotoBlurs(draft.photoBlurs ?? []);
+      setBirthDate(draft.birthDate ?? "");
       setBio(draft.bio);
       setInterests(draft.interests);
       setHeightCm(draft.heightCm);
@@ -124,6 +131,8 @@ function Onboarding() {
       role,
       lookingFor,
       photos,
+      photoBlurs,
+      birthDate,
       bio,
       interests,
       heightCm,
@@ -143,6 +152,8 @@ function Onboarding() {
     role,
     lookingFor,
     photos,
+    photoBlurs,
+    birthDate,
     bio,
     interests,
     heightCm,
@@ -165,6 +176,8 @@ function Onboarding() {
         bio,
         interests,
         heightCm: heightCm ? Number(heightCm) : null,
+        birthDate,
+        photoBlurs,
       };
       return postProfile({ ...base, photos });
     },
@@ -189,6 +202,8 @@ function Onboarding() {
         role,
         lookingFor,
         photos,
+        photoBlurs,
+        birthDate,
         bio,
         interests,
         heightCm,
@@ -204,6 +219,9 @@ function Onboarding() {
   if (phase === "member") return <Navigate to="/discover" />;
 
   const steps = ["You", "Identity", "Looks", "Voice"];
+  // Computed once so the hint and the step gate share one verdict (TypeScript
+  // can't narrow two separate calls to the same discriminant union).
+  const dobCheck = checkBirthDate(birthDate);
 
   return (
     <div className="min-h-dvh bg-bg px-5 py-8">
@@ -253,17 +271,31 @@ function Onboarding() {
                   autoComplete="username"
                 />
               </Field>
+              {/* The 18+ gate. A date of birth is required to hold a profile
+                  and is immutable once set — an editable birthday is not a
+                  gate, and Strut ships explicit adult content in 27 regulated
+                  US states. Age shown on the card is derived from this. */}
+              <Field
+                label="Date of birth"
+                hint={
+                  dobCheck.ok
+                    ? `Strut is 18+. You're ${dobCheck.age}.`
+                    : "Strut is strictly 18+. Required, and it can't be changed later."
+                }
+              >
+                <Input
+                  type="date"
+                  required
+                  value={birthDate}
+                  max={new Date(Date.now() - 18 * 365.25 * 24 * 3600 * 1000)
+                    .toISOString()
+                    .slice(0, 10)}
+                  min="1900-01-01"
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  autoComplete="bday"
+                />
+              </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Age">
-                  <Input
-                    type="number"
-                    min={18}
-                    max={99}
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    inputMode="numeric"
-                  />
-                </Field>
                 <Field label="City">
                   <Input
                     value={location}
@@ -372,7 +404,14 @@ function Onboarding() {
               <p className="text-sm text-muted">
                 Your photos. Not someone else's. Main look sits large — drag the rest into order.
               </p>
-              <PhotoEditor photos={photos} onChange={setPhotos} />
+              <PhotoEditor
+                photos={photos}
+                blurs={photoBlurs}
+                onChange={(nextPhotos, nextBlurs) => {
+                  setPhotos(nextPhotos);
+                  setPhotoBlurs(nextBlurs);
+                }}
+              />
             </div>
           )}
 
@@ -416,6 +455,10 @@ function Onboarding() {
                 }
                 if (step === 1 && identities.length === 0) {
                   toast.error("Pick at least one identity.");
+                  return;
+                }
+                if (step === 0 && !dobCheck.ok) {
+                  toast.error(dobCheck.error);
                   return;
                 }
                 if (step === 2 && photos.length === 0) {

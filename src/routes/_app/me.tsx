@@ -63,6 +63,8 @@ function Me() {
   const [role, setRole] = useState("");
   const [lookingFor, setLookingFor] = useState<string[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoBlurs, setPhotoBlurs] = useState<string[]>([]);
+  const [birthDate, setBirthDate] = useState("");
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [heightCm, setHeightCm] = useState("");
@@ -80,6 +82,8 @@ function Me() {
     setRole(p.role ?? "");
     setLookingFor(p.lookingFor);
     setPhotos(p.photos);
+    setPhotoBlurs(p.photoBlurs ?? []);
+    setBirthDate(p.birthDate ?? "");
     setBio(p.bio);
     setInterests(p.interests);
     setHeightCm(p.heightCm ? String(p.heightCm) : "");
@@ -99,6 +103,7 @@ function Me() {
         role: judgeRole(identities, role).forced,
         lookingFor,
         photos,
+        photoBlurs,
         bio,
         interests,
         heightCm: heightCm ? Number(heightCm) : null,
@@ -306,7 +311,14 @@ function Me() {
           <Field label="Bio">
             <Textarea value={bio} maxLength={500} onChange={(e) => setBio(e.target.value)} />
           </Field>
-          <PhotoEditor photos={photos} onChange={setPhotos} />
+          <PhotoEditor
+            photos={photos}
+            blurs={photoBlurs}
+            onChange={(nextPhotos, nextBlurs) => {
+              setPhotos(nextPhotos);
+              setPhotoBlurs(nextBlurs);
+            }}
+          />
           <MultiChips
             label="Interests"
             options={interestTags.data ?? [...INTERESTS]}
@@ -324,6 +336,156 @@ function Me() {
             </Button>
           </div>
         </form>
+      )}
+
+      {!editing && <SafetyPanel />}
+    </div>
+  );
+}
+
+/**
+ * Blocks, data portability and deletion.
+ *
+ * Presented as part of *my* profile rather than buried in settings: for this
+ * audience the ability to make someone vanish — and to make yourself vanish —
+ * is the feature that makes the rest of the app usable.
+ */
+function SafetyPanel() {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState("");
+
+  const blocks = useQuery({
+    queryKey: ["blocks"],
+    queryFn: () => app<{ items: { blockedId: string; handle: string; displayName: string }[] }>("blocks"),
+    enabled: open,
+  });
+
+  const unblock = useMutation({
+    mutationFn: (blockedId: string) => app<{ ok: true }>("unblock", { blockedId }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["blocks"] });
+      await queryClient.invalidateQueries({ queryKey: ["deck"] });
+      toast.success("Unblocked.");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not unblock."),
+  });
+
+  const wipe = useMutation({
+    mutationFn: () =>
+      fetch("/api/account", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirm: "delete" }),
+      }).then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Delete failed.");
+        return r.json();
+      }),
+    onSuccess: () => {
+      toast.success("Account deleted.");
+      window.location.href = "/";
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Delete failed."),
+  });
+
+  const items = blocks.data?.items ?? [];
+
+  return (
+    <div className="mt-6 rounded-2xl border border-white/10 bg-white/5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="text-sm font-medium text-white/90">Safety &amp; privacy</span>
+        <span className="text-xs text-white/40">{open ? "Hide" : "Show"}</span>
+      </button>
+
+      {open && (
+        <div className="space-y-5 border-t border-white/10 px-4 py-4">
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-white/50">
+              Blocked
+            </h3>
+            {blocks.isLoading && <p className="text-xs text-white/40">Loading…</p>}
+            {!blocks.isLoading && items.length === 0 && (
+              <p className="text-xs text-white/40">
+                Nobody. Blocking is mutual — you both disappear from each other&apos;s
+                deck, likes and messages.
+              </p>
+            )}
+            <ul className="space-y-2">
+              {items.map((b: { blockedId: string; handle: string }) => (
+                <li
+                  key={b.blockedId}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2"
+                >
+                  <span className="truncate text-sm text-white/80">
+                    @{b.handle || "member"}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={unblock.isPending}
+                    onClick={() => unblock.mutate(b.blockedId)}
+                  >
+                    Unblock
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-white/50">
+              Your data
+            </h3>
+            <p className="text-xs text-white/45">
+              Take everything Strut holds about you, or delete the account and its
+              photos outright. Deletion is immediate and cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  window.open("/api/account", "_blank");
+                }}
+              >
+                Download my data
+              </Button>
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-white/50">
+              Delete account
+            </h3>
+            <p className="text-xs text-white/45">
+              Removes your profile, photos, likes, posts and every message you have
+              sent. Type <span className="font-mono text-white/70">DELETE</span> to
+              confirm.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="DELETE"
+                className="max-w-40"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="danger"
+                disabled={confirm.trim().toLowerCase() !== "delete" || wipe.isPending}
+                onClick={() => wipe.mutate()}
+              >
+                {wipe.isPending ? "Deleting…" : "Delete account"}
+              </Button>
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

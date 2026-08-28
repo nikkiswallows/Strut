@@ -18,6 +18,7 @@ import { Route as AppFeedRouteImport } from './routes/_app/feed'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppLikesRouteImport } from './routes/_app/likes'
 import { Route as AppMeRouteImport } from './routes/_app/me'
+import { Route as ApiAccountRouteImport } from './routes/api/account'
 import { Route as ApiAppRouteImport } from './routes/api/app'
 import { Route as ApiConfigRouteImport } from './routes/api/config'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -38,6 +39,7 @@ import { Route as ApiMessagesStreamRouteImport } from './routes/api/messages/str
 import { Route as ApiMessagesThreadRouteImport } from './routes/api/messages/thread'
 import { Route as ApiPhoneLoginRouteImport } from './routes/api/phone/login'
 import { Route as ApiPhoneStartRouteImport } from './routes/api/phone/start'
+import { Route as ApiPhoneStatusRouteImport } from './routes/api/phone/status'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -82,6 +84,11 @@ const AppMeRoute = AppMeRouteImport.update({
   id: '/me',
   path: '/me',
   getParentRoute: () => AppRoute,
+} as any)
+const ApiAccountRoute = ApiAccountRouteImport.update({
+  id: '/api/account',
+  path: '/api/account',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAppRoute = ApiAppRouteImport.update({
   id: '/api/app',
@@ -183,6 +190,11 @@ const ApiPhoneStartRoute = ApiPhoneStartRouteImport.update({
   path: '/api/phone/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPhoneStatusRoute = ApiPhoneStatusRouteImport.update({
+  id: '/api/phone/status',
+  path: '/api/phone/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -193,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AppInboxRouteWithChildren
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
+  '/api/account': typeof ApiAccountRoute
   '/api/app': typeof ApiAppRoute
   '/api/config': typeof ApiConfigRoute
   '/api/health': typeof ApiHealthRoute
@@ -212,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/api/messages/thread': typeof ApiMessagesThreadRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
   '/api/phone/start': typeof ApiPhoneStartRoute
+  '/api/phone/status': typeof ApiPhoneStatusRoute
   '/inbox/': typeof AppInboxIndexRoute
 }
 export interface FileRoutesByTo {
@@ -222,6 +236,7 @@ export interface FileRoutesByTo {
   '/feed': typeof AppFeedRoute
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
+  '/api/account': typeof ApiAccountRoute
   '/api/app': typeof ApiAppRoute
   '/api/config': typeof ApiConfigRoute
   '/api/health': typeof ApiHealthRoute
@@ -241,6 +256,7 @@ export interface FileRoutesByTo {
   '/api/messages/thread': typeof ApiMessagesThreadRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
   '/api/phone/start': typeof ApiPhoneStartRoute
+  '/api/phone/status': typeof ApiPhoneStatusRoute
   '/inbox': typeof AppInboxIndexRoute
 }
 export interface FileRoutesById {
@@ -254,6 +270,7 @@ export interface FileRoutesById {
   '/_app/inbox': typeof AppInboxRouteWithChildren
   '/_app/likes': typeof AppLikesRoute
   '/_app/me': typeof AppMeRoute
+  '/api/account': typeof ApiAccountRoute
   '/api/app': typeof ApiAppRoute
   '/api/config': typeof ApiConfigRoute
   '/api/health': typeof ApiHealthRoute
@@ -273,6 +290,7 @@ export interface FileRoutesById {
   '/api/messages/thread': typeof ApiMessagesThreadRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
   '/api/phone/start': typeof ApiPhoneStartRoute
+  '/api/phone/status': typeof ApiPhoneStatusRoute
   '/_app/inbox/': typeof AppInboxIndexRoute
 }
 export interface FileRouteTypes {
@@ -286,6 +304,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/likes'
     | '/me'
+    | '/api/account'
     | '/api/app'
     | '/api/config'
     | '/api/health'
@@ -305,6 +324,7 @@ export interface FileRouteTypes {
     | '/api/messages/thread'
     | '/api/phone/login'
     | '/api/phone/start'
+    | '/api/phone/status'
     | '/inbox/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -315,6 +335,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/likes'
     | '/me'
+    | '/api/account'
     | '/api/app'
     | '/api/config'
     | '/api/health'
@@ -334,6 +355,7 @@ export interface FileRouteTypes {
     | '/api/messages/thread'
     | '/api/phone/login'
     | '/api/phone/start'
+    | '/api/phone/status'
     | '/inbox'
   id:
     | '__root__'
@@ -346,6 +368,7 @@ export interface FileRouteTypes {
     | '/_app/inbox'
     | '/_app/likes'
     | '/_app/me'
+    | '/api/account'
     | '/api/app'
     | '/api/config'
     | '/api/health'
@@ -365,6 +388,7 @@ export interface FileRouteTypes {
     | '/api/messages/thread'
     | '/api/phone/login'
     | '/api/phone/start'
+    | '/api/phone/status'
     | '/_app/inbox/'
   fileRoutesById: FileRoutesById
 }
@@ -373,6 +397,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  ApiAccountRoute: typeof ApiAccountRoute
   ApiAppRoute: typeof ApiAppRoute
   ApiConfigRoute: typeof ApiConfigRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -390,6 +415,7 @@ export interface RootRouteChildren {
   ApiMessagesThreadRoute: typeof ApiMessagesThreadRoute
   ApiPhoneLoginRoute: typeof ApiPhoneLoginRoute
   ApiPhoneStartRoute: typeof ApiPhoneStartRoute
+  ApiPhoneStatusRoute: typeof ApiPhoneStatusRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -456,6 +482,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/me'
       preLoaderRoute: typeof AppMeRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/account': {
+      id: '/api/account'
+      path: '/api/account'
+      fullPath: '/api/account'
+      preLoaderRoute: typeof ApiAccountRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/app': {
       id: '/api/app'
@@ -597,6 +630,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPhoneStartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/phone/status': {
+      id: '/api/phone/status'
+      path: '/api/phone/status'
+      fullPath: '/api/phone/status'
+      preLoaderRoute: typeof ApiPhoneStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -639,6 +679,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  ApiAccountRoute: ApiAccountRoute,
   ApiAppRoute: ApiAppRoute,
   ApiConfigRoute: ApiConfigRoute,
   ApiHealthRoute: ApiHealthRoute,
@@ -656,6 +697,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMessagesThreadRoute: ApiMessagesThreadRoute,
   ApiPhoneLoginRoute: ApiPhoneLoginRoute,
   ApiPhoneStartRoute: ApiPhoneStartRoute,
+  ApiPhoneStatusRoute: ApiPhoneStatusRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

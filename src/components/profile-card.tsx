@@ -17,8 +17,11 @@ export function ProfileCard({
   layout?: "grid" | "feed";
 }) {
   const photos = asPhotoList(profile.photos);
+  const blurs = asPhotoList(profile.photoBlurs);
   const [index, setIndex] = useState(0);
-  const photo = photos[Math.min(index, Math.max(photos.length - 1, 0))];
+  const safeIndex = Math.min(index, Math.max(photos.length - 1, 0));
+  const photo = photos[safeIndex];
+  const blur = blurs[safeIndex] ?? null;
   const age = shownAge(profile);
   const distance = formatMiles(profile.distanceMiles);
   const ident = identityLine(profile);
@@ -43,6 +46,7 @@ export function ProfileCard({
       <div className={cn("relative overflow-hidden", feed ? "aspect-[4/5]" : "aspect-[3/4]")}>
         <Photo
           src={photo}
+          blurSrc={blur}
           alt={profile.displayName}
           name={profile.displayName}
           discreet={Boolean(profile.discreet)}

@@ -14,6 +14,7 @@ import {
 import { hordeCheck, hordeSubmit } from "./horde.server";
 import { publish } from "./realtime.server";
 import { ensureSeed } from "./seed";
+import { assertNotBlocked } from "./safety";
 
 type BotJobRow = {
   id: number;
@@ -71,6 +72,9 @@ export async function listChats(userId: string): Promise<ConversationPreview[]> 
 
 export async function openChat(userId: string, otherUserId: string): Promise<{ id: number }> {
   if (otherUserId === userId) throw new Error("That's you.");
+  // A block must close the door on starting a conversation too, not just on
+  // seeing someone in the deck.
+  await assertNotBlocked(userId, otherUserId);
   const sql = await getSql();
   const existing = await sql.query<{ id: number }>(
     `select id from conversations
@@ -166,6 +170,9 @@ export async function sendChat(userId: string, conversationId: number, body: str
     throw new Error("Conversation not found.");
   }
   const otherId = row.user_a === userId ? row.user_b : row.user_a;
+  // Re-checked on every send: a block that lands mid-conversation has to stop
+  // the next message, not just the next conversation.
+  await assertNotBlocked(userId, otherId);
   await sql.query(
     `insert into messages (conversation_id, sender_id, body) values ($1, $2, $3)`,
     [conversationId, userId, text],

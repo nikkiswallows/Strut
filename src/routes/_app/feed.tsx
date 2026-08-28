@@ -40,7 +40,8 @@ function Feed() {
     const file = list?.[0];
     if (!file) return;
     try {
-      setPhotoUrl(await uploadPhotoFile(file));
+      const uploaded = await uploadPhotoFile(file);
+      setPhotoUrl(uploaded.url);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not upload that photo.");
     }

@@ -7,9 +7,11 @@ import { PROFILE_COLS_P, mapProfile, type ProfileRow } from "./map";
 import { parseJson } from "@/lib/utils";
 import { ensureSeed } from "./seed";
 import { isStoredPhotoUrl } from "./media.server";
+import { assertNotBlocked } from "./safety";
 
 export async function toggleLikeFor(userId: string, toUserId: string) {
   if (toUserId === userId) throw new Error("You cannot like yourself.");
+  await assertNotBlocked(userId, toUserId);
   const sql = await getSql();
   const existing = await sql.query<{ from_user_id: string }>(
     `select from_user_id from likes where from_user_id = $1 and to_user_id = $2`,
@@ -22,10 +24,14 @@ export async function toggleLikeFor(userId: string, toUserId: string) {
     ]);
     return { liked: false, matched: false };
   }
-  await sql.query(`insert into likes (from_user_id, to_user_id) values ($1, $2)`, [
-    userId,
-    toUserId,
-  ]);
+  // `on conflict do nothing`: the SELECT above is a UX check, not a lock — a
+  // double-tap race would otherwise throw a duplicate-key error and surface as
+  // a 400 to the user. (Matches how swipeFor already behaves.)
+  await sql.query(
+    `insert into likes (from_user_id, to_user_id) values ($1, $2)
+     on conflict (from_user_id, to_user_id) do nothing`,
+    [userId, toUserId],
+  );
   // A like is a strong engagement signal: bump the actor's last_active so the
   // discover deck (ordered by last_active desc) surfaces them, and so "recently
   // active" reflects real behavior rather than last profile save.
@@ -49,6 +55,7 @@ export async function toggleLikeFor(userId: string, toUserId: string) {
 
 export async function toggleFollowFor(userId: string, otherId: string) {
   if (otherId === userId) return { following: false };
+  await assertNotBlocked(userId, otherId);
   const sql = await getSql();
   const existing = await sql.query<{ follower_id: string }>(
     `select follower_id from follows where follower_id = $1 and following_id = $2`,
@@ -61,24 +68,37 @@ export async function toggleFollowFor(userId: string, otherId: string) {
     ]);
     return { following: false };
   }
-  await sql.query(`insert into follows (follower_id, following_id) values ($1, $2)`, [
-    userId,
-    otherId,
-  ]);
+  await sql.query(
+    `insert into follows (follower_id, following_id) values ($1, $2)
+     on conflict (follower_id, following_id) do nothing`,
+    [userId, otherId],
+  );
   return { following: true };
 }
 
-export async function listLikesFor(userId: string): Promise<LikeBundle> {
+/**
+ * Blocked accounts are hidden in both directions, and the result is bounded —
+ * an unbounded "who liked you" query is the payload you plan to sell, so it is
+ * the one most guaranteed to grow until it hurts.
+ */
+export async function listLikesFor(userId: string, limit = 200): Promise<LikeBundle> {
   await ensureSeed();
   const sql = await getSql();
+  const bound = Math.max(20, Math.min(500, Math.round(limit)));
+  const noBlocks = `and not exists (
+     select 1 from blocks b
+     where (b.blocker_id = $1 and b.blocked_id = p.user_id)
+        or (b.blocked_id = $1 and b.blocker_id = p.user_id)
+   )`;
   const incoming = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS_P},
             true as likes_me,
             exists(select 1 from likes l where l.from_user_id = $1 and l.to_user_id = p.user_id) as liked_by_me
      from likes lk
      join profiles p on p.user_id = lk.from_user_id
-     where lk.to_user_id = $1
-     order by lk.created_at desc`,
+     where lk.to_user_id = $1 ${noBlocks}
+     order by lk.created_at desc
+     limit ${bound}`,
     [userId],
   );
   const outgoing = await sql.query<ProfileRow>(
@@ -87,8 +107,9 @@ export async function listLikesFor(userId: string): Promise<LikeBundle> {
             exists(select 1 from likes l where l.from_user_id = p.user_id and l.to_user_id = $1) as likes_me
      from likes lk
      join profiles p on p.user_id = lk.to_user_id
-     where lk.from_user_id = $1
-     order by lk.created_at desc`,
+     where lk.from_user_id = $1 ${noBlocks}
+     order by lk.created_at desc
+     limit ${bound}`,
     [userId],
   );
   const matches = incoming.filter((row) => Boolean(row.liked_by_me));

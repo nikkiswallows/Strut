@@ -55,6 +55,11 @@ export default defineConfig(({ command, isPreview }) => ({
     host: "0.0.0.0",
     port: 8080,
     strictPort: true,
+    // The app is served behind generated proxy hostnames (live previews,
+    // tunnels, staging aliases). Vite 6+ rejects any Host it doesn't recognise
+    // with a 403 "Blocked request", so those surfaces were dead on arrival.
+    // Only ever relaxed for the dev server — never for `preview`/`build`.
+    allowedHosts: true,
   },
   preview: {
     host: "127.0.0.1",

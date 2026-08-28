@@ -75,3 +75,22 @@ export function assertSameSiteRequest(): void {
   if (isTopLevelGet) return;
   throw new CrossSiteRequestError();
 }
+
+/**
+ * Guard for `/api/*` route handlers.
+ *
+ * `isTrustedAppOrigin` is the check; this wraps it so every route can apply the
+ * same rule in one line. It was previously applied to /api/app, /api/media and
+ * /api/profile but NOT to any /api/messages/* route — a per-route decision that
+ * had already drifted. Making it a single call makes the next route harder to
+ * get wrong.
+ *
+ * Returns a 403 Response when the request came from another origin, else null.
+ */
+export function forbiddenUnlessTrustedOrigin(request: Request): Response | null {
+  if (isTrustedAppOrigin(request)) return null;
+  return Response.json(
+    { error: "Forbidden" },
+    { status: 403, headers: { "cache-control": "no-store" } },
+  );
+}

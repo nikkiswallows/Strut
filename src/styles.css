@@ -187,20 +187,6 @@
   background-size: 72px 88px;
 }
 
-@keyframes hypno-spin {
-  from { transform: rotate(0deg) scale(1); }
-  to { transform: rotate(360deg) scale(1.04); }
-}
-
-.hypno-disc {
-  background: repeating-radial-gradient(
-    circle at center,
-    rgb(197 160 89 / 0.16) 0 10px,
-    rgb(10 9 7 / 0.0) 10px 20px
-  );
-  animation: hypno-spin 28s linear infinite;
-}
-
 .bnwo-ticker {
   display: flex;
   gap: 2.5rem;

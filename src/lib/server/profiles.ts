@@ -5,7 +5,10 @@ import { getSql } from "@/lib/db";
 import { judgeRole } from "@/lib/bnwo";
 import { DISCOVER_TABS, identityLine, ROLES, type DiscoverTab, type Profile } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
-import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
+import { PROFILE_COLS, PROFILE_COLS_PUBLIC, mapProfile, type ProfileRow } from "./map";
+import { cleanPhotoBlurs, isAllowedPhotoUrl } from "@/lib/photo-url";
+import { ageOn, checkBirthDate, MIN_AGE, normalizeBirthDate } from "@/lib/age";
+import { assertNotBlocked } from "./safety";
 import { SEED_PROFILES } from "@/lib/seed-data";
 import { ensureSeed } from "./seed";
 
@@ -157,6 +160,16 @@ export async function listDiscoverForUser(
   const params: unknown[] = [userId];
   let where = `user_id <> $1 and onboarded = true`;
 
+  // Blocks are symmetrical and enforced in SQL so no code path can forget them:
+  // if either party has blocked the other, the profile never enters the deck,
+  // the grid, or search. Filtering this in JS after the fact would let a blocked
+  // account still consume a slot in every page.
+  where += ` and not exists (
+    select 1 from blocks b
+    where (b.blocker_id = $1 and b.blocked_id = profiles.user_id)
+       or (b.blocked_id = $1 and b.blocker_id = profiles.user_id)
+  )`;
+
   // Deterministic filters are pushed into SQL so the DB return set is bounded and
   // index-backed (see migrations/0011). This is what keeps discover O(page-ish)
   // instead of "load everything into the app and filter in JS".
@@ -208,9 +221,29 @@ export async function listDiscoverForUser(
     origin?.lat != null && origin?.lng != null ? { lat: origin.lat, lng: origin.lng } : null;
   const box =
     originAt && data.miles < 500 ? bboxFor(originAt, data.miles) : null;
-  if (box) {
+  if (box && originAt) {
     params.push(box.latMin, box.latMax, box.lngMin, box.lngMax);
-    where += ` and (lat is null or (lat between $${params.length - 3} and $${params.length - 2} and lng between $${params.length - 1} and $${params.length}))`;
+    const boxStart = params.length - 3;
+    // Exact haversine, evaluated IN SQL, so the radius filter happens before
+    // LIMIT rather than after it. Previously the distance test ran in JS on an
+    // already-truncated page: in a dense metro with a tight radius the member
+    // could be handed an empty page while the API still advertised "more".
+    params.push(originAt.lat, originAt.lng, data.miles);
+    const latP = params.length - 2;
+    const lngP = params.length - 1;
+    const miP = params.length;
+    where += ` and (lat is null or (
+        lat between $${boxStart} and $${boxStart + 1}
+    and lng between $${boxStart + 2} and $${boxStart + 3}
+    and (
+      3958.8 * acos(
+        least(1, greatest(-1,
+            cos(radians($${latP})) * cos(radians(lat)) * cos(radians(lng) - radians($${lngP}))
+          + sin(radians($${latP})) * sin(radians(lat))
+        ))
+      )
+    ) <= $${miP}
+    ))`;
   }
 
   // Keyset cursor: restart the deck strictly after the previous page's last row
@@ -233,6 +266,17 @@ export async function listDiscoverForUser(
     )`;
   }
 
+  // Over-fetch by a bounded multiple, then trim to `limit`.
+  //
+  // A handful of rows can still be dropped after the query: profiles with no
+  // coordinates are resolved from their `location` text in JS, and legacy rows
+  // can carry an identity label the SQL predicates miss. Filtering those out
+  // after a bare `limit` is what starved pages in dense metros — the API would
+  // return 3 profiles and still report "more to load". Over-fetching keeps a
+  // page full, and the cursor is taken from the last row actually RETURNED, so
+  // it stays honest no matter how many rows the filter removed.
+  const fetchLimit = Math.min(240, data.limit * 3);
+
   const rows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS},
             exists(select 1 from likes l where l.from_user_id = $1 and l.to_user_id = profiles.user_id) as liked_by_me,
@@ -240,13 +284,17 @@ export async function listDiscoverForUser(
      from profiles
      where ${where}
      order by last_active desc, id desc
-     limit ${data.limit}`,
+     limit ${fetchLimit}`,
     params,
   );
 
   const match = new Set(tab.match.map((s) => s.toLowerCase()));
   const wantLooking = lookingFor?.toLowerCase() ?? null;
 
+  // Keep the raw row alongside each mapped profile: the keyset cursor needs the
+  // driver's own `last_active` value (a Date on Neon/PGlite), and mapProfile
+  // flattens it to a string — which is what makeDiscoverCursor exists to
+  // normalise, but only if we hand it the raw value.
   const items = rows
     .map((row) => {
       const profile = mapProfile(row);
@@ -258,6 +306,7 @@ export async function listDiscoverForUser(
         ...profile,
         photos: profile.photos.slice(0, 6),
         distanceMiles: there && originAt ? milesBetween(originAt, there) : null,
+        __row: row,
       };
     })
     .filter((profile) => {
@@ -282,18 +331,39 @@ export async function listDiscoverForUser(
       }
       if (profile.distanceMiles != null && profile.distanceMiles > data.miles) return false;
       return true;
-    })
-    .sort((a, b) => (a.distanceMiles ?? 9_999) - (b.distanceMiles ?? 9_999));
+    });
+  // NOTE: there is deliberately no re-sort here any more.
+  //
+  // The previous code sorted each page by distance *after* the SQL had already
+  // ordered it by (last_active DESC, id DESC) — while the keyset cursor was
+  // taken from the last raw SQL row. Two orderings in one paginated feed meant
+  // the cursor no longer described what the member had actually seen, so page
+  // boundaries silently dropped and repeated profiles. It also ran the distance
+  // filter after LIMIT, so a dense metro with a tight radius could return an
+  // empty page while still advertising "more".
+  //
+  // Ordering is now exactly one thing — the SQL order — so the cursor is honest.
+  // Exact nearest-first ordering arrives with PostGIS (see ARCHITECTURE.md);
+  // until then distance is shown and filtered, not used to sort.
 
-  // nextCursor reflects the last row actually returned (the deck-order boundary),
-  // so the next page resumes right after it and never overlaps or skips.
-  const boundary = rows[rows.length - 1];
+  // Trim to the requested page size. `items` is still in the SQL order
+  // (last_active DESC, id DESC) because the re-sort by distance was removed,
+  // so slicing here is stable and matches the keyset.
+  const page = items.slice(0, data.limit);
+
+  // nextCursor marks the last row actually returned, so the next page resumes
+  // immediately after it — no overlap, no gap, regardless of how many rows the
+  // post-query filter removed. `rows.length >= fetchLimit` means the database
+  // still had candidates, so there is more to fetch even if this page is short.
+  const boundary = page[page.length - 1]?.__row;
+  const moreAvailable = rows.length >= fetchLimit || page.length >= data.limit;
   const nextCursor =
-    rows.length >= data.limit && boundary
+    moreAvailable && boundary
       ? makeDiscoverCursor({ last_active: boundary.last_active, id: Number(boundary.id) })
       : null;
 
-  return { items, nextCursor };
+  // `__row` is an internal cursor hint, never part of the API surface.
+  return { items: page.map(({ __row: _row, ...rest }) => rest), nextCursor };
 }
 
 /**
@@ -311,6 +381,7 @@ export async function swipeFor(
 ): Promise<{ ok: true; matched: boolean }> {
   if (targetId === userId) throw new Error("You cannot swipe on yourself.");
   if (direction !== "like" && direction !== "pass") throw new Error("Bad swipe direction.");
+  await assertNotBlocked(userId, targetId);
   const sql = await getSql();
 
   // Upsert the decision (last one wins for this target).
@@ -351,6 +422,36 @@ export async function swipeFor(
 }
 
 export type SwipeDirection = "like" | "pass";
+
+/**
+ * Undo the last swipe decision.
+ *
+ * The deck's Undo button previously only rewound a local index: the decision
+ * was already in `swipes` and already mirrored into `likes`, so the member saw
+ * a card they had in fact already liked. Swiping again re-recorded it, and on a
+ * like the other person saw a match with someone who believed they had taken it
+ * back — a false match, which in this app is a safety problem, not just a bug.
+ *
+ * This removes both the decision and the mirrored like. Undoing is best-effort
+ * by nature (the other party may already have matched), which is exactly why
+ * the client must never *show* an undone card without calling this first.
+ */
+export async function undoSwipeFor(
+  userId: string,
+  targetId: string,
+): Promise<{ ok: true; undone: boolean }> {
+  if (!targetId || targetId === userId) return { ok: true, undone: false };
+  const sql = await getSql();
+  await sql.query(
+    `delete from swipes where user_id = $1 and target_id = $2`,
+    [userId, targetId],
+  );
+  await sql.query(
+    `delete from likes where from_user_id = $1 and to_user_id = $2`,
+    [userId, targetId],
+  );
+  return { ok: true, undone: true };
+}
 
 /**
  * The swipe deck: the discover deck limited to profiles you haven't decided on.
@@ -411,8 +512,11 @@ export const listFeatured = createServerFn({ method: "GET" }).handler(async () =
     return [];
   }
   const sql = await getSql();
+  // The landing page is public, so this projection deliberately omits lat/lng
+  // and the age-assurance columns (see PROFILE_COLS_PUBLIC). Serving a
+  // member's coordinates to an anonymous caller is the leak this closes.
   const rows = await sql.query<ProfileRow>(
-    `select ${PROFILE_COLS} from profiles
+    `select ${PROFILE_COLS_PUBLIC} from profiles
      where is_seed = true and onboarded = true
      order by id
      limit 24`,
@@ -424,8 +528,12 @@ export type ProfileInput = {
   handle: string;
   displayName: string;
   age: number | null;
+  /** ISO `YYYY-MM-DD`. Required for a new profile; ignored on later saves. */
+  birthDate?: string | null;
   hideAge?: boolean;
   discreet?: boolean;
+  /** Tiny data-URI blur placeholders, aligned index-wise with `photos`. */
+  photoBlurs?: string[];
   identities: string[];
   pronouns: string[];
   role?: string | null;
@@ -444,15 +552,34 @@ function asLookingList(value: string[] | string | null | undefined): string[] {
   return [];
 }
 
-function cleanProfile(input: ProfileInput) {
+function cleanProfile(input: ProfileInput, existingBirthDate: string | null = null) {
   const handle = slugifyHandle(input.handle);
   const displayName = input.displayName.trim().slice(0, 40);
   if (handle.length < 3) throw new Error("Handle must be at least 3 characters.");
   if (displayName.length < 2) throw new Error("Name is required.");
-  const age =
-    input.age == null || Number.isNaN(Number(input.age))
-      ? null
-      : Math.max(18, Math.min(99, Number(input.age)));
+
+  // ── Age gate ────────────────────────────────────────────────────────────
+  // A date of birth is required to hold a profile, and once attested it is
+  // immutable: there is no "edit my birthday" path, because an editable DOB is
+  // not a gate. The age shown on the card is derived, never trusted from input.
+  let birthDate: string | null = null;
+  let age: number | null = null;
+  if (existingBirthDate) {
+    birthDate = normalizeBirthDate(existingBirthDate);
+  }
+  if (!birthDate && input.birthDate) {
+    const checked = checkBirthDate(input.birthDate);
+    if (!checked.ok) throw new Error(checked.error);
+    birthDate = checked.birthDate;
+  }
+  if (!birthDate) {
+    throw new Error("Confirm your date of birth to create a profile. Strut is 18+.");
+  }
+  age = ageOn(birthDate);
+  if (age < MIN_AGE) {
+    throw new Error("Strut is strictly 18+. You cannot create an account.");
+  }
+
   const identities = unique(input.identities).slice(0, 8);
   const pronouns = unique(input.pronouns).slice(0, 6);
   const interests = unique(input.interests).slice(0, 16);
@@ -461,10 +588,32 @@ function cleanProfile(input: ProfileInput) {
   const coord = coordForLocation(location);
   const roleRaw = input.role?.trim() || "";
   const role = judgeRole(identities, roleRaw).forced;
+
+  // Photos must point somewhere this app controls. See isAllowedPhotoUrl: an
+  // arbitrary remote URL is a tracking pixel that deanonymizes every member
+  // whose deck loads the card.
+  const photos = input.photos
+    .filter((src) => typeof src === "string" && src.trim())
+    .map((src) => src.trim())
+    .filter((src) => {
+      if (isAllowedPhotoUrl(src)) return true;
+      throw new Error(
+        "One of those photos isn't hosted by Strut. Upload photos in the app.",
+      );
+    })
+    .map((src) => {
+      if (src.startsWith("data:image/") && src.length > 240_000) {
+        throw new Error("Upload photos before saving. Data URLs are too large for the profile.");
+      }
+      return src;
+    })
+    .slice(0, 8);
+
   return {
     handle,
     displayName,
     age,
+    birthDate,
     hideAge: Boolean(input.hideAge),
     discreet: Boolean(input.discreet),
     identities,
@@ -476,16 +625,10 @@ function cleanProfile(input: ProfileInput) {
     location,
     ethnicity,
     lookingFor: asLookingList(input.lookingFor),
-    photos: input.photos
-      .filter((src) => typeof src === "string" && src.trim())
-      .filter((src) => /^(https?:\/\/|\/photos\/|\/uploads\/)/i.test(src) || src.startsWith("data:image/"))
-      .map((src) => {
-        if (src.startsWith("data:image/") && src.length > 240_000) {
-          throw new Error("Upload photos before saving. Data URLs are too large for the profile.");
-        }
-        return src;
-      })
-      .slice(0, 8),
+    photos,
+    // Blur placeholders are index-aligned with `photos`; extras are dropped so
+    // the two arrays can never drift out of sync.
+    photoBlurs: cleanPhotoBlurs(input.photoBlurs, photos.length),
     interests,
     heightCm:
       input.heightCm == null || Number.isNaN(Number(input.heightCm))
@@ -497,26 +640,44 @@ function cleanProfile(input: ProfileInput) {
 }
 
 export async function writeProfileForUser(userId: string, input: ProfileInput) {
-  const data = cleanProfile(input);
   try {
     await ensureSeed();
   } catch (err) {
     console.error("[seed] save continued:", err);
   }
   const sql = await getSql();
+
+  // The age gate needs the *existing* birth date before it can decide whether
+  // this save is creating one (required) or updating one (immutable).
+  const existingRows = await sql.query<{ birth_date: string | null }>(
+    `select birth_date from profiles where user_id = $1`,
+    [userId],
+  );
+  const existingBirthDate = existingRows[0]?.birth_date ?? null;
+
+  const data = cleanProfile(input, existingBirthDate);
+
   const taken = await sql.query<{ user_id: string }>(
     `select user_id from profiles where handle = $1 and user_id <> $2`,
     [data.handle, userId],
   );
   if (taken[0]) throw new Error("That handle is taken.");
+
+  // Attested once, on the first save that carries a birth date. Never backdated
+  // or rewritten afterward — `birth_date` is excluded from the update set below,
+  // and age_attested_at is only populated while it is still null.
+  const firstAttestation = existingBirthDate ? null : new Date().toISOString();
+
   const rows = await sql.query<ProfileRow>(
     `insert into profiles (
        user_id, handle, display_name, age, identity, pronouns, bio, location, ethnicity,
        looking_for, looking_for_list, photos, interests, height_cm, onboarded, last_active,
-       identities, pronoun_list, hide_age, discreet, lat, lng, role
+       identities, pronoun_list, hide_age, discreet, lat, lng, role,
+       birth_date, age_attested_at, photo_blurs
      ) values (
        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14,true,now(),
-       $15::jsonb,$16::jsonb,$17::boolean,$18::boolean,$19,$20,$21
+       $15::jsonb,$16::jsonb,$17::boolean,$18::boolean,$19,$20,$21,
+       $22::date,$23::timestamptz,$24::jsonb
      )
      on conflict (user_id) do update set
        handle = excluded.handle,
@@ -539,6 +700,10 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
        lat = excluded.lat,
        lng = excluded.lng,
        role = excluded.role,
+       photo_blurs = excluded.photo_blurs,
+       -- Attested once; the birth_date column itself is deliberately NOT in
+       -- this update list, so a later save can never move it.
+       age_attested_at = coalesce(profiles.age_attested_at, excluded.age_attested_at),
        onboarded = true,
        last_active = now()
      returning ${PROFILE_COLS}`,
@@ -564,6 +729,9 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
       data.lat,
       data.lng,
       data.role,
+      data.birthDate,
+      firstAttestation,
+      JSON.stringify(data.photoBlurs),
     ],
   );
   return mapProfile(rows[0]!);

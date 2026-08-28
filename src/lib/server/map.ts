@@ -3,11 +3,21 @@ import { asPhotoList, type Profile } from "@/lib/types";
 
 export const PROFILE_COLS = `id, user_id, handle, display_name, age, identity, pronouns, bio,
   location, ethnicity, looking_for, looking_for_list, photos, interests, height_cm, is_seed,
-  last_active, onboarded, created_at, identities, pronoun_list, hide_age, discreet, lat, lng, role`;
+  last_active, onboarded, created_at, identities, pronoun_list, hide_age, discreet, lat, lng, role,
+  birth_date, age_attested_at, photo_blurs`;
 
 export const PROFILE_COLS_P = `p.id, p.user_id, p.handle, p.display_name, p.age, p.identity, p.pronouns, p.bio,
   p.location, p.ethnicity, p.looking_for, p.looking_for_list, p.photos, p.interests, p.height_cm, p.is_seed,
-  p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.discreet, p.lat, p.lng, p.role`;
+  p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.discreet, p.lat, p.lng, p.role,
+  p.birth_date, p.age_attested_at, p.photo_blurs`;
+
+/**
+ * Public-safe projection: the landing page's featured strip is unauthenticated,
+ * so it must never carry coordinates or the age-assurance bookkeeping.
+ */
+export const PROFILE_COLS_PUBLIC = `id, user_id, handle, display_name, age, identity, pronouns, bio,
+  location, ethnicity, looking_for, looking_for_list, photos, interests, height_cm, is_seed,
+  last_active, onboarded, created_at, identities, pronoun_list, hide_age, discreet, role, photo_blurs`;
 
 export type ProfileRow = {
   id: number;
@@ -36,6 +46,9 @@ export type ProfileRow = {
   lat?: number | string | null;
   lng?: number | string | null;
   role?: string | null;
+  birth_date?: string | null;
+  age_attested_at?: string | null;
+  photo_blurs?: unknown;
   liked_by_me?: boolean | number | string | null;
   likes_me?: boolean | number | string | null;
   following?: boolean | number | string | null;
@@ -89,5 +102,7 @@ export function mapProfile(row: ProfileRow): Profile {
         : flag(row.liked_by_me) && flag(row.likes_me),
     following: row.following == null ? undefined : flag(row.following),
     likeCount: row.like_count == null ? undefined : Number(row.like_count),
+    birthDate: row.birth_date ? String(row.birth_date).slice(0, 10) : null,
+    photoBlurs: asPhotoList(parseJson<unknown>(row.photo_blurs, [])),
   };
 }

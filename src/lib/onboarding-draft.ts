@@ -14,6 +14,9 @@ export type OnboardingDraft = {
   role: string;
   lookingFor: string[];
   photos: string[];
+  /** Discreet placeholders, index-aligned with `photos` (never persisted). */
+  photoBlurs: string[];
+  birthDate: string;
   bio: string;
   interests: string[];
   heightCm: string;
@@ -40,6 +43,8 @@ export function readOnboardingDraft(): OnboardingDraft | null {
       role: parsed.role ?? "Switch",
       lookingFor: Array.isArray(parsed.lookingFor) ? parsed.lookingFor : ["Dates"],
       photos: [],
+      photoBlurs: [],
+      birthDate: parsed.birthDate ?? "",
       bio: parsed.bio ?? "",
       interests: Array.isArray(parsed.interests) ? parsed.interests : [],
       heightCm: parsed.heightCm ?? "",

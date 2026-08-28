@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { blobToken, isProduction } from "@/lib/env";
+import {
+  allowedPhotoHosts,
+  BLOB_PUBLIC_HOST_SUFFIX,
+  blobToken,
+  isProduction,
+} from "@/lib/env";
 
 /**
  * Max upload size (2.5 MB after the client downscales to a 1080px JPEG).
@@ -104,6 +109,27 @@ export async function storePhotoObject(input: {
   return `data:image/jpeg;base64,${Buffer.from(input.bytes).toString("base64")}`;
 }
 
-export function isStoredPhotoUrl(src: string) {
-  return /^(https?:\/\/|\/photos\/|\/uploads\/|data:image\/)/i.test(src);
-}
+/**
+ * True for a photo URL this app is willing to store on a profile.
+ *
+ * `isStoredPhotoUrl` below is the *loose* check (any http(s) URL) kept for
+ * reading back legacy rows. This is the strict one used on write.
+ *
+ * Why it matters: a profile that can store any http(s) URL can store a
+ * tracking pixel. Every member whose deck loads that card then leaks their IP,
+ * user agent and referer to whoever controls that host — a deanonymization
+ * primitive aimed at a closeted audience, and effectively free to deploy.
+ * Photos are therefore restricted to this app's own paths, the Vercel Blob CDN
+ * host, and hosts explicitly allowlisted via PHOTO_HOST_ALLOWLIST.
+ */
+// Re-exported from the isomorphic module so server and client share one
+// allowlist. See src/lib/photo-url.ts for why this file must not define it.
+export { cleanPhotoBlurs, isAllowedPhotoUrl, isStoredPhotoUrl } from "@/lib/photo-url";
+
+/**
+ * Validate the discreet-mode blur placeholders that ride along with photos.
+ *
+ * Each entry is a ~24px JPEG data URI generated in the browser (1–2 KB), never
+ * a remote URL — a remote "blur" would reintroduce the tracking-pixel leak the
+ * allowlist above exists to prevent.
+ */

@@ -147,6 +147,19 @@ function Discover() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  // Undo is a real server write: it clears the recorded decision AND the
+  // mirrored like. Without it the member sees a card they have already liked
+  // and the other party keeps a match that was meant to be withdrawn.
+  const undo = useMutation({
+    mutationFn: ({ targetId }: { targetId: string }) =>
+      app<{ ok: true; undone: boolean }>("undo", { targetId }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["likes"] });
+      void queryClient.invalidateQueries({ queryKey: ["discover"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const milesLabel = miles >= 500 ? "Any distance" : `Within ${miles} mi`;
   const activeTab = DISCOVER_TABS.find((t) => t.id === tab) ?? DISCOVER_TABS[0]!;
   const filterBits = useMemo(
@@ -269,6 +282,7 @@ function Discover() {
                 key={`${tab}|${miles}|${lookingFor}|${role}|${ethnicity}|${q}`}
                 profiles={deckRows}
                 onSwipe={(profile, direction) => swipe.mutate({ targetId: profile.userId, direction })}
+                onUndo={(profile) => undo.mutate({ targetId: profile.userId })}
                 onNeedMore={() => {
                   if (deck.hasNextPage && !deck.isFetchingNextPage) void deck.fetchNextPage();
                 }}

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { forbiddenUnlessTrustedOrigin } from "@/lib/auth/isolation.server";
 import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 import { pumpBotJob } from "@/lib/server/chat.server";
 import { rateLimit, sweepRateBuckets } from "@/lib/server/rate-limit";
@@ -10,6 +11,8 @@ export const Route = createFileRoute("/api/messages/bot-status")({
       // Advances any pending bot reply (AI Horde poll) and reports state.
       //   { status: "pending", queuePosition } | { status: "ready" } | { status: "idle" }
       GET: async ({ request }) => {
+          const forbidden = forbiddenUnlessTrustedOrigin(request);
+          if (forbidden) return forbidden;
         try {
           const url = new URL(request.url);
           const conversationId = Number(url.searchParams.get("conversationId"));
