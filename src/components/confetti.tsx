@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bbc, Crown, Heart, Lips, Spade } from "./graphics";
+import { ChastityCage, Cock, Crown, Heart, Lips, Spade } from "./graphics";
 
 /**
- * BNWO confetti — no library, no emoji. Gold spades, crowns, hearts, lips and
- * BBC monogram chips rain from the top and burst from the center. Honors
- * prefers-reduced-motion (renders a single static burst instead of a storm).
+ * BNWO confetti — no library, no emoji. Realistic BBCs, chastity cages and gold
+ * spades rain from the top and burst from the center, with crowns, hearts, lips
+ * and coins as the festive accents. Honors prefers-reduced-motion (renders a
+ * single static burst instead of a storm).
  *
  * Usage: mount <Confetti fire={nonce} /> and bump `fire` to trigger a round.
  */
 
 type Piece = {
   id: number;
-  kind: "spade" | "crown" | "heart" | "lips" | "bbc" | "coin";
+  kind: "spade" | "crown" | "heart" | "lips" | "cock" | "cage" | "coin";
+  /** Palette variant for the figure pieces (skin tone / cage metal). */
+  tone?: number;
   left: number; // vw
   delay: number; // ms
   duration: number; // ms
@@ -22,12 +25,18 @@ type Piece = {
 };
 
 function makeRain(count: number): Piece[] {
-  const kinds: Piece["kind"][] = ["spade", "spade", "crown", "heart", "lips", "bbc", "coin", "spade"];
+  const kinds: Piece["kind"][] = [
+    "spade", "cock", "cage", "spade", "cock", "cage",
+    "crown", "cock", "spade", "heart", "cage", "lips", "coin", "spade", "cock",
+  ];
   return Array.from({ length: count }, (_, i) => {
+    const kind = kinds[Math.floor(Math.random() * kinds.length)]!;
     const size = 16 + Math.random() * 26;
     return {
       id: i,
-      kind: kinds[Math.floor(Math.random() * kinds.length)]!,
+      kind,
+      tone:
+        kind === "cock" ? Math.floor(Math.random() * 3) : kind === "cage" ? (Math.random() > 0.5 ? 1 : 0) : undefined,
       left: Math.random() * 100,
       delay: Math.random() * 700,
       duration: 2600 + Math.random() * 1800,
@@ -42,13 +51,18 @@ function makeRain(count: number): Piece[] {
 type Burst = Piece & { bx: number; by: number };
 
 function makeBurst(count: number): Burst[] {
-  const kinds: Piece["kind"][] = ["spade", "crown", "heart", "bbc", "coin", "lips"];
+  const kinds: Piece["kind"][] = [
+    "spade", "cock", "cage", "crown", "cock", "spade", "coin", "cage", "lips", "heart",
+  ];
   return Array.from({ length: count }, (_, i) => {
+    const kind = kinds[Math.floor(Math.random() * kinds.length)]!;
     const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
     const dist = 140 + Math.random() * 260;
     return {
       id: 1000 + i,
-      kind: kinds[Math.floor(Math.random() * kinds.length)]!,
+      kind,
+      tone:
+        kind === "cock" ? Math.floor(Math.random() * 3) : kind === "cage" ? (Math.random() > 0.5 ? 1 : 0) : undefined,
       left: 50,
       delay: Math.random() * 120,
       duration: 900,
@@ -62,9 +76,20 @@ function makeBurst(count: number): Burst[] {
   });
 }
 
-function Glyph({ kind, size, gold }: { kind: Piece["kind"]; size: number; gold: boolean }) {
+function Glyph({
+  kind,
+  size,
+  gold,
+  tone,
+}: {
+  kind: Piece["kind"];
+  size: number;
+  gold: boolean;
+  tone?: number;
+}) {
   const cls = gold ? "text-accent" : "text-fg/80";
   const style = { width: size, height: size, filter: gold ? "drop-shadow(0 0 6px rgba(216,175,78,.55))" : undefined };
+  const figureStyle = { filter: "drop-shadow(0 2px 3px rgba(0,0,0,.45))" };
   switch (kind) {
     case "spade":
       return (
@@ -78,17 +103,16 @@ function Glyph({ kind, size, gold }: { kind: Piece["kind"]; size: number; gold: 
       return <span style={style} className={cls}><Heart className="size-full" /></span>;
     case "lips":
       return <span style={style} className={cls}><Lips className="size-full" /></span>;
-    case "bbc":
+    case "cock":
       return (
-        <span
-          style={{
-            width: size * 0.85,
-            height: size * 1.35,
-            filter: style.filter,
-          }}
-          className={cls}
-        >
-          <Bbc className="size-full" />
+        <span style={{ width: size * 0.58, height: size, ...figureStyle }}>
+          <Cock className="size-full" tone={(tone ?? 0) as 0 | 1 | 2} />
+        </span>
+      );
+    case "cage":
+      return (
+        <span style={{ width: size * 1.18, height: size * 0.94, ...figureStyle }}>
+          <ChastityCage className="size-full" tone={(tone ?? 0) as 0 | 1} />
         </span>
       );
     case "coin":
@@ -141,7 +165,7 @@ export function Confetti({ fire }: { fire: number }) {
             ["--spin" as string]: `${p.spin}deg`,
           }}
         >
-          <Glyph kind={p.kind} size={p.size} gold={p.gold} />
+          <Glyph kind={p.kind} size={p.size} gold={p.gold} tone={p.tone} />
         </span>
       ))}
       {pieces.burst.map((p) => (
@@ -155,7 +179,7 @@ export function Confetti({ fire }: { fire: number }) {
             ["--spin" as string]: `${p.spin}deg`,
           }}
         >
-          <Glyph kind={p.kind} size={p.size} gold={p.gold} />
+          <Glyph kind={p.kind} size={p.size} gold={p.gold} tone={p.tone} />
         </span>
       ))}
     </div>

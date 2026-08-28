@@ -33,16 +33,16 @@ you out.
 
 > ### ⚠️ These credentials are committed literals
 >
-> `src/lib/server/secrets.server.ts` holds the fallback admin password **and**
-> the AI Horde API key as source literals, because the current operator cannot
-> set environment variables on their hosting side. If this repository is public,
-> those values are public.
+> `src/lib/server/secrets.server.ts` holds a fallback admin password **and** a
+> fallback AI Horde API key as source literals, so the console works out of the
+> box. If this repository is public, those values are public — they must never
+> be used on a real deployment.
 >
-> Fix, in order of preference:
+> Before any public deployment, in order of preference:
 > 1. Set `ADMIN_EMAILS`, `ADMIN_PASSWORD`, `AIHORDE_API_KEY` as real env vars and
 >    delete the literals (env always wins — step 1 is safe at any time).
-> 2. Make the repository private.
-> 3. Rotate both when testing is done.
+> 2. Rotate the Horde key if it has ever been exposed.
+> 3. Make the repository private if it stays public.
 >
 > The console shows a red banner for as long as it is running on the fallbacks.
 

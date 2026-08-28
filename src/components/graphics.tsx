@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -125,6 +126,245 @@ export function Bbc({ className }: IconProps) {
         <circle cx="15.4" cy="34.2" r="3.6" />
         <rect x="8.6" y="31" width="6.8" height="3.5" rx="1.2" />
       </g>
+    </svg>
+  );
+}
+
+/* ── Realistic confetti pieces ─────────────────────────────────────────────
+ * These are the hand-drawn "figure" pieces for the match confetti: an
+ * anatomically-proportioned BBC and a chastity cage, rendered with gradients
+ * so they read as realistic at any size (they are tinted fills, not
+ * currentColor). `tone` selects the palette: three skin tones for the BBC,
+ * steel or gold for the cage. ids are uniquified per instance so several
+ * pieces can be on screen at once.
+ */
+
+const COCK_TONES = [
+  {
+    skin: [
+      { o: 0, c: "#2a160c" },
+      { o: 0.28, c: "#4a2c1a" },
+      { o: 0.55, c: "#6b4226" },
+      { o: 0.78, c: "#7d5230" },
+      { o: 1, c: "#452818" },
+    ],
+    glans: [
+      { o: 0, c: "#8a5a33" },
+      { o: 0.55, c: "#6b4226" },
+      { o: 1, c: "#4a2c1a" },
+    ],
+  },
+  {
+    skin: [
+      { o: 0, c: "#4a2c17" },
+      { o: 0.28, c: "#6f4526" },
+      { o: 0.55, c: "#8a5a33" },
+      { o: 0.78, c: "#9c6a3e" },
+      { o: 1, c: "#5c3a20" },
+    ],
+    glans: [
+      { o: 0, c: "#a5754a" },
+      { o: 0.55, c: "#8a5a33" },
+      { o: 1, c: "#5c3a20" },
+    ],
+  },
+  {
+    skin: [
+      { o: 0, c: "#33190d" },
+      { o: 0.28, c: "#5c3a20" },
+      { o: 0.55, c: "#7a4b28" },
+      { o: 0.78, c: "#8a5832" },
+      { o: 1, c: "#4a2c1a" },
+    ],
+    glans: [
+      { o: 0, c: "#a06c3f" },
+      { o: 0.55, c: "#81542f" },
+      { o: 1, c: "#5c3a20" },
+    ],
+  },
+] as const;
+
+/** A realistic BBC — flared corona, glans, tapered shaft, bulging balls. */
+export function Cock({ className, tone = 0 }: IconProps & { tone?: 0 | 1 | 2 }) {
+  const gid = useId().replace(/:/g, "");
+  const t = COCK_TONES[tone] ?? COCK_TONES[0]!;
+  return (
+    <svg viewBox="0 0 36 60" className={cn(className)} aria-hidden>
+      <defs>
+        <linearGradient id={`cskin-${gid}`} x1="0" y1="0" x2="1" y2="0">
+          {t.skin.map((s, i) => (
+            <stop key={i} offset={s.o} stopColor={s.c} />
+          ))}
+        </linearGradient>
+        <radialGradient id={`cglans-${gid}`} cx="0.5" cy="0.26" r="0.8">
+          {t.glans.map((s, i) => (
+            <stop key={i} offset={s.o} stopColor={s.c} />
+          ))}
+        </radialGradient>
+      </defs>
+      {/* silhouette */}
+      <path
+        fill={`url(#cskin-${gid})`}
+        d="M18 2C22.8 2.6 25.6 5.6 25.6 9.4C25.6 11.6 24.8 12.8 23.4 13.6C26.6 14.6 27.8 16.4 27.8 18.2C27.8 19.8 26.6 20.9 24.8 21.3C24.6 26 24.3 33 24 40C23.9 43.6 23 45.8 21.4 47C27 47.8 28.4 51.8 25.8 54.6C24.2 55.9 21.6 56 19.4 55C18.7 54.6 18 54.1 18 53.4C18 54.1 17.3 54.6 16.6 55C14.4 56 11.8 55.9 10.2 54.6C7.6 51.8 9 47.8 14.6 47C13 45.8 12.1 43.6 12 40C11.7 33 11.4 26 11.2 21.3C9.4 20.9 8.2 19.8 8.2 18.2C8.2 16.4 9.4 14.6 12.6 13.6C11.2 12.8 10.4 11.6 10.4 9.4C10.4 5.6 13.2 2.6 18 2Z"
+      />
+      {/* glans cap */}
+      <path
+        fill={`url(#cglans-${gid})`}
+        opacity="0.92"
+        d="M10.4 9.4C10.4 5.6 13.2 2.6 18 2C22.8 2.6 25.6 5.6 25.6 9.4C25.6 11.4 24.9 12.5 23.6 13.3C20.6 11.9 15.4 11.9 12.4 13.3C11.1 12.5 10.4 11.4 10.4 9.4Z"
+      />
+      {/* corona rim */}
+      <path
+        d="M10.6 14.2 C13.2 15.9 22.8 15.9 25.4 14.2"
+        stroke="#33190d"
+        strokeWidth="1.2"
+        fill="none"
+        opacity="0.7"
+        strokeLinecap="round"
+      />
+      {/* veins */}
+      <path
+        d="M23 22 C23.3 28 22.9 34 22.4 38.5"
+        stroke="#33190d"
+        strokeWidth="0.9"
+        fill="none"
+        opacity="0.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.2 23.5 C12.9 29 13.1 33 13.5 36.5"
+        stroke="#33190d"
+        strokeWidth="0.8"
+        fill="none"
+        opacity="0.4"
+        strokeLinecap="round"
+      />
+      {/* ball shading */}
+      <path
+        d="M25.8 54.6 C24.2 55.9 21.6 56 19.4 55 C21.9 52.6 23.6 49.6 24.4 47.6 C26.9 48.9 27.3 51.9 25.8 54.6 Z"
+        fill="#2a160c"
+        opacity="0.55"
+      />
+      <path
+        d="M10.2 54.6 C8.2 51.9 8.8 49 11.3 47.9 C12.4 50.5 13.6 52.7 15 54.4 C14.1 55.2 12.3 55.6 10.2 54.6 Z"
+        fill="#2a160c"
+        opacity="0.45"
+      />
+      {/* glans shine */}
+      <ellipse
+        cx="16.4"
+        cy="5.8"
+        rx="2.2"
+        ry="1.4"
+        fill="#ffffff"
+        opacity="0.2"
+        transform="rotate(-18 16.4 5.8)"
+      />
+    </svg>
+  );
+}
+
+const CAGE_TONES = [
+  {
+    tube: [
+      { o: 0, c: "#8f9aa4" },
+      { o: 0.3, c: "#d6dde3" },
+      { o: 0.55, c: "#eef2f5" },
+      { o: 0.8, c: "#aeb8c1" },
+      { o: 1, c: "#7d8891" },
+    ],
+    ring: [
+      { o: 0, c: "#dde3e8" },
+      { o: 0.5, c: "#9aa4ad" },
+      { o: 1, c: "#6f7981" },
+    ],
+    slit: "#232a30",
+    keyhole: "#20262b",
+    highlight: "#ffffff",
+  },
+  {
+    tube: [
+      { o: 0, c: "#8a6d2a" },
+      { o: 0.3, c: "#d9b64f" },
+      { o: 0.55, c: "#f2d98a" },
+      { o: 0.8, c: "#c9a24a" },
+      { o: 1, c: "#7d5f22" },
+    ],
+    ring: [
+      { o: 0, c: "#e8cd7a" },
+      { o: 0.5, c: "#c9a24a" },
+      { o: 1, c: "#8a6d2a" },
+    ],
+    slit: "#3a2f14",
+    keyhole: "#2a2410",
+    highlight: "#fff6d8",
+  },
+] as const;
+
+/** A realistic chastity cage — base ring, perforated tube, tip slot, padlock. */
+export function ChastityCage({ className, tone = 0 }: IconProps & { tone?: 0 | 1 }) {
+  const gid = useId().replace(/:/g, "");
+  const t = CAGE_TONES[tone] ?? CAGE_TONES[0]!;
+  return (
+    <svg viewBox="0 0 52 44" className={cn(className)} aria-hidden>
+      <defs>
+        <linearGradient id={`ctube-${gid}`} x1="0" y1="0" x2="1" y2="0">
+          {t.tube.map((s, i) => (
+            <stop key={i} offset={s.o} stopColor={s.c} />
+          ))}
+        </linearGradient>
+        <linearGradient id={`cring-${gid}`} x1="0" y1="0" x2="0" y2="1">
+          {t.ring.map((s, i) => (
+            <stop key={i} offset={s.o} stopColor={s.c} />
+          ))}
+        </linearGradient>
+      </defs>
+      {/* base ring */}
+      <circle cx="13" cy="22" r="10" fill="none" stroke={`url(#cring-${gid})`} strokeWidth="4.6" />
+      {/* cage tube */}
+      <path
+        fill={`url(#ctube-${gid})`}
+        d="M23 13.2C30 11.6 38 12 43.5 14C46.4 15 48 16.9 48.6 19.1C49.2 21.3 48.6 23.4 46.9 24.7C45.6 25.6 44 26 42.8 25.7C36.5 27.3 28.5 27.6 23 27.2C23 27.2 23 13.2 23 13.2Z"
+      />
+      {/* tube highlight */}
+      <path
+        d="M24 15.4 C30 13.9 37.6 14.2 43 16.1"
+        stroke={t.highlight}
+        strokeWidth="1.4"
+        fill="none"
+        opacity="0.4"
+        strokeLinecap="round"
+      />
+      {/* perforations */}
+      <g stroke={t.slit} strokeWidth="1.5" strokeLinecap="round" opacity="0.9">
+        <path d="M26.2 16.4 C26 20 26 23.4 26.4 25.6" />
+        <path d="M29.8 16.1 C29.5 19.8 29.5 23.2 30 25.8" />
+        <path d="M33.4 16 C33.1 19.9 33.1 23.3 33.6 26" />
+        <path d="M37 16.2 C36.7 20 36.8 23.3 37.2 26" />
+        <path d="M40.4 16.8 C40.1 20.3 40.2 23.4 40.6 25.4" />
+      </g>
+      {/* tip opening */}
+      <ellipse cx="46.3" cy="19.9" rx="1.15" ry="3.4" fill={t.slit} opacity="0.85" />
+      <path
+        d="M46.3 16.5 L46.3 23.3"
+        stroke={t.highlight}
+        strokeWidth="0.8"
+        strokeLinecap="round"
+      />
+      {/* lock shackle */}
+      <path
+        d="M8.6 27.4 V23.6 a4.4 4.4 0 0 1 8.8 0 v3.8"
+        stroke={`url(#cring-${gid})`}
+        strokeWidth="2.3"
+        fill="none"
+        strokeLinecap="round"
+      />
+      {/* lock body */}
+      <rect x="6.8" y="27.2" width="12.4" height="8.8" rx="2" fill={`url(#cring-${gid})`} />
+      <rect x="6.8" y="27.2" width="12.4" height="3.4" rx="1.6" fill={t.highlight} opacity="0.18" />
+      {/* keyhole */}
+      <circle cx="13" cy="31" r="1.5" fill={t.keyhole} />
+      <rect x="12.45" y="31.6" width="1.1" height="2.6" rx="0.55" fill={t.keyhole} />
     </svg>
   );
 }

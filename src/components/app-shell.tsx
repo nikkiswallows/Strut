@@ -21,6 +21,7 @@ export function AppShell() {
   const { phase, user, profile } = useMembership();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const inThread = /^\/inbox\/[^/]+$/.test(pathname);
+  const inDeck = pathname === "/discover";
 
   const inbox = useQuery({
     queryKey: ["conversations"],
@@ -108,9 +109,12 @@ export function AppShell() {
         </header>
         <main
           className={cn(
-            "mx-auto w-full max-w-5xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 lg:min-h-dvh lg:px-8 lg:pb-10 lg:pt-8",
-            !inThread && "min-h-[calc(100dvh-3.5rem)]",
-            inThread && "min-h-dvh px-0 pb-0 pt-0 lg:min-h-dvh lg:px-8 lg:pt-8",
+            "mx-auto w-full max-w-5xl lg:min-h-dvh",
+            inThread
+              ? "min-h-dvh px-0 pb-0 pt-0 lg:min-h-dvh lg:px-8 lg:pt-8"
+              : inDeck
+                ? "min-h-[calc(100dvh-3.5rem)] px-4 pb-0 pt-4 lg:min-h-dvh lg:px-8 lg:pb-10 lg:pt-8"
+                : "min-h-[calc(100dvh-3.5rem)] px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 lg:min-h-dvh lg:px-8 lg:pb-10 lg:pt-8",
           )}
         >
           <Outlet />

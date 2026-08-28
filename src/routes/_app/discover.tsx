@@ -179,7 +179,15 @@ function Discover() {
   );
 
   return (
-    <div className="flex min-h-[calc(100dvh-8rem)] flex-col">
+    <div
+      className={cn(
+        "flex flex-col",
+        // Deck mode claims the full viewport (below the app header) so the deck
+        // can flex-fill the leftover space and the action buttons stay above
+        // the bottom nav. Grid mode keeps the normal scrollable min-height.
+        mode === "deck" ? "h-[calc(100dvh-4.5rem)] lg:h-auto" : "min-h-[calc(100dvh-8rem)]",
+      )}
+    >
       {/* Header block — compact on mobile so tabs don't get clipped */}
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -277,7 +285,7 @@ function Discover() {
       ) : null}
 
       {mode === "deck" ? (
-        <div className="flex flex-1 flex-col -mx-4 lg:-mx-0">
+        <div className="-mx-4 flex min-h-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0 lg:-mx-0">
           {deck.isError && deckRows.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-muted">Could not load the deck.</p>
@@ -290,11 +298,12 @@ function Discover() {
               </button>
             </div>
           ) : deck.isPending && deckRows.length === 0 ? (
-            <div className="h-[64vh] min-h-[480px] animate-pulse rounded-3xl bg-surface" />
+            <div className="flex-1 animate-pulse rounded-3xl bg-surface" />
           ) : (
-            <div className="relative flex flex-1 flex-col">
-              {/* Deck height is bounded so action buttons never hide behind bottom nav */}
-              <div className="h-[calc(100dvh-16rem)] min-h-[520px] sm:h-[min(68vh,680px)]">
+            <div className="relative min-h-0 flex-1 lg:h-[min(68vh,680px)] lg:flex-none">
+              {/* The deck fills the leftover space between the tabs and the bottom
+                  nav, so the pass/like/undo buttons are always on screen. */}
+              <div className="absolute inset-0 lg:static lg:h-full">
                 <SwipeDeck
                   key={`${tab}|${miles}|${lookingFor}|${role}|${ethnicity}|${q}`}
                   profiles={deckRows}

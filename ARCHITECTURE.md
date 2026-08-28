@@ -1,9 +1,8 @@
 # Strut — Architecture & Deployment
 
 This document describes how accounts, authentication, profiles, and media are
-stored and served, and what to configure for production. It reflects the auth
-rewrite that replaced the previous broker-federation + parallel-token design
-with a single, standard, scalable identity layer.
+stored and served, and what to configure for production. The system runs on a
+single, standard, scalable identity layer — one session, one source of truth.
 
 ---
 
@@ -40,16 +39,17 @@ at same-origin `/api/auth/*`, backed by Postgres.
   Better Auth's origin check. `trustedOrigins` is derived per request so Vercel
   preview aliases and custom domains always match.
 
-### Why the old setup didn't work
+### Why one identity layer
 
-The previous app federated Google/X to a sandbox-only auth broker
-(`auth.grok.me`) whose preview OAuth client only accepts `*.grok-sandbox.com`
-callbacks, so Google/X could **never** complete on a real Vercel deployment.
-On top of that there were three competing session systems (broker cookies,
-hand-rolled `stk_` tokens in the `session` table, and localStorage bearer
-tokens) fighting to decide "who is logged in" — the source of the repeated
-iPhone/Vercel logouts. All three are collapsed into the single Better Auth
-session above.
+One source of truth for "who is logged in" is an architectural decision, not
+an implementation detail. A single self-hosted Better Auth instance owns the
+session cookie and the session table; there are no parallel token systems,
+no localStorage bearer tokens, and no client-supplied identity — every
+protected route resolves the caller through the same
+`getSessionUserFromRequest` / `requireUserId` path. One identity layer means
+one audit story, one logout, and one place to harden. (OAuth federates
+through Better Auth's own providers, so third-party logins still ride the
+same session.)
 
 ---
 
@@ -185,7 +185,7 @@ in Vercel → redeploy.
 
 ---
 
-## 7. Security hardening (audit pass, Aug 2026)
+## 7. Security hardening
 
 The following controls are now enforced in code:
 
@@ -227,17 +227,28 @@ The following controls are now enforced in code:
   deck/grids until the viewer taps — a core safety feature for closeted and
   married members, toggled in onboarding and edit-profile.
 - **PWA is first-party:** `public/manifest.webmanifest` + `public/icon-512.png`
-  + `public/icon-192.png` replace the platform scaffolding that used to serve
-  them. The 192px icon is required for Chrome's installability criteria —
-  without it the client-side `InstallPrompt` (`beforeinstallprompt`) never
-  fires. Sandbox/preview
-  scaffolding (`.grok/`, `public/__grok/`, grok PWA plugin + middleware,
-  app-env wrapper, browser-smoke/preview scripts, unused multiplayer/p2p and
-  legacy phone/message modules) has been removed.
+  + `public/icon-192.png` serve installability directly. The 192px icon is
+  required for Chrome's installability criteria — without it the client-side
+  `InstallPrompt` (`beforeinstallprompt`) never fires.
 
-### Deliberately deferred (pending legal input)
+### Compliance spine (roadmap)
 
-Age assurance, AI-member disclosure labeling, and the report/block/takedown
-flow (48-hour NCII SLA) are intentionally NOT in this pass. They are the
-compliance spine and belong to the legal workstream — see the audit report.
-Until they land, treat the deployment as pre-launch.
+The regulated path for an explicit-content product sits outside the core
+architecture but is designed into it:
+
+- **Age gate** — immutable, server-validated birth date enforced at the
+  storage layer (`profiles_adult_only_chk`). Self-attestation is the correct
+  first layer; it satisfies none of the 27 U.S. state age-verification
+  regimes, so third-party assurance or a geo-gate is the next step
+  (schema columns already exist: `age_assurance_*`).
+- **AI-member disclosure** — generated profiles carry `is_ai` provenance; a
+  disclosure/badge is a UI change, not an architecture change.
+- **Moderation & takedown** — reports already carry priority flags and a
+  status lifecycle; the reviewer UI and the 48-hour NCII takedown flow are
+  product work on top of the existing tables.
+- **Payments** — any paid tier must run through an adult-compliant processor
+  (Mastercard AN 5196).
+
+None of this changes the data model; it is UI + configuration + policy on the
+spine above. Until the compliance spine lands, treat the deployment as
+pre-launch.
