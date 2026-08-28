@@ -1,6 +1,6 @@
 import { Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Compass, Heart, MessageCircle, Newspaper, UserRound } from "lucide-react";
+import { Compass, Heart, MessageCircle, Newspaper, Trophy, UserRound } from "lucide-react";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useMembership } from "@/lib/auth/use-membership";
 import { fetchConversations } from "@/lib/messages-api";
@@ -9,9 +9,10 @@ import { Logo, Mark } from "./logo";
 import { Avatar } from "./photo";
 
 const NAV = [
-  { to: "/discover", label: "Order", icon: Compass },
+  { to: "/discover", label: "Deck", icon: Compass },
   { to: "/feed", label: "Room", icon: Newspaper },
   { to: "/likes", label: "Claimed", icon: Heart },
+  { to: "/glory", label: "Glory", icon: Trophy },
   { to: "/inbox", label: "DMs", icon: MessageCircle },
   { to: "/me", label: "Me", icon: UserRound },
 ] as const;

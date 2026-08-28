@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppDiscoverRouteImport } from './routes/_app/discover'
 import { Route as AppFeedRouteImport } from './routes/_app/feed'
+import { Route as AppGloryRouteImport } from './routes/_app/glory'
 import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppLikesRouteImport } from './routes/_app/likes'
 import { Route as AppMeRouteImport } from './routes/_app/me'
@@ -75,6 +76,11 @@ const AppDiscoverRoute = AppDiscoverRouteImport.update({
 const AppFeedRoute = AppFeedRouteImport.update({
   id: '/feed',
   path: '/feed',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGloryRoute = AppGloryRouteImport.update({
+  id: '/glory',
+  path: '/glory',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInboxRoute = AppInboxRouteImport.update({
@@ -215,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/discover': typeof AppDiscoverRoute
   '/feed': typeof AppFeedRoute
+  '/glory': typeof AppGloryRoute
   '/inbox': typeof AppInboxRouteWithChildren
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
@@ -249,6 +256,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/discover': typeof AppDiscoverRoute
   '/feed': typeof AppFeedRoute
+  '/glory': typeof AppGloryRoute
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
   '/api/account': typeof ApiAccountRoute
@@ -284,6 +292,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/_app/discover': typeof AppDiscoverRoute
   '/_app/feed': typeof AppFeedRoute
+  '/_app/glory': typeof AppGloryRoute
   '/_app/inbox': typeof AppInboxRouteWithChildren
   '/_app/likes': typeof AppLikesRoute
   '/_app/me': typeof AppMeRoute
@@ -320,6 +329,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/discover'
     | '/feed'
+    | '/glory'
     | '/inbox'
     | '/likes'
     | '/me'
@@ -354,6 +364,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/discover'
     | '/feed'
+    | '/glory'
     | '/likes'
     | '/me'
     | '/api/account'
@@ -388,6 +399,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/_app/discover'
     | '/_app/feed'
+    | '/_app/glory'
     | '/_app/inbox'
     | '/_app/likes'
     | '/_app/me'
@@ -493,6 +505,13 @@ declare module '@tanstack/react-router' {
       path: '/feed'
       fullPath: '/feed'
       preLoaderRoute: typeof AppFeedRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/glory': {
+      id: '/_app/glory'
+      path: '/glory'
+      fullPath: '/glory'
+      preLoaderRoute: typeof AppGloryRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/inbox': {
@@ -697,6 +716,7 @@ const AppInboxRouteWithChildren = AppInboxRoute._addFileChildren(
 interface AppRouteChildren {
   AppDiscoverRoute: typeof AppDiscoverRoute
   AppFeedRoute: typeof AppFeedRoute
+  AppGloryRoute: typeof AppGloryRoute
   AppInboxRoute: typeof AppInboxRouteWithChildren
   AppLikesRoute: typeof AppLikesRoute
   AppMeRoute: typeof AppMeRoute
@@ -706,6 +726,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppDiscoverRoute: AppDiscoverRoute,
   AppFeedRoute: AppFeedRoute,
+  AppGloryRoute: AppGloryRoute,
   AppInboxRoute: AppInboxRouteWithChildren,
   AppLikesRoute: AppLikesRoute,
   AppMeRoute: AppMeRoute,

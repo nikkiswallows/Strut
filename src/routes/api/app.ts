@@ -24,6 +24,7 @@ import {
   toggleLikeFor,
   togglePostLikeFor,
 } from "@/lib/server/social";
+import { gloryFor, releaseLockFor, startLockFor } from "@/lib/server/glory.server";
 
 /**
  * Per-user ceilings for the deck endpoints.
@@ -205,6 +206,36 @@ export const Route = createFileRoute("/api/app")({
               }
               data = await togglePostLikeFor(userId, Number(body.postId));
               break;
+            case "glory":
+              data = await gloryFor(userId);
+              break;
+            case "lockStart": {
+              if (!limited("mutate", MUTATION_PER_HOUR)) {
+                return Response.json(
+                  { error: "Slow down a second." },
+                  { status: 429, headers: { "cache-control": "no-store" } },
+                );
+              }
+              const pledge =
+                typeof body.pledgeHours === "number" && body.pledgeHours > 0
+                  ? body.pledgeHours
+                  : null;
+              data = await startLockFor(userId, {
+                pledgeHours: pledge,
+                note: typeof body.note === "string" ? body.note : null,
+              });
+              break;
+            }
+            case "lockRelease": {
+              if (!limited("mutate", MUTATION_PER_HOUR)) {
+                return Response.json(
+                  { error: "Slow down a second." },
+                  { status: 429, headers: { "cache-control": "no-store" } },
+                );
+              }
+              data = await releaseLockFor(userId);
+              break;
+            }
             default:
               return Response.json({ error: "Unknown action." }, { status: 400 });
           }

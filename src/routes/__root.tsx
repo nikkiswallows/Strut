@@ -8,19 +8,19 @@ import {
 import { Toaster } from "sonner";
 import { queryClient } from "@/lib/query-client";
 import appCss from "../styles.css?url";
+import { NAME, DESCRIPTION } from "@/lib/brand";
 
-const APP_NAME = "Strut";
+const APP_NAME = NAME;
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: APP_NAME },
+      { title: `${APP_NAME} — BNWO dating` },
       {
         name: "description",
-        content:
-          "Strut — BNWO dating. Black superiority, sissies, whitebois, cuckold, breeding white wives. 18+.",
+        content: DESCRIPTION,
       },
       { name: "theme-color", content: "#0a0907" },
       { name: "apple-mobile-web-app-capable", content: "yes" },

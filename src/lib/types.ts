@@ -232,3 +232,70 @@ export type LikeBundle = {
   outgoing: Profile[];
   matches: Profile[];
 };
+
+/**
+ * Raw counts that drive the Orders of the Set (achievement board). Every
+ * number is computed live from existing tables; the only new state is the
+ * chastity lock session log. See `src/lib/achievements.ts`.
+ */
+export type GloryStats = {
+  onboarded: number;
+  matches: number;
+  posts: number;
+  chats: number;
+  likesSent: number;
+  likesReceived: number;
+  wearsSpade: number;
+  /** matches where the OTHER person is a bull (king) and viewer is not. */
+  kingMatches: number;
+  /** matches with a bull, counted for a kneeler viewer. */
+  kneelerKingMatches: number;
+  /** matches with a bull, counted for a hotwife viewer. */
+  wifeKingMatches: number;
+  /** conversations a king has with kneelers. */
+  kingKneelerChats: number;
+  /** conversations a kneeler opened/has with kings. */
+  kneelerKingChats: number;
+  /** conversations a wife has with kings. */
+  wifeKingChats: number;
+  /** completed lock sessions. */
+  locksCompleted: number;
+  /** total hours served across all (completed + elapsed) locks. */
+  lockedHours: number;
+  /** hours into the currently-open lock, 0 if not caged now. */
+  currentLockHours: number;
+};
+
+export type LockSession = {
+  id: number;
+  startedAt: string;
+  releasedAt: string | null;
+  pledgeHours: number | null;
+  completed: boolean;
+  note: string | null;
+  /** elapsed hours, rounded to 1 decimal (0 if open & just started). */
+  elapsedHours: number;
+  /** for an open lock: 0..1 progress toward the pledge (1 if no pledge). */
+  pledgeProgress: number;
+  open: boolean;
+};
+
+export type GloryBoard = {
+  stats: GloryStats;
+  flags: {
+    isKing: boolean;
+    isKneeler: boolean;
+    isWife: boolean;
+    isCuck: boolean;
+    intoChastity: boolean;
+  };
+  points: number;
+  rankName: string;
+  rankIcon: string;
+  nextRankName: string | null;
+  nextRankAt: number | null;
+  /** ids of achievements with at least one tier earned. */
+  earnedIds: string[];
+  currentLock: LockSession | null;
+  locks: LockSession[];
+};

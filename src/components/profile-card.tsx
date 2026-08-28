@@ -6,6 +6,7 @@ import { badgeFor } from "@/lib/bnwo";
 import { asPhotoList, identityLine, shownAge, type Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Photo } from "./photo";
+import { BadgePill } from "./graphics";
 
 export function ProfileCard({
   profile,
@@ -54,9 +55,7 @@ export function ProfileCard({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/25 to-transparent" />
         {badge ? (
-          <span className="absolute top-3 left-3 z-[3] rounded-full border border-accent/50 bg-bg/70 px-2 py-0.5 text-[10px] tracking-[0.18em] text-accent uppercase backdrop-blur-sm">
-            {badge}
-          </span>
+          <BadgePill badge={badge} />
         ) : null}
         {count > 1 ? (
           <>

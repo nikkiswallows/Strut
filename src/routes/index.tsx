@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { Kicker, Logo, Wordmark } from "@/components/logo";
 import { Photo } from "@/components/photo";
+import { Crown, Spade } from "@/components/graphics";
+import { NAME, tickerText } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
 import { useMembership } from "@/lib/auth/use-membership";
 import { HERO_LOCKER, HERO_PHOTO, HERO_STREET } from "@/lib/seed-data";
@@ -53,18 +55,20 @@ function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/25" />
         <div className="spade-veil pointer-events-none absolute inset-0" />
-        <Wordmark className="pointer-events-none absolute inset-x-0 top-[16%] text-center text-[20vw] leading-none text-accent/15 sm:text-[16vw]" />
+        <Wordmark className="pointer-events-none absolute inset-x-0 top-[16%] text-center text-[22vw] leading-none text-accent/15 sm:text-[16vw]" />
+        <Crown className="pointer-events-none absolute top-[24%] right-[12%] size-16 text-accent/25 animate-float-slow sm:size-24" />
+        <Spade className="pointer-events-none absolute bottom-[26%] left-[10%] size-14 text-accent/20 animate-float-slow sm:size-20" />
         <div className="relative z-10 mx-auto flex min-h-[100dvh] max-w-3xl flex-col justify-end px-6 pb-16 pt-28">
-          <Kicker>BNWO · 18+ · BBC HYPNO</Kicker>
+          <Kicker>BNWO · 18+ · QOS · BBC</Kicker>
           <h1 className="mt-3 font-display text-5xl leading-[0.92] text-fg sm:text-7xl lg:text-8xl">
-            BBC first.
+            <span className="text-gold-gradient">BBC first.</span>
             <br />
-            Kneel. Stay.
+            Kneel. <span className="shimmer-text">Stay.</span>
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            Strut is BNWO propaganda with a dating app attached. Black superiority.
-            Whiteboi feminization. Cuckold. Breeding white wives. Sissies and faggots
-            on their knees. If you have to ask what this room is for, get on the floor.
+            {NAME} is the BNWO dating club. Black kings walk in first. Sissies and
+            whitebois kneel. Wives get bred. Cucks hold the phone. Say it out loud —
+            spade, cage, crown and all — or keep scrolling.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             {["QOS", "BBC", "Cuck", "Sissy", "Whiteboi", "Breeding", "Hypno"].map((tag) => (
@@ -92,11 +96,11 @@ function Home() {
         </div>
       </section>
 
-      <div className="overflow-hidden border-y border-accent/30 bg-accent/5 py-2">
+      <div className="overflow-hidden border-y border-accent/40 bg-accent/10 py-2.5 shadow-gold">
         <div className="bnwo-ticker w-[200%]">
           {Array.from({ length: 2 }).map((_, i) => (
-            <span key={i}>
-              BBC FIRST · WHITEBOI KNEEL · SISSY FAGGOTS SERVE · QOS · BREED THE WIFE · CUCK WATCHES · BNWO IS REAL · ON YOUR KNEES ·
+            <span key={i} className="inline-flex items-center gap-10">
+              {tickerText()}
             </span>
           ))}
         </div>
@@ -206,8 +210,8 @@ function Home() {
             on the floor. Nobody here is confused.
           </p>
           <Link to="/login" search={{ mode: "join" }} className="mt-8 inline-block">
-            <Button size="lg" className="h-14 px-8 text-base">
-              Join Strut
+            <Button size="lg" className="btn-gold h-14 px-8 text-base">
+              Enter Strut
               <ArrowRight className="size-4" />
             </Button>
           </Link>

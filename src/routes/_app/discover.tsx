@@ -1,13 +1,16 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { Grid2x2, Layers, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProfileCard } from "@/components/profile-card";
 import { SwipeDeck } from "@/components/swipe-deck";
+import { MatchCelebration } from "@/components/match-celebration";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/query-client";
 import { app } from "@/lib/http";
+import { useMembership } from "@/lib/auth/use-membership";
+import { postOpenChat } from "@/lib/messages-api";
 import {
   DISCOVER_TABS,
   ETHNICITIES,
@@ -25,6 +28,10 @@ export const Route = createFileRoute("/_app/discover")({ component: Discover });
 type DiscoverPage = { items: Profile[]; nextCursor: string | null };
 
 function Discover() {
+  const { profile: meProfile } = useMembership();
+  const navigate = useNavigate();
+  const [match, setMatch] = useState<Profile | null>(null);
+  const [matchFire, setMatchFire] = useState(0);
   const [tab, setTab] = useState<DiscoverTab>("nearby");
   const [miles, setMiles] = useState(100);
   const [lookingFor, setLookingFor] = useState("");
@@ -100,7 +107,11 @@ function Discover() {
     onSuccess: (res, p) => {
       void queryClient.invalidateQueries({ queryKey: ["discover"] });
       void queryClient.invalidateQueries({ queryKey: ["likes"] });
-      if (res.matched) toast.success(`You and ${p.displayName} matched.`);
+      void queryClient.invalidateQueries({ queryKey: ["glory"] });
+      if (res.matched) {
+        setMatch(p);
+        setMatchFire((n) => n + 1);
+      }
     },
     onError: (err: Error, _p, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(ctx.key, ctx.prev);
@@ -137,12 +148,21 @@ function Discover() {
   const swipe = useMutation({
     mutationFn: ({ targetId, direction }: { targetId: string; direction: "like" | "pass" }) =>
       app<{ ok: true; matched: boolean }>("swipe", { targetId, direction }),
-    onSuccess: (res, { direction }) => {
+    onSuccess: (res, { direction, targetId }) => {
       // The deck advances its own internal index; just keep the match feed and
       // grid fresh. Liking a card never resets the deck below.
       void queryClient.invalidateQueries({ queryKey: ["likes"] });
       void queryClient.invalidateQueries({ queryKey: ["discover"] });
-      if (direction === "like" && res.matched) toast.success("You matched.");
+      void queryClient.invalidateQueries({ queryKey: ["glory"] });
+      if (direction === "like" && res.matched) {
+        const matchedProfile = deckRows.find((r) => r.userId === targetId);
+        if (matchedProfile) {
+          setMatch(matchedProfile);
+          setMatchFire((n) => n + 1);
+        } else {
+          toast.success("You matched.");
+        }
+      }
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -462,11 +482,28 @@ function Discover() {
               onClick={() => setFiltersOpen(false)}
               className="mt-6 h-12 w-full rounded-lg bg-fg text-sm font-medium text-bg transition-transform duration-150 ease-out active:scale-[0.96]"
             >
-              Show the order
+              Serve the order
             </button>
           </div>
         </div>
       ) : null}
+
+      <MatchCelebration
+        match={match}
+        mePhoto={meProfile?.photos?.[0]}
+        meName={meProfile?.displayName}
+        fire={matchFire}
+        onClose={() => setMatch(null)}
+        onMessage={async (otherUserId) => {
+          try {
+            const { id } = await postOpenChat(otherUserId);
+            setMatch(null);
+            await navigate({ to: "/inbox/$id", params: { id: String(id) } });
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not open the chat.");
+          }
+        }}
+      />
     </div>
   );
 }

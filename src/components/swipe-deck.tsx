@@ -1,4 +1,4 @@
-import { Heart, RotateCcw, X } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -10,7 +10,9 @@ import {
 import { formatMiles } from "@/lib/geo";
 import { badgeFor } from "@/lib/bnwo";
 import { asPhotoList, identityLine, shownAge, type Profile } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Photo } from "./photo";
+import { Crown, BadgePill } from "./graphics";
 
 /**
  * A Tinder-style one-card-at-a-time deck.
@@ -238,21 +240,19 @@ export function SwipeDeck({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/20 to-transparent" />
         {badge ? (
-          <span className="absolute top-4 left-4 z-[3] rounded-full border border-accent/50 bg-bg/70 px-2.5 py-0.5 text-[10px] tracking-[0.18em] text-accent uppercase backdrop-blur-sm">
-            {badge}
-          </span>
+          <BadgePill badge={badge} className="top-4 left-4 px-2.5 py-1 text-[10px]" iconClassName="size-3.5" />
         ) : null}
         <div
-          className="absolute top-8 right-4 rounded-xl border-2 border-[#3fb96b] px-3 py-1 text-lg font-bold tracking-widest text-[#3fb96b]"
-          style={{ opacity: likeOpacity, transform: "rotate(12deg)" }}
+          className="absolute top-10 right-3 rounded-xl border-4 border-accent px-3 py-1 font-display text-2xl font-bold tracking-widest text-accent"
+          style={{ opacity: likeOpacity, transform: "rotate(12deg)", textShadow: "0 0 18px rgba(216,175,78,.6)" }}
         >
-          Like
+          KNEEL
         </div>
         <div
-          className="absolute top-8 left-4 rounded-xl border-2 border-red-500 px-3 py-1 text-lg font-bold tracking-widest text-red-500"
+          className="absolute top-10 left-3 rounded-xl border-4 border-[#c0492f] px-3 py-1 font-display text-2xl font-bold tracking-widest text-[#c0492f]"
           style={{ opacity: passOpacity, transform: "rotate(-12deg)" }}
         >
-          Pass
+          PASS
         </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] p-5">
           <p className="font-display text-4xl leading-tight text-fg">
@@ -298,11 +298,11 @@ export function SwipeDeck({
         </button>
         <button
           type="button"
-          aria-label="Like"
+          aria-label="Like — kneel"
           onClick={() => decide("like")}
-          className="grid size-14 place-items-center rounded-full bg-accent text-accent-fg transition-transform duration-150 ease-out active:scale-[0.9]"
+          className="btn-gold grid size-14 place-items-center rounded-full active:scale-[0.9]"
         >
-          <Heart className="size-5 fill-current" />
+          <Crown className="size-6" />
         </button>
       </div>
     </div>
