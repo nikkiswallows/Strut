@@ -12,6 +12,7 @@ import {
   isValidNational,
   type Country,
 } from "@/lib/phone";
+import { fetchRuntimeConfig } from "@/lib/auth/runtime-config";
 import { cn } from "@/lib/utils";
 
 type Phase = "number" | "code";
@@ -39,6 +40,11 @@ export function PhoneAuth({
   const [picker, setPicker] = useState(false);
   const [sent, setSent] = useState<SendResult | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  // The server fail-closes phone OTP in production without Twilio (returning
+  // the code on screen there would let anyone take over any phone account).
+  // Detect that state up front so the form explains itself instead of
+  // erroring after the user types a number.
+  const [smsGated, setSmsGated] = useState(false);
   const phoneRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
 
@@ -49,6 +55,16 @@ export function PhoneAuth({
 
   useEffect(() => {
     setIso(guessCountryIso());
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchRuntimeConfig().then((cfg) => {
+      if (alive && cfg) setSmsGated(cfg.production && !cfg.sms);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -208,8 +224,21 @@ export function PhoneAuth({
             </label>
           </div>
 
-          <Button type="submit" size="lg" className="h-14 w-full text-base" disabled={busy || !valid}>
-            {busy ? "Sending…" : "Text me a code"}
+          {smsGated && (
+            <div className="rounded-lg border border-border bg-elevated px-3.5 py-3 text-sm leading-relaxed text-muted">
+              Text codes aren’t wired on this deployment yet — use{" "}
+              <span className="text-fg">email sign-in</span> for now. Phone sign-in
+              switches on automatically once SMS (Twilio) is configured.
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            size="lg"
+            className="h-14 w-full text-base"
+            disabled={busy || !valid || smsGated}
+          >
+            {busy ? "Sending…" : smsGated ? "SMS not wired yet" : "Text me a code"}
           </Button>
         </form>
       ) : (
