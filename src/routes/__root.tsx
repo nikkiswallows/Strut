@@ -56,6 +56,11 @@ function RootDocument() {
           <Toaster
             theme="dark"
             position="top-center"
+            // Standalone PWA: viewport-fit=cover puts the page under the iPhone
+            // status bar, so a fixed top toast without a safe-area offset is
+            // invisible behind the notch. Both offsets (desktop + mobile) clear it.
+            offset={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
+            mobileOffset={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
             toastOptions={{
               style: {
                 background: "#1c1812",

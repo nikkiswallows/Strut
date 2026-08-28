@@ -104,6 +104,9 @@ function Me() {
         lookingFor,
         photos,
         photoBlurs,
+        // Sent so members from before DOB attestation can attest from the edit
+        // form; the server ignores it once a birth date is on file (immutable).
+        birthDate: birthDate || null,
         bio,
         interests,
         heightCm: heightCm ? Number(heightCm) : null,
@@ -232,6 +235,25 @@ function Me() {
               <Input value={location} onChange={(e) => setLocation(e.target.value)} />
             </Field>
           </div>
+          {p && !p.birthDate ? (
+            // Members from before DOB attestation have no birth date on file, and
+            // the server refuses any save without one. Asked once, right here;
+            // after the first save it's immutable and this field disappears.
+            <Field
+              label="Date of birth"
+              hint="Asked once — Strut is 18+. It can't be changed after you save."
+            >
+              <Input
+                type="date"
+                required
+                value={birthDate}
+                max={new Date(Date.now() - 18 * 365.25 * 24 * 3600 * 1000)
+                  .toISOString()
+                  .slice(0, 10)}
+                onChange={(e) => setBirthDate(e.target.value)}
+              />
+            </Field>
+          ) : null}
           <Field label="Height (cm)">
             <Input
               type="number"

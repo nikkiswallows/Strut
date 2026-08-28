@@ -576,7 +576,7 @@ function cleanProfile(input: ProfileInput, existingBirthDate: string | null = nu
     birthDate = checked.birthDate;
   }
   if (!birthDate) {
-    throw new Error("Confirm your date of birth to create a profile. Strut is 18+.");
+    throw new Error("Confirm your date of birth to save your profile. Strut is 18+.");
   }
   age = ageOn(birthDate);
   if (age < MIN_AGE) {
