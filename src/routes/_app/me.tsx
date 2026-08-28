@@ -56,6 +56,7 @@ function Me() {
   const [handle, setHandle] = useState("");
   const [age, setAge] = useState("");
   const [hideAge, setHideAge] = useState(false);
+  const [discreet, setDiscreet] = useState(false);
   const [location, setLocation] = useState("");
   const [identities, setIdentities] = useState<string[]>([]);
   const [pronouns, setPronouns] = useState<string[]>([]);
@@ -72,6 +73,7 @@ function Me() {
     setHandle(p.handle);
     setAge(p.age ? String(p.age) : "");
     setHideAge(p.hideAge);
+    setDiscreet(p.discreet);
     setLocation(p.location ?? "");
     setIdentities(p.identities);
     setPronouns(p.pronouns);
@@ -90,6 +92,7 @@ function Me() {
         handle,
         age: age ? Number(age) : null,
         hideAge,
+        discreet,
         location,
         identities,
         pronouns,
@@ -242,6 +245,18 @@ function Me() {
             )}
           >
             {hideAge ? "Age hidden on your profile" : "Do not show my age"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDiscreet((v) => !v)}
+            className={cn(
+              "h-11 w-full rounded-lg px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
+              discreet ? "bg-fg text-bg" : "bg-elevated text-muted",
+            )}
+          >
+            {discreet
+              ? "Photos blurred until someone taps"
+              : "Blur my photos (discreet)"}
           </button>
           <MultiChips
             label="Identity"

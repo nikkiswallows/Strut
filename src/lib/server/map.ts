@@ -3,11 +3,11 @@ import { asPhotoList, type Profile } from "@/lib/types";
 
 export const PROFILE_COLS = `id, user_id, handle, display_name, age, identity, pronouns, bio,
   location, ethnicity, looking_for, looking_for_list, photos, interests, height_cm, is_seed,
-  last_active, onboarded, created_at, identities, pronoun_list, hide_age, lat, lng, role`;
+  last_active, onboarded, created_at, identities, pronoun_list, hide_age, discreet, lat, lng, role`;
 
 export const PROFILE_COLS_P = `p.id, p.user_id, p.handle, p.display_name, p.age, p.identity, p.pronouns, p.bio,
   p.location, p.ethnicity, p.looking_for, p.looking_for_list, p.photos, p.interests, p.height_cm, p.is_seed,
-  p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.lat, p.lng, p.role`;
+  p.last_active, p.onboarded, p.created_at, p.identities, p.pronoun_list, p.hide_age, p.discreet, p.lat, p.lng, p.role`;
 
 export type ProfileRow = {
   id: number;
@@ -32,6 +32,7 @@ export type ProfileRow = {
   identities?: unknown;
   pronoun_list?: unknown;
   hide_age?: boolean | number | string | null;
+  discreet?: boolean | number | string | null;
   lat?: number | string | null;
   lng?: number | string | null;
   role?: string | null;
@@ -63,6 +64,7 @@ export function mapProfile(row: ProfileRow): Profile {
     displayName: row.display_name,
     age: row.age == null ? null : Number(row.age),
     hideAge: flag(row.hide_age),
+    discreet: flag(row.discreet),
     identities: asList(row.identities, row.identity),
     pronouns: asList(row.pronoun_list, row.pronouns),
     role: row.role?.trim() || null,

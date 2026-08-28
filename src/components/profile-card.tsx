@@ -45,6 +45,7 @@ export function ProfileCard({
           src={photo}
           alt={profile.displayName}
           name={profile.displayName}
+          discreet={Boolean(profile.discreet)}
           className="absolute inset-0 size-full transition-transform duration-500 group-hover:scale-[1.03]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/25 to-transparent" />

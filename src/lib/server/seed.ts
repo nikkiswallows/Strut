@@ -16,12 +16,46 @@ export async function ensureSeed(): Promise<void> {
     globalRef.__strutSeedVersion__ = SEED_VERSION;
   }
   if (!globalRef.__strutSeedPromise__) {
-    globalRef.__strutSeedPromise__ = runSeed().catch((err) => {
+    globalRef.__strutSeedPromise__ = seedOnce().catch((err) => {
       globalRef.__strutSeedPromise__ = undefined;
       throw err;
     });
   }
   await globalRef.__strutSeedPromise__;
+}
+
+/**
+ * Seed only when the DATABASE says it hasn't seen this SEED_VERSION yet.
+ *
+ * Previously every fresh serverless isolate replayed the full ~53-profile
+ * upsert storm on its first request (the version flag lived in module memory).
+ * Now the version is persisted in `seed_state` (migration 0013): a cold start
+ * costs one tiny indexed read, and only a real version bump (or a wiped
+ * database) replays the idempotent upserts.
+ */
+async function seedOnce(): Promise<void> {
+  const sql = await getSql();
+  let seeded = false;
+  try {
+    const rows = await sql.query<{ version: number }>(
+      `select version from seed_state where id = true`,
+    );
+    seeded = Number(rows[0]?.version) === SEED_VERSION;
+  } catch {
+    // seed_state missing (migration not applied yet / legacy DB) — behave like
+    // the old code and just seed.
+    seeded = false;
+  }
+  if (seeded) return;
+  await runSeed();
+  try {
+    await sql.query(
+      `update seed_state set version = $1, updated_at = now() where id = true`,
+      [SEED_VERSION],
+    );
+  } catch {
+    // Recording the version is best-effort; the upserts are idempotent anyway.
+  }
 }
 
 function canonIdentity(raw: string): string {

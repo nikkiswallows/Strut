@@ -121,6 +121,8 @@ export type Profile = {
   displayName: string;
   age: number | null;
   hideAge: boolean;
+  /** Blurred photos in deck/grids until tapped (closeted-user safety). */
+  discreet: boolean;
   identities: string[];
   pronouns: string[];
   role: string | null;

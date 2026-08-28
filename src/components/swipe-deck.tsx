@@ -173,6 +173,7 @@ export function SwipeDeck({
             src={asPhotoList(nextCard.photos)[0]}
             alt={nextCard.displayName}
             name={nextCard.displayName}
+            discreet={Boolean(nextCard.discreet)}
             className="absolute inset-0 size-full rounded-3xl object-cover opacity-80"
           />
         ) : null}
@@ -202,6 +203,7 @@ export function SwipeDeck({
           src={photo}
           alt={current?.displayName ?? ""}
           name={current?.displayName ?? ""}
+          discreet={Boolean(current?.discreet)}
           className="absolute inset-0 size-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/20 to-transparent" />

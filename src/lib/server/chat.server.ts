@@ -78,11 +78,22 @@ export async function openChat(userId: string, otherUserId: string): Promise<{ i
     [userId, otherUserId],
   );
   if (existing[0]) return { id: Number(existing[0].id) };
+  // on conflict handles the double-tap race on the pair's unique expression
+  // index; when we lose the race, re-select the winner's row.
   const inserted = await sql.query<{ id: number }>(
-    `insert into conversations (user_a, user_b) values ($1, $2) returning id`,
+    `insert into conversations (user_a, user_b) values ($1, $2)
+     on conflict do nothing
+     returning id`,
     [userId, otherUserId],
   );
-  return { id: Number(inserted[0]!.id) };
+  if (inserted[0]) return { id: Number(inserted[0].id) };
+  const again = await sql.query<{ id: number }>(
+    `select id from conversations
+     where (user_a = $1 and user_b = $2) or (user_a = $2 and user_b = $1)`,
+    [userId, otherUserId],
+  );
+  if (again[0]) return { id: Number(again[0].id) };
+  throw new Error("Could not open that chat. Try again.");
 }
 
 export async function getChat(userId: string, id: number) {
@@ -182,13 +193,15 @@ async function loadBotContext(
   const seedId = row.user_a === userId ? row.user_b : row.user_a;
   if (!isSeedUser(seedId)) return null;
 
-  const historyRows = await sql.query<{ sender_id: string; body: string }>(
+  const recentRows = await sql.query<{ sender_id: string; body: string }>(
     `select sender_id, body from messages
      where conversation_id = $1
-     order by created_at asc
+     order by created_at desc
      limit 24`,
     [conversationId],
   );
+  // Newest-first from SQL; the prompt builder expects chronological order.
+  const historyRows = recentRows.slice().reverse();
   const last = historyRows.at(-1);
   // Only reply when the last message is from the human (avoid double replies).
   if (!last || last.sender_id === seedId) return null;
@@ -332,10 +345,11 @@ export async function pumpBotJob(
   const failWithCanned = async (err: string) => {
     console.error("[bot] job", job.id, "failed:", err);
     const hist = await sql.query<{ sender_id: string; body: string }>(
-      `select sender_id, body from messages where conversation_id = $1 order by created_at asc limit 24`,
+      `select sender_id, body from messages where conversation_id = $1 order by created_at desc limit 24`,
       [conversationId],
     );
-    const history = hist.map((m) => ({ senderId: m.sender_id, body: m.body }));
+    // Newest-first from SQL; the prompt builder expects chronological order.
+    const history = hist.slice().reverse().map((m) => ({ senderId: m.sender_id, body: m.body }));
     const seed = getSeed(seedId);
     const prior = history.filter((m) => m.senderId === seedId).map((m) => m.body);
     const body = seed ? cannedReply(seed, prior, isFreaky(history)) : "hey… you there?";
@@ -391,11 +405,12 @@ export async function pumpBotJob(
   }
 
   // Done — convert generation to a reply.
-  const histRows = await sql.query<{ sender_id: string; body: string }>(
-    `select sender_id, body from messages where conversation_id = $1 order by created_at asc limit 24`,
+  const histRowsRaw = await sql.query<{ sender_id: string; body: string }>(
+    `select sender_id, body from messages where conversation_id = $1 order by created_at desc limit 24`,
     [conversationId],
   );
-  const history = histRows.map((m) => ({ senderId: m.sender_id, body: m.body }));
+  // Newest-first from SQL; the prompt builder expects chronological order.
+  const history = histRowsRaw.slice().reverse().map((m) => ({ senderId: m.sender_id, body: m.body }));
   const prior = history.filter((m) => m.senderId === seedId).map((m) => m.body);
   const reply = hordeResultToReply(seedId, prior, status.text);
   const seed = getSeed(seedId);

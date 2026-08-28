@@ -6,6 +6,7 @@ import type { FeedPost, LikeBundle } from "@/lib/types";
 import { PROFILE_COLS_P, mapProfile, type ProfileRow } from "./map";
 import { parseJson } from "@/lib/utils";
 import { ensureSeed } from "./seed";
+import { isStoredPhotoUrl } from "./media.server";
 
 export async function toggleLikeFor(userId: string, toUserId: string) {
   if (toUserId === userId) throw new Error("You cannot like yourself.");
@@ -155,6 +156,11 @@ export async function createPostFor(
   const photoUrl = input.photoUrl?.trim() || null;
   if (photoUrl?.startsWith("data:")) {
     throw new Error("Upload the photo first. Feed posts store URLs, not raw files.");
+  }
+  if (photoUrl && !isStoredPhotoUrl(photoUrl)) {
+    // Only allow http(s)/app-relative photo URLs — arbitrary schemes
+    // (javascript:, etc.) must never reach the feed.
+    throw new Error("Use an uploaded photo.");
   }
   const sql = await getSql();
   await sql.query(`insert into posts (user_id, body, photo_url) values ($1, $2, $3)`, [

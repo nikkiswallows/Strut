@@ -15,7 +15,17 @@ import type { Profile } from "@/lib/types";
 import { asPhotoList, identityLine, lookingLine, pronounLine, shownAge } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_app/u/$handle")({ component: ProfilePage });
+export const Route = createFileRoute("/_app/u/$handle")({
+  component: ProfilePage,
+  // Member profiles must never end up in a search engine index — being
+  // outed via Google is the worst-case privacy event for this community.
+  head: () => ({
+    meta: [
+      { name: "robots", content: "noindex, nofollow" },
+      { name: "description", content: "Strut member profile. 18+." },
+    ],
+  }),
+});
 
 function ProfilePage() {
   const { handle } = Route.useParams();

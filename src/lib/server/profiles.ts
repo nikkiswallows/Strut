@@ -20,18 +20,6 @@ export const getMyProfile = createServerFn({ method: "GET" })
     return rows[0] ? mapProfile(rows[0]) : null;
   });
 
-export const getPublicProfile = createServerFn({ method: "GET" })
-  .validator((handle: string) => handle.replace(/^@/, "").toLowerCase())
-  .handler(async ({ data: handle }) => {
-    await ensureSeed();
-    const sql = await getSql();
-    const rows = await sql.query<ProfileRow>(
-      `select ${PROFILE_COLS} from profiles where handle = $1`,
-      [handle],
-    );
-    return rows[0] ? mapProfile(rows[0]) : null;
-  });
-
 export const getProfileForViewer = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((handle: string) => handle.replace(/^@/, "").toLowerCase())
@@ -437,6 +425,7 @@ export type ProfileInput = {
   displayName: string;
   age: number | null;
   hideAge?: boolean;
+  discreet?: boolean;
   identities: string[];
   pronouns: string[];
   role?: string | null;
@@ -477,6 +466,7 @@ function cleanProfile(input: ProfileInput) {
     displayName,
     age,
     hideAge: Boolean(input.hideAge),
+    discreet: Boolean(input.discreet),
     identities,
     pronouns,
     identity: identities[0] ?? null,
@@ -523,10 +513,10 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
     `insert into profiles (
        user_id, handle, display_name, age, identity, pronouns, bio, location, ethnicity,
        looking_for, looking_for_list, photos, interests, height_cm, onboarded, last_active,
-       identities, pronoun_list, hide_age, lat, lng, role
+       identities, pronoun_list, hide_age, discreet, lat, lng, role
      ) values (
        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14,true,now(),
-       $15::jsonb,$16::jsonb,$17::boolean,$18,$19,$20
+       $15::jsonb,$16::jsonb,$17::boolean,$18::boolean,$19,$20,$21
      )
      on conflict (user_id) do update set
        handle = excluded.handle,
@@ -545,6 +535,7 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
        identities = excluded.identities,
        pronoun_list = excluded.pronoun_list,
        hide_age = excluded.hide_age,
+       discreet = excluded.discreet,
        lat = excluded.lat,
        lng = excluded.lng,
        role = excluded.role,
@@ -569,6 +560,7 @@ export async function writeProfileForUser(userId: string, input: ProfileInput) {
       JSON.stringify(data.identities),
       JSON.stringify(data.pronouns),
       data.hideAge,
+      data.discreet,
       data.lat,
       data.lng,
       data.role,

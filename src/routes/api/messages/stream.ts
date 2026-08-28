@@ -3,6 +3,40 @@ import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 import { getSql } from "@/lib/db";
 import { subscribe, unsubscribe, type RealtimeEvent } from "@/lib/server/realtime.server";
 
+// Per-user concurrent SSE connection cap (per warm instance). Each connection
+// pins a server response open; without a cap one account can script dozens of
+// streams. In-process by necessity — same trade-off as the realtime bus below.
+// Counts reset after 30 idle minutes so a leaked stream can't wedge a user out.
+const MAX_STREAMS_PER_USER = 4;
+const STREAM_STALE_MS = 30 * 60 * 1000;
+const streamsRef = globalThis as typeof globalThis & {
+  __strutSseStreams__?: Map<string, { count: number; lastAt: number }>;
+};
+function streamCounters(): Map<string, { count: number; lastAt: number }> {
+  return (streamsRef.__strutSseStreams__ ??= new Map());
+}
+function acquireStream(userId: string): boolean {
+  const now = Date.now();
+  const map = streamCounters();
+  const entry = map.get(userId);
+  if (!entry || now - entry.lastAt > STREAM_STALE_MS) {
+    map.set(userId, { count: 1, lastAt: now });
+    return true;
+  }
+  if (entry.count >= MAX_STREAMS_PER_USER) return false;
+  entry.count += 1;
+  entry.lastAt = now;
+  return true;
+}
+function releaseStream(userId: string): void {
+  const map = streamCounters();
+  const entry = map.get(userId);
+  if (!entry) return;
+  entry.count -= 1;
+  entry.lastAt = Date.now();
+  if (entry.count <= 0) map.delete(userId);
+}
+
 /**
  * Server-Sent Events stream of live thread events for a conversation.
  *
@@ -21,7 +55,14 @@ export const Route = createFileRoute("/api/messages/stream")({
       GET: async ({ request }) => {
         const user = await getSessionUserFromRequest(request);
         if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+        if (!acquireStream(user.id)) {
+          return Response.json(
+            { error: "Too many live connections." },
+            { status: 429 },
+          );
+        }
 
+        const userId = user.id;
         const url = new URL(request.url);
         const conversationId = Number(url.searchParams.get("conversationId"));
         if (!Number.isFinite(conversationId)) {
@@ -66,6 +107,7 @@ export const Route = createFileRoute("/api/messages/stream")({
           cancel() {
             if (heartbeat) clearInterval(heartbeat);
             if (listener) subscribeToNothing(channel, listener);
+            releaseStream(userId);
           },
         });
 

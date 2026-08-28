@@ -73,14 +73,16 @@ for the full env-var list. Quick deploy checklist:
 3. Create one Vercel Blob store and set `BLOB_READ_WRITE_TOKEN`.
 4. (Optional) Google/X OAuth clients — redirect to
    `<APP_URL>/api/auth/callback/google` and `.../callback/twitter`.
-5. (Optional) Twilio for real SMS; without it the phone code is shown on screen.
+5. (Optional) Twilio for real SMS. The on-screen code is dev/preview-only —
+   production refuses phone sign-in when SMS isn't configured.
 
 ## Notes
 
 - 18+ only
 - Seed photos in `public/photos/`
 - Phone sign-in: add Twilio credentials (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
-  `TWILIO_FROM_NUMBER`) for real texts; otherwise the code is shown on the verify
-  screen so you can finish sign-in.
+  `TWILIO_FROM_NUMBER`) for real texts. The on-screen code is a **dev/preview-only**
+  affordance — production refuses phone sign-in (400) when SMS isn't configured, so
+  codes can never leak to the client.
 - Seed chats use the xAI API when `XAI_API_KEY` is present
 - Brand: black / ivory / gold. Queen of spades. Cinzel + Outfit.

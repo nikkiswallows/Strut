@@ -8,10 +8,16 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { isMigrationFile, migrationName, pendingMigrations } from "./migration-plan.mjs";
-import { projectRoot } from "./with-app-env.mjs";
+
+// Repo root (two levels up from scripts/) — inlined from the removed
+// with-app-env.mjs helper this test used to import.
+function projectRoot() {
+  return dirname(dirname(fileURLToPath(import.meta.url)));
+}
 
 const AUTH_MIGRATION = "0001_auth.sql";
 

@@ -1,16 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { aiConfigured, aiSelfTest } from "@/lib/server/ai.server";
+import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 
 /**
- * Live AI wiring check. Open https://<your-domain>/api/ai/selftest in a browser.
- * It actually sends a short in-character message to every configured provider
- * and reports which model returns a usable reply (and the exact HTTP error for
- * any that don't). No secrets are returned. Safe to call after setting keys.
+ * Live AI wiring check. Requires a signed-in session — every call fires real
+ * requests at every configured provider, so an unauthenticated endpoint is an
+ * open AI-credit drain for anyone who finds the URL.
  */
 export const Route = createFileRoute("/api/ai/selftest")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        const user = await getSessionUserFromRequest(request);
+        if (!user) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
         if (!aiConfigured()) {
           return Response.json(
             {

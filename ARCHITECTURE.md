@@ -182,3 +182,62 @@ tier to start; switch to Grok/OpenRouter paid or your own endpoint at scale.
 
 Free key: sign up at **console.groq.com** → API Keys → Create → add `GROQ_API_KEY`
 in Vercel → redeploy.
+
+---
+
+## 7. Security hardening (audit pass, Aug 2026)
+
+The following controls are now enforced in code:
+
+- **Phone OTP fails closed.** In production without Twilio credentials,
+  `/api/phone/start` refuses to send a code and the Better Auth `sendOTP`
+  callback throws — the 6-digit code is never returned to the client. (The
+  on-screen "preview code" is a dev/preview-only affordance.) Previously a
+  production deployment without Twilio let anyone sign into any
+  phone-registered account by reading the code off the verify screen.
+- **Trusted origins are provable, not asserted.** `buildTrustedOrigins` only
+  trusts the configured base URL, Vercel deployment URLs, the request's own
+  host, and `*.vercel.app` (Public-Suffix-List protected). A client-supplied
+  `Origin`/`Referer`/`X-Forwarded-Host` is never trusted on its own, so the
+  CSRF origin check is a real check again (relevant on any shared parent
+  domain).
+- **`BETTER_AUTH_SECRET` is required in production.** Boot fails closed rather
+  than deriving the session-signing key from `DATABASE_URL`.
+- **Uploads are sniffed, not trusted.** `/api/media` stores only real
+  JPEG/PNG/WebP bytes (magic-byte sniff) and writes the sniffed Content-Type,
+  so arbitrary `text/html`/SVG can't be hosted on the Blob CDN domain.
+- **Rate limits (in-memory, per warm instance — swap for Upstash when global
+  limits matter):** bot replies 30/user/hr, bot-status polls 360/user/hr,
+  uploads 40/user/hr, tag additions 10/user/hr, 4 concurrent SSE streams per
+  user. `/api/ai/selftest` now requires a session (it fires real LLM calls at
+  every configured provider).
+- **Feed photo URLs are allow-listed** (`isStoredPhotoUrl`) — no arbitrary
+  schemes in `posts.photo_url`.
+- **`addTag` is authenticated** (it previously ran before the session check and
+  let anonymous callers write to the global tag catalog).
+- **Security headers** via `vercel.json`: nosniff, DENY framing,
+  strict-origin-when-cross-origin referrer, permissions-policy, HSTS.
+- **Member profile pages are `noindex`** — profile pages must never be
+  searchable. The unauthenticated `getPublicProfile` server function (which
+  exposed city coordinates without a session) was removed.
+- **Seed-once:** the seed version is persisted in `seed_state` (migration
+  0013), so cold starts no longer replay 53 profile upserts; bump
+  `SEED_VERSION` in `src/lib/server/seed.ts` to push new seed content.
+- **Discreet mode** (migration 0014): profiles can blur their photos in the
+  deck/grids until the viewer taps — a core safety feature for closeted and
+  married members, toggled in onboarding and edit-profile.
+- **PWA is first-party:** `public/manifest.webmanifest` + `public/icon-512.png`
+  + `public/icon-192.png` replace the platform scaffolding that used to serve
+  them. The 192px icon is required for Chrome's installability criteria —
+  without it the client-side `InstallPrompt` (`beforeinstallprompt`) never
+  fires. Sandbox/preview
+  scaffolding (`.grok/`, `public/__grok/`, grok PWA plugin + middleware,
+  app-env wrapper, browser-smoke/preview scripts, unused multiplayer/p2p and
+  legacy phone/message modules) has been removed.
+
+### Deliberately deferred (pending legal input)
+
+Age assurance, AI-member disclosure labeling, and the report/block/takedown
+flow (48-hour NCII SLA) are intentionally NOT in this pass. They are the
+compliance spine and belong to the legal workstream — see the audit report.
+Until they land, treat the deployment as pre-launch.

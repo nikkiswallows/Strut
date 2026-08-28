@@ -48,6 +48,14 @@ function authSecret(): string {
   if (injected) return injected;
   const db = env("DATABASE_URL");
   if (db) {
+    if (isProduction()) {
+      // Fail closed: deriving the session-signing key from the DB URL means
+      // anyone who learns the connection string can forge session cookies,
+      // and the key can't be rotated without rotating the database.
+      throw new Error(
+        "[auth] BETTER_AUTH_SECRET is required in production. Generate one with `openssl rand -hex 32` and set it in the deployment environment.",
+      );
+    }
     // Deterministic across isolates from the DB URL (kept server-side).
     return `strut.auth.v2.${db}`;
   }
@@ -57,14 +65,19 @@ function authSecret(): string {
 
 if (isProduction() && !env("BETTER_AUTH_SECRET") && !env("AUTH_SECRET")) {
   console.warn(
-    "[auth] BETTER_AUTH_SECRET is not set — using a DATABASE_URL-derived key. " +
-      "Set BETTER_AUTH_SECRET in production for stable, rotatable sessions.",
+    "[auth] BETTER_AUTH_SECRET is not set — auth will fail closed until it is configured.",
   );
 }
 
 /** Database: real Postgres when DATABASE_URL is set, else embedded PGlite. */
 const database = hasDatabase()
-  ? new Pool({ connectionString: env("DATABASE_URL") })
+  ? new Pool({
+      connectionString: env("DATABASE_URL"),
+      // Serverless: each warm instance keeps its own pool. A small cap per
+      // instance keeps a traffic spike from exhausting the Postgres connection
+      // limit (use a pooled connection string on Neon/Supabase, too).
+      max: 5,
+    })
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 const baseUrl = appBaseUrl();
@@ -96,9 +109,56 @@ function buildTrustedOrigins(request?: Request): string[] {
       /* ignore malformed */
     }
   };
+
+  // Hosts that provably belong to THIS deployment: the configured base URL,
+  // Vercel's deployment/production URLs, and the host the request actually
+  // reached. A client-supplied Origin/Referer/X-Forwarded-Host is trusted ONLY
+  // when its host is on this list — never on its own, which would make the CSRF
+  // origin check a no-op (and let same-site sibling apps on shared parent
+  // domains ride a victim's session cookie).
+  const knownHosts = new Set<string>();
+  const collectHost = (value: string | null | undefined) => {
+    if (!value || value === "null") return;
+    try {
+      knownHosts.add(
+        new URL(value.includes("://") ? value : `https://${value}`).host.toLowerCase(),
+      );
+    } catch {
+      /* ignore malformed */
+    }
+  };
+  collectHost(baseUrl);
+  collectHost(env("VERCEL_PROJECT_PRODUCTION_URL"));
+  collectHost(env("VERCEL_URL"));
   if (request) {
-    // The request's own forwarded/origin host is this deployment by definition.
-    add(request.headers.get("origin"));
+    try {
+      collectHost(new URL(request.url).host);
+    } catch {
+      /* ignore */
+    }
+    // The Host header is set by the browser to whatever it connected to and
+    // cannot be spoofed cross-origin, so it is a safe identity anchor.
+    collectHost(request.headers.get("host"));
+    // Vercel preview aliases are *.vercel.app, which is on the Public Suffix
+    // List — sibling deployments are cross-site, so trusting the suffix cannot
+    // enable same-site CSRF.
+    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+    if (forwardedHost?.toLowerCase().endsWith(".vercel.app")) collectHost(forwardedHost);
+  }
+
+  const hostIsKnown = (value: string | null | undefined): boolean => {
+    if (!value || value === "null") return false;
+    try {
+      const url = new URL(value.includes("://") ? value : `https://${value}`);
+      return knownHosts.has(url.host.toLowerCase());
+    } catch {
+      return false;
+    }
+  };
+
+  if (request) {
+    const origin = request.headers.get("origin");
+    if (hostIsKnown(origin)) add(origin);
     const fwdHost = request.headers
       .get("x-forwarded-host")
       ?.split(",")[0]
@@ -106,8 +166,9 @@ function buildTrustedOrigins(request?: Request): string[] {
     const fwdProto =
       request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
       (new URL(request.url).protocol === "http:" ? "http" : "https");
-    if (fwdHost) add(`${fwdProto}://${fwdHost}`);
-    add(request.headers.get("referer"));
+    if (fwdHost && hostIsKnown(fwdHost)) add(`${fwdProto}://${fwdHost}`);
+    const referer = request.headers.get("referer");
+    if (hostIsKnown(referer)) add(referer);
   }
   return origins;
 }
@@ -186,8 +247,15 @@ export const auth = betterAuth({
           await deliverSmsOtp(phoneNumber, code);
           return;
         }
-        // No Twilio (local/preview): log + stash so /api/phone/start can show
-        // the code on the verify screen. Never reached in production.
+        // No Twilio. Dev/preview only: log + stash so /api/phone/start can show
+        // the code on the verify screen. In production we must fail closed —
+        // returning the code to the client would let anyone take over any
+        // phone-registered account.
+        if (isProduction()) {
+          throw new Error(
+            "Phone sign-in is not configured on this deployment (missing Twilio credentials).",
+          );
+        }
         console.log(`[auth] phone OTP for ${phoneNumber}: ${code}`);
         stashDevOtp(phoneNumber, code);
       },

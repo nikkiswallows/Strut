@@ -54,6 +54,7 @@ function Onboarding() {
   const [handle, setHandle] = useState("");
   const [age, setAge] = useState("24");
   const [hideAge, setHideAge] = useState(false);
+  const [discreet, setDiscreet] = useState(false);
   const [location, setLocation] = useState("");
   const [ethnicity, setEthnicity] = useState("");
   const [identities, setIdentities] = useState<string[]>(["T-Girl"]);
@@ -77,6 +78,7 @@ function Onboarding() {
     if (me.data) {
       setAge(me.data.age ? String(me.data.age) : draft?.age || "24");
       setHideAge(me.data.hideAge);
+      setDiscreet(me.data.discreet);
       setLocation(me.data.location ?? draft?.location ?? "");
       setEthnicity(me.data.ethnicity ?? draft?.ethnicity ?? "");
       setIdentities(me.data.identities.length ? me.data.identities : draft?.identities?.length ? draft.identities : ["T-Girl"]);
@@ -90,6 +92,7 @@ function Onboarding() {
     } else if (draft) {
       setAge(draft.age);
       setHideAge(draft.hideAge);
+      setDiscreet(Boolean(draft.discreet));
       setLocation(draft.location);
       setEthnicity(draft.ethnicity ?? "");
       setIdentities(draft.identities.length ? draft.identities : ["T-Girl"]);
@@ -113,6 +116,7 @@ function Onboarding() {
       handle,
       age,
       hideAge,
+      discreet,
       location,
       ethnicity,
       identities,
@@ -131,6 +135,7 @@ function Onboarding() {
     handle,
     age,
     hideAge,
+    discreet,
     location,
     ethnicity,
     identities,
@@ -150,6 +155,7 @@ function Onboarding() {
         handle: handle.length >= 3 ? handle : slugifyHandle(displayName),
         age: Number(age) || 18,
         hideAge,
+        discreet,
         location,
         ethnicity: ethnicity || null,
         identities,
@@ -175,6 +181,7 @@ function Onboarding() {
         handle,
         age,
         hideAge,
+        discreet,
         location,
         ethnicity,
         identities,
@@ -285,6 +292,18 @@ function Onboarding() {
                 )}
               >
                 {hideAge ? "Age hidden on your profile" : "Do not show my age"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscreet((v) => !v)}
+                className={cn(
+                  "h-11 w-full rounded-lg px-3.5 text-sm transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.96]",
+                  discreet ? "bg-fg text-bg" : "bg-elevated text-muted",
+                )}
+              >
+                {discreet
+                  ? "Photos blurred until someone taps"
+                  : "Blur my photos (discreet)"}
               </button>
             </div>
           )}

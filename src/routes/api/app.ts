@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { isTrustedAppOrigin } from "@/lib/auth/isolation.server";
 import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 import { addTagFor, listTagsFor } from "@/lib/server/catalog";
+import { rateLimit, sweepRateBuckets } from "@/lib/server/rate-limit";
 import { getProfileForViewerUser, listDeckForUser, listDiscoverForUser, swipeFor } from "@/lib/server/profiles";
 import {
   createPostFor,
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/api/app")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          sweepRateBuckets();
           if (!isTrustedAppOrigin(request)) {
             return Response.json({ error: "Forbidden" }, { status: 403 });
           }
@@ -28,13 +30,20 @@ export const Route = createFileRoute("/api/app")({
             const data = await listTagsFor(String(body.kind ?? ""));
             return Response.json({ data }, { headers: { "cache-control": "no-store" } });
           }
-          if (op === "addTag") {
-            const data = await addTagFor(String(body.kind ?? ""), String(body.label ?? ""));
-            return Response.json({ data }, { headers: { "cache-control": "no-store" } });
-          }
           const authUser = await getSessionUserFromRequest(request);
           if (!authUser) return Response.json({ error: "Unauthorized" }, { status: 401 });
           const userId = authUser.id;
+
+          if (op === "addTag") {
+            // Writing to the global tag catalog is an authenticated, rate-limited
+            // action (any signed-in user can still add niche tags; they just
+            // can't script or spam the catalog).
+            if (!rateLimit(`add-tag:${userId}`, 10, 60 * 60 * 1000)) {
+              return Response.json({ error: "Slow down." }, { status: 429 });
+            }
+            const data = await addTagFor(String(body.kind ?? ""), String(body.label ?? ""));
+            return Response.json({ data }, { headers: { "cache-control": "no-store" } });
+          }
           let data: unknown;
           switch (op) {
             case "discover":

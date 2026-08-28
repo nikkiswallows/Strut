@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { isTrustedAppOrigin } from "@/lib/auth/isolation.server";
 import { getSessionUserFromRequest } from "@/lib/auth/session.server";
 import { storePhotoObject } from "@/lib/server/media.server";
+import { rateLimit, sweepRateBuckets } from "@/lib/server/rate-limit";
 
 function dataUrlToBytes(image: string): { bytes: Uint8Array; contentType: string } | null {
   const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(
@@ -27,6 +28,15 @@ export const Route = createFileRoute("/api/media")({
             return Response.json(
               { error: "Sign in again to add photos." },
               { status: 401 },
+            );
+          }
+
+          // Uploads write to paid Blob storage — cap per user per hour.
+          sweepRateBuckets();
+          if (!rateLimit(`media-upload:${user.id}`, 40, 60 * 60 * 1000)) {
+            return Response.json(
+              { error: "Too many uploads. Try again in a little while." },
+              { status: 429, headers: { "cache-control": "no-store" } },
             );
           }
 

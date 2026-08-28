@@ -9,6 +9,47 @@ import { blobToken, isProduction } from "@/lib/env";
 const MAX_BYTES = 2_500_000;
 
 /**
+ * Sniff the real image type from magic bytes and ignore whatever the client
+ * claimed. Passing the client's Content-Type through to Blob allowed arbitrary
+ * types (text/html, image/svg+xml) to be hosted and served from the storage
+ * domain — stored XSS on the Blob CDN subdomain plus free file hosting.
+ */
+export function sniffImageType(
+  bytes: Uint8Array,
+): "image/jpeg" | "image/png" | "image/webp" | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 && // "RIFF"
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50 // "WEBP"
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
+
+/**
  * Store a user photo and return its public URL.
  *
  * Production: Vercel Blob (`BLOB_READ_WRITE_TOKEN`). Object keys are
@@ -28,6 +69,12 @@ export async function storePhotoObject(input: {
   if (input.bytes.byteLength > MAX_BYTES) {
     throw new Error("That photo is too large. Use a smaller shot.");
   }
+  // Only real JPEG/PNG/WebP bytes are accepted; the stored Content-Type is
+  // decided by the sniffed bytes, never by the client.
+  const sniffed = sniffImageType(input.bytes);
+  if (!sniffed) {
+    throw new Error("Photos must be JPEG, PNG, or WebP images.");
+  }
   const token = blobToken();
   const key = `photos/${input.userId}/${Date.now()}-${randomUUID().slice(0, 8)}.jpg`;
 
@@ -36,7 +83,7 @@ export async function storePhotoObject(input: {
     const blob = await put(key, Buffer.from(input.bytes), {
       access: "public",
       token,
-      contentType: input.contentType || "image/jpeg",
+      contentType: sniffed,
       addRandomSuffix: false,
       cacheControlMaxAge: 31_536_000, // immutable: key changes on every new upload
     });
