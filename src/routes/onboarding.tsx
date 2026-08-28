@@ -19,7 +19,10 @@ import { fetchMyProfile, postProfile } from "@/lib/profile-api";
 import { ETHNICITIES, IDENTITIES, INTERESTS, LOOKING_FOR, PRONOUNS, ROLES } from "@/lib/types";
 import { cn, slugifyHandle } from "@/lib/utils";
 
-export const Route = createFileRoute("/onboarding")({ component: Onboarding });
+export const Route = createFileRoute("/onboarding")({
+  component: Onboarding,
+  head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
+});
 
 function Onboarding() {
   const { phase, user, profile } = useMembership();

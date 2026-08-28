@@ -5,6 +5,7 @@ import { pathForMembership } from "@/lib/auth/membership";
 
 export const Route = createFileRoute("/auth/complete")({
   component: AuthComplete,
+  head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
 });
 
 function AuthComplete() {

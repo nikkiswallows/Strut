@@ -11,6 +11,7 @@ import { AgeGate } from "@/components/age-gate";
 import { queryClient } from "@/lib/query-client";
 import appCss from "../styles.css?url";
 import { NAME, DESCRIPTION } from "@/lib/brand";
+import { APP_LD, KEYWORDS, ld, OG_IMAGE, ORG_LD, WEBSITE_LD } from "@/lib/seo";
 
 const APP_NAME = NAME;
 
@@ -24,6 +25,25 @@ export const Route = createRootRoute({
         name: "description",
         content: DESCRIPTION,
       },
+      // ── SEO ─────────────────────────────────────────────────────────────
+      { name: "keywords", content: KEYWORDS },
+      { name: "robots", content: "index, follow, max-image-preview:large" },
+      // Adult labeling: RTA lets family filters do their job and is table
+      // stakes for an adult site that wants to be indexed, not blacklisted.
+      // (The plain "adult" rating tag is rendered manually in RootDocument —
+      // the head() meta list dedupes by name and would swallow one of them.)
+      { name: "rating", content: "RTA-5042-1996-1400-1577-RTA" },
+      // Open Graph defaults (pages override title/description/url).
+      { property: "og:site_name", content: APP_NAME },
+      { property: "og:type", content: "website" },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:image", content: OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: `${APP_NAME} — the BNWO dating club. 18+.` },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: OG_IMAGE },
+      // ────────────────────────────────────────────────────────────────────
       { name: "theme-color", content: "#0a0907" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
@@ -49,6 +69,22 @@ function RootDocument() {
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <meta name="rating" content="adult" />
+        {/* Site-wide structured data: who we are, what the site is, that the
+            app is free and 18+. Page-specific JSON-LD (the landing FAQ) lives
+            with its page. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: ld(ORG_LD) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: ld(WEBSITE_LD) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: ld(APP_LD) }}
+        />
       </head>
       <body className="bg-bg text-fg">
         <QueryClientProvider client={queryClient}>

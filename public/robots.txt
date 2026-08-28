@@ -1,0 +1,19 @@
+# Strut — BNWO dating. 18+.
+# The landing and login pages are the public face; the club itself is
+# members-only and marked noindex anyway.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /discover
+Disallow: /feed
+Disallow: /likes
+Disallow: /inbox
+Disallow: /glory
+Disallow: /me
+Disallow: /u/
+Disallow: /auth/
+
+Sitemap: https://strut-zeta.vercel.app/sitemap.xml

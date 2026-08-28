@@ -15,6 +15,7 @@ import { fetchRuntimeConfig } from "@/lib/auth/runtime-config";
 import type { PublicRuntimeConfig } from "@/lib/auth/runtime-config.server";
 import { useMembership } from "@/lib/auth/use-membership";
 import { HERO_STREET } from "@/lib/seed-data";
+import { abs } from "@/lib/seo";
 
 type Search = { mode?: "join" | "in" };
 
@@ -23,6 +24,19 @@ export const Route = createFileRoute("/login")({
     mode: s.mode === "join" ? "join" : s.mode === "in" ? "in" : undefined,
   }),
   component: Login,
+  head: () => ({
+    meta: [
+      { title: "Join Strut — the BNWO dating club (18+)" },
+      {
+        name: "description",
+        content:
+          "Enter Strut: free BNWO dating for Black kings, QOS wives, hotwives, sissies, whitebois and cucks. State your place and walk in. 18+ only.",
+      },
+      { property: "og:title", content: "Join Strut — the BNWO dating club (18+)" },
+      { property: "og:url", content: abs("/login") },
+    ],
+    links: [{ rel: "canonical", href: abs("/login") }],
+  }),
 });
 
 function Login() {

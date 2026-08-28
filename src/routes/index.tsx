@@ -10,8 +10,27 @@ import { useMembership } from "@/lib/auth/use-membership";
 import { HERO_LOCKER, HERO_PHOTO, HERO_STREET } from "@/lib/seed-data";
 import { listFeatured } from "@/lib/server/profiles";
 import { shownAge } from "@/lib/types";
+import { abs, FAQ, FAQ_LD, ld } from "@/lib/seo";
 
-export const Route = createFileRoute("/")({ component: Home });
+const LANDING_TITLE = `${NAME} — BNWO Dating App · Queen of Spades, Bulls, Hotwives & Sissies (18+)`;
+const LANDING_DESCRIPTION =
+  "The BNWO dating app. Black kings and bulls first — Queen of Spades wives, snowbunnies, hotwives, cuckold couples, sissies, whitebois, T-girls and femboys in service. Free to join. Strictly 18+.";
+
+export const Route = createFileRoute("/")({
+  component: Home,
+  head: () => ({
+    meta: [
+      { title: LANDING_TITLE },
+      { name: "description", content: LANDING_DESCRIPTION },
+      { property: "og:title", content: LANDING_TITLE },
+      { property: "og:description", content: LANDING_DESCRIPTION },
+      { property: "og:url", content: abs("/") },
+      { name: "twitter:title", content: LANDING_TITLE },
+      { name: "twitter:description", content: LANDING_DESCRIPTION },
+    ],
+    links: [{ rel: "canonical", href: abs("/") }],
+  }),
+});
 
 const PILLARS = [
   {
@@ -219,6 +238,39 @@ function Home() {
             </Button>
           </Link>
         </div>
+      </section>
+
+      {/* FAQ — the crawlable answers for every BNWO / QOS / bull query.
+          Visible copy mirrors FAQ_LD exactly (Google requires it). */}
+      <section className="border-t border-border py-16" aria-labelledby="faq-heading">
+        <div className="mx-auto max-w-3xl px-5">
+          <Kicker>Said out loud</Kicker>
+          <h2 id="faq-heading" className="mt-1 font-display text-4xl sm:text-5xl">
+            BNWO, QOS, bulls — the questions
+          </h2>
+          <div className="mt-8 space-y-3">
+            {FAQ.map(({ q, a }) => (
+              <details
+                key={q}
+                className="group rounded-2xl border border-border bg-surface/60 px-5 py-4 open:border-accent/40"
+              >
+                <summary className="cursor-pointer list-none font-display text-lg text-fg marker:content-none">
+                  <span className="flex items-center justify-between gap-3">
+                    {q}
+                    <span className="text-accent transition-transform duration-200 group-open:rotate-45">
+                      +
+                    </span>
+                  </span>
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: ld(FAQ_LD) }}
+        />
       </section>
 
       <footer className="border-t border-border px-5 py-10">

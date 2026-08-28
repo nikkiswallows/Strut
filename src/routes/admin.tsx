@@ -94,7 +94,10 @@ type WhoAmI = {
 
 const adminPost = <T,>(body: Record<string, unknown>) => http<T>("/api/admin", body);
 
-export const Route = createFileRoute("/admin")({ component: AdminPage });
+export const Route = createFileRoute("/admin")({
+  component: AdminPage,
+  head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
+});
 
 /* ── shell ───────────────────────────────────────────────────────────────── */
 
