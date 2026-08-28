@@ -39,3 +39,40 @@ export async function botStatus(conversationId: number) {
     `/api/messages/bot-status?conversationId=${conversationId}`,
   );
 }
+
+/**
+ * Open a Server-Sent Events stream of live messages for a conversation. Returns
+ * a close() handle. If the stream can't be opened (or drops), `onClose` fires so
+ * the caller can fall back to its polling path.
+ */
+export function openConversationStream(
+  conversationId: number,
+  onEvent: (type: string, data: unknown) => void,
+  onClose?: () => void,
+): { close: () => void } {
+  // AbortController-backed EventSource (EventSource itself has no built-in, but
+  // we keep the reference so `.close()` is reliable across reconnects).
+  let es: EventSource | null = null;
+  let closed = false;
+  try {
+    es = new EventSource(`/api/messages/stream?conversationId=${conversationId}`);
+    es.addEventListener("message", (e) => {
+      try {
+        onEvent("message", JSON.parse((e as MessageEvent).data));
+      } catch {
+        /* ignore bad frame */
+      }
+    });
+    es.onerror = () => {
+      if (!closed) onClose?.();
+    };
+  } catch {
+    onClose?.();
+  }
+  return {
+    close: () => {
+      closed = true;
+      es?.close();
+    },
+  };
+}

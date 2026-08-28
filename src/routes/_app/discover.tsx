@@ -1,9 +1,10 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { keepPreviousData, useInfiniteQuery, useMutation } from "@tanstack/react-query";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Grid2x2, Layers, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProfileCard } from "@/components/profile-card";
+import { SwipeDeck } from "@/components/swipe-deck";
 import { Input } from "@/components/ui/input";
 import { queryClient } from "@/lib/query-client";
 import { app } from "@/lib/http";
@@ -32,6 +33,7 @@ function Discover() {
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mode, setMode] = useState<"grid" | "deck">("grid");
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const queryKey = ["discover", tab, miles, lookingFor, role, q, ethnicity] as const;
@@ -105,6 +107,45 @@ function Discover() {
     },
   });
 
+  // Swipe deck: same filters, but the deck only ever surfaces profiles the
+  // viewer hasn't decided on yet (like or pass, server-side).
+  const deckQueryKey = ["deck", tab, miles, lookingFor, role, q, ethnicity] as const;
+  const deck = useInfiniteQuery({
+    queryKey: deckQueryKey,
+    queryFn: ({ pageParam }) =>
+      app<DiscoverPage>("deck", {
+        tab,
+        miles,
+        lookingFor,
+        role,
+        ethnicity,
+        q,
+        cursor: pageParam ?? undefined,
+        limit: 40,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: mode === "deck",
+    placeholderData: keepPreviousData,
+  });
+  const deckRows = useMemo(
+    () => (deck.data?.pages ?? []).flatMap((p) => p.items),
+    [deck.data],
+  );
+
+  const swipe = useMutation({
+    mutationFn: ({ targetId, direction }: { targetId: string; direction: "like" | "pass" }) =>
+      app<{ ok: true; matched: boolean }>("swipe", { targetId, direction }),
+    onSuccess: (res, { direction }) => {
+      // The deck advances its own internal index; just keep the match feed and
+      // grid fresh. Liking a card never resets the deck below.
+      void queryClient.invalidateQueries({ queryKey: ["likes"] });
+      void queryClient.invalidateQueries({ queryKey: ["discover"] });
+      if (direction === "like" && res.matched) toast.success("You matched.");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const milesLabel = miles >= 500 ? "Any distance" : `Within ${miles} mi`;
   const activeTab = DISCOVER_TABS.find((t) => t.id === tab) ?? DISCOVER_TABS[0]!;
   const filterBits = useMemo(
@@ -120,14 +161,40 @@ function Discover() {
           <h1 className="font-display text-5xl leading-[0.9]">The order</h1>
           <p className="mt-1 text-sm text-muted">Bulls. Sissies. Wives. Cucks. Whitebois already on Bottom.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen(true)}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-elevated px-4 text-sm text-muted transition-transform duration-150 ease-out hover:text-fg active:scale-[0.96]"
-        >
-          <SlidersHorizontal className="size-4" />
-          {milesLabel}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-full bg-elevated p-1">
+            <button
+              type="button"
+              aria-label="Deck view"
+              onClick={() => setMode("deck")}
+              className={cn(
+                "grid size-9 place-items-center rounded-full transition-transform duration-150 ease-out active:scale-[0.96]",
+                mode === "deck" ? "bg-fg text-bg" : "text-muted hover:text-fg",
+              )}
+            >
+              <Layers className="size-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Grid view"
+              onClick={() => setMode("grid")}
+              className={cn(
+                "grid size-9 place-items-center rounded-full transition-transform duration-150 ease-out active:scale-[0.96]",
+                mode === "grid" ? "bg-fg text-bg" : "text-muted hover:text-fg",
+              )}
+            >
+              <Grid2x2 className="size-4" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-elevated px-4 text-sm text-muted transition-transform duration-150 ease-out hover:text-fg active:scale-[0.96]"
+          >
+            <SlidersHorizontal className="size-4" />
+            {milesLabel}
+          </button>
+        </div>
       </div>
 
       <form
@@ -180,7 +247,32 @@ function Discover() {
         <p className="mb-3 text-xs text-subtle">{filterBits.join(" · ")}</p>
       ) : null}
 
-      {profiles.isError && !rows.length && /unauthorized/i.test(profiles.error instanceof Error ? profiles.error.message : "") ? (
+      {mode === "deck" ? (
+        deck.isError && deckRows.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-muted">Could not load the deck.</p>
+            <button
+              type="button"
+              onClick={() => void deck.refetch()}
+              className="mt-4 h-11 rounded-full bg-elevated px-5 text-sm text-fg transition-transform duration-150 ease-out active:scale-[0.96]"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <SwipeDeck
+            key={`${tab}|${miles}|${lookingFor}|${role}|${ethnicity}|${q}`}
+            profiles={deckRows}
+            onSwipe={(profile, direction) => swipe.mutate({ targetId: profile.userId, direction })}
+            onNeedMore={() => {
+              if (deck.hasNextPage && !deck.isFetchingNextPage) void deck.fetchNextPage();
+            }}
+            loadingMore={deck.isFetchingNextPage}
+            hasMore={Boolean(deck.hasNextPage)}
+            emptyLabel="No one to kneel for yet. Widen it."
+          />
+        )
+      ) : profiles.isError && !rows.length && /unauthorized/i.test(profiles.error instanceof Error ? profiles.error.message : "") ? (
         <Navigate to="/login" />
       ) : profiles.isError && !rows.length ? (
         <div className="py-16 text-center">

@@ -6,6 +6,7 @@ import { judgeRole } from "@/lib/bnwo";
 import { DISCOVER_TABS, identityLine, ROLES, type DiscoverTab, type Profile } from "@/lib/types";
 import { slugifyHandle, unique } from "@/lib/utils";
 import { PROFILE_COLS, mapProfile, type ProfileRow } from "./map";
+import { SEED_PROFILES } from "@/lib/seed-data";
 import { ensureSeed } from "./seed";
 
 export const getMyProfile = createServerFn({ method: "GET" })
@@ -75,6 +76,8 @@ export type DiscoverInput = {
   cursor?: string;
   /** Page size (clamped). Defaults to PAGE_SIZE. */
   limit?: number;
+  /** For the swipe deck: drop profiles the viewer has already decided on. */
+  excludeDecided?: boolean;
 };
 
 export type DiscoverPage = {
@@ -94,6 +97,7 @@ export function normalizeDiscover(input: DiscoverInput | undefined) {
     q: input?.q ?? "",
     cursor: input?.cursor ?? "",
     limit: clampPageSize(input?.limit),
+    excludeDecided: Boolean(input?.excludeDecided),
   };
 }
 
@@ -229,6 +233,18 @@ export async function listDiscoverForUser(
     where += ` and (last_active, id) < ($${params.length - 1}::timestamptz, $${params.length})`;
   }
 
+  // Swipe deck: exclude profiles the viewer has already decided on (a like or a
+  // pass). This keeps the deck moving forward and never re-surfaces a card.
+  if (data.excludeDecided) {
+    where += ` and not exists (
+      select 1 from swipes s
+      where s.user_id = $1 and s.target_id = profiles.user_id
+    ) and not exists (
+      select 1 from likes lk
+      where lk.from_user_id = $1 and lk.to_user_id = profiles.user_id
+    )`;
+  }
+
   const rows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS},
             exists(select 1 from likes l where l.from_user_id = $1 and l.to_user_id = profiles.user_id) as liked_by_me,
@@ -290,6 +306,73 @@ export async function listDiscoverForUser(
       : null;
 
   return { items, nextCursor };
+}
+
+/**
+ * Record a swipe decision and keep `likes` (and thus matches) consistent.
+ *  - like → also mirror into `likes` (so the existing match logic and the grid's
+ *           liked_by_me / likes_me / like_count all keep working), clear a pass.
+ *  - pass → remove any prior like from this viewer to the target (a pass isn't a
+ *           like), leaving `likes`/matches untouched otherwise.
+ * `swipes` is the deck's "already decided on" log; `likes` stays the match truth.
+ */
+export async function swipeFor(
+  userId: string,
+  targetId: string,
+  direction: "like" | "pass",
+): Promise<{ ok: true; matched: boolean }> {
+  if (targetId === userId) throw new Error("You cannot swipe on yourself.");
+  if (direction !== "like" && direction !== "pass") throw new Error("Bad swipe direction.");
+  const sql = await getSql();
+
+  // Upsert the decision (last one wins for this target).
+  await sql.query(
+    `insert into swipes (user_id, target_id, direction)
+     values ($1, $2, $3)
+     on conflict (user_id, target_id)
+     do update set direction = excluded.direction, created_at = now()`,
+    [userId, targetId, direction],
+  );
+
+  if (direction === "like") {
+    // Decide first, then record the like for match purposes.
+    const seed = SEED_PROFILES.find((p) => p.userId === targetId);
+    await sql.query(
+      `insert into likes (from_user_id, to_user_id) values ($1, $2) on conflict do nothing`,
+      [userId, targetId],
+    );
+    if (seed?.autoMatch) {
+      await sql.query(
+        `insert into likes (from_user_id, to_user_id) values ($1, $2) on conflict do nothing`,
+        [targetId, userId],
+      );
+    }
+    const back = await sql.query<{ from_user_id: string }>(
+      `select from_user_id from likes where from_user_id = $1 and to_user_id = $2`,
+      [targetId, userId],
+    );
+    return { ok: true, matched: Boolean(back[0]) };
+  }
+
+  // pass → a like and a pass are mutually exclusive decisions.
+  await sql.query(`delete from likes where from_user_id = $1 and to_user_id = $2`, [
+    userId,
+    targetId,
+  ]);
+  return { ok: true, matched: false };
+}
+
+export type SwipeDirection = "like" | "pass";
+
+/**
+ * The swipe deck: the discover deck limited to profiles you haven't decided on.
+ * Rows are the same shapes as DiscoverItem; the client consumes one per swipe.
+ */
+export async function listDeckForUser(
+  userId: string,
+  input: DiscoverInput | undefined,
+): Promise<DiscoverPage> {
+  return listDiscoverForUser(userId, { ...input, excludeDecided: true });
 }
 
 export async function getProfileForViewerUser(userId: string, handleRaw: string) {

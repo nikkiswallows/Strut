@@ -12,6 +12,7 @@ import {
   type ChatViewer,
 } from "./bot";
 import { hordeCheck, hordeSubmit } from "./horde.server";
+import { publish } from "./realtime.server";
 import { ensureSeed } from "./seed";
 
 type BotJobRow = {
@@ -160,6 +161,8 @@ export async function sendChat(userId: string, conversationId: number, body: str
   );
   await sql.query(`update conversations set last_message_at = now() where id = $1`, [conversationId]);
   await sql.query(`update profiles set last_active = now() where user_id = $1`, [userId]);
+  publish(`conv:${conversationId}`, { type: "message", payload: { mine: true, body: text } });
+  publish(`user:${otherId}`, { type: "message", payload: { conversationId } });
   return { ok: true as const, otherId, seed: isSeedUser(otherId) };
 }
 
@@ -223,6 +226,8 @@ async function insertBotMessage(conversationId: number, seedId: string, body: st
     [conversationId, seedId, body],
   );
   await sql.query(`update conversations set last_message_at = now() where id = $1`, [conversationId]);
+  publish(`conv:${conversationId}`, { type: "message", payload: { mine: false, body } });
+  publish(`user:${seedId}`, { type: "message", payload: { conversationId } });
 }
 
 /**

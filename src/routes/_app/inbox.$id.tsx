@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Avatar } from "@/components/photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { botStatus, fetchThread, postBotReply, postSendChat } from "@/lib/messages-api";
+import { botStatus, fetchThread, openConversationStream, postBotReply, postSendChat } from "@/lib/messages-api";
 import { queryClient } from "@/lib/query-client";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,18 @@ function Thread() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [thread.data?.messages.length, thread.isFetching, waitingBot]);
+
+  // Live updates: connect to the conversation's SSE stream and refetch on any
+  // frame. This is a fast path — if the stream drops, the existing poll/send
+  // logic still covers it, so a missed frame never leaves the thread stale.
+  useEffect(() => {
+    if (!Number.isFinite(convId)) return;
+    const stream = openConversationStream(convId, () => {
+      void queryClient.invalidateQueries({ queryKey: ["conversation", convId] });
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    });
+    return () => stream.close();
+  }, [convId]);
 
   // Poll the bot-reply job while a seed match is "typing". Fast providers
   // resolve on the first check; the uncensored async worker (AI Horde) can take

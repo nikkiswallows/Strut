@@ -289,8 +289,21 @@ against the embedded Postgres (PGlite) to confirm the SQL runs.
 | `src/routes/api/app.ts` | Pass `cursor`/`limit` to discover. |
 | `src/routes/_app/inbox.$id.tsx` | Seed chat: composer no longer disabled while the seed is "writing" (server dedupes pending jobs, so you can keep typing); typing indicator cap shortened to ~2 min and clears reliably. |
 
-**Suggested next build list:** §4.1 (real-time chat), §4.2 (swipe left/right), and the 18+
-age gate + reporting in §6.
+**Second pass — real-time chat + swipe deck**
+- `migrations/0012_swipes.sql` — `swipes` table (user,target,direction,PK; indexes) so the deck knows what a viewer already decided (like or pass).
+- `src/lib/server/realtime.server.ts` — in-process pub/sub (HMR-safe, state on `globalThis`); per-instance by design, with a note to back it with Redis on multi-instance Vercel.
+- `src/routes/api/messages/stream.ts` — SSE endpoint (auth: caller owns the conversation, keep-alive, clean teardown).
+- `src/lib/server/chat.server.ts` — publishes `conv:{id}` / `user:{id}` events on user send and seed replies.
+- `src/lib/messages-api.ts` — `openConversationStream()` client helper (EventSource + abort).
+- `src/routes/_app/inbox.$id.tsx` — live stream connected; refetch thread/list on a frame.
+- `src/lib/server/profiles.ts` — `swipeFor()` (like mirrors into `likes` for match logic + seed auto-match; pass clears a like) and `listDeckForUser()` (discover with `excludeDecided`).
+- `src/components/swipe-deck.tsx` — Tinder-style one-card-at-a-time deck: drag-to-decide, Like/Pass buttons, Undo, request next page when running low.
+- `src/routes/_app/discover.tsx` — Deck/Grid toggle; deck mode uses the swipe deck + `deck`/`swipe` ops.
+- `src/routes/api/app.ts` — `deck` and `swipe` ops wired.
+
+**Suggested next build list:** §4.3 (video on profiles), §4.5 (creator links + monetization),
+the 18+ age gate + reporting in §6, and the §4.1 note above about moving real-time to
+Redis pub/sub on a multi-instance deploy.
 
 ---
 

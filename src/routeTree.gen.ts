@@ -34,6 +34,7 @@ import { Route as ApiMessagesListRouteImport } from './routes/api/messages/list'
 import { Route as ApiMessagesOpenRouteImport } from './routes/api/messages/open'
 import { Route as ApiMessagesReplyRouteImport } from './routes/api/messages/reply'
 import { Route as ApiMessagesSendRouteImport } from './routes/api/messages/send'
+import { Route as ApiMessagesStreamRouteImport } from './routes/api/messages/stream'
 import { Route as ApiMessagesThreadRouteImport } from './routes/api/messages/thread'
 import { Route as ApiPhoneLoginRouteImport } from './routes/api/phone/login'
 import { Route as ApiPhoneStartRouteImport } from './routes/api/phone/start'
@@ -162,6 +163,11 @@ const ApiMessagesSendRoute = ApiMessagesSendRouteImport.update({
   path: '/api/messages/send',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMessagesStreamRoute = ApiMessagesStreamRouteImport.update({
+  id: '/api/messages/stream',
+  path: '/api/messages/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMessagesThreadRoute = ApiMessagesThreadRouteImport.update({
   id: '/api/messages/thread',
   path: '/api/messages/thread',
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/api/messages/open': typeof ApiMessagesOpenRoute
   '/api/messages/reply': typeof ApiMessagesReplyRoute
   '/api/messages/send': typeof ApiMessagesSendRoute
+  '/api/messages/stream': typeof ApiMessagesStreamRoute
   '/api/messages/thread': typeof ApiMessagesThreadRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
   '/api/phone/start': typeof ApiPhoneStartRoute
@@ -230,6 +237,7 @@ export interface FileRoutesByTo {
   '/api/messages/open': typeof ApiMessagesOpenRoute
   '/api/messages/reply': typeof ApiMessagesReplyRoute
   '/api/messages/send': typeof ApiMessagesSendRoute
+  '/api/messages/stream': typeof ApiMessagesStreamRoute
   '/api/messages/thread': typeof ApiMessagesThreadRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
   '/api/phone/start': typeof ApiPhoneStartRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   '/api/messages/open': typeof ApiMessagesOpenRoute
   '/api/messages/reply': typeof ApiMessagesReplyRoute
   '/api/messages/send': typeof ApiMessagesSendRoute
+  '/api/messages/stream': typeof ApiMessagesStreamRoute
   '/api/messages/thread': typeof ApiMessagesThreadRoute
   '/api/phone/login': typeof ApiPhoneLoginRoute
   '/api/phone/start': typeof ApiPhoneStartRoute
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/api/messages/open'
     | '/api/messages/reply'
     | '/api/messages/send'
+    | '/api/messages/stream'
     | '/api/messages/thread'
     | '/api/phone/login'
     | '/api/phone/start'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/api/messages/open'
     | '/api/messages/reply'
     | '/api/messages/send'
+    | '/api/messages/stream'
     | '/api/messages/thread'
     | '/api/phone/login'
     | '/api/phone/start'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/api/messages/open'
     | '/api/messages/reply'
     | '/api/messages/send'
+    | '/api/messages/stream'
     | '/api/messages/thread'
     | '/api/phone/login'
     | '/api/phone/start'
@@ -374,6 +386,7 @@ export interface RootRouteChildren {
   ApiMessagesOpenRoute: typeof ApiMessagesOpenRoute
   ApiMessagesReplyRoute: typeof ApiMessagesReplyRoute
   ApiMessagesSendRoute: typeof ApiMessagesSendRoute
+  ApiMessagesStreamRoute: typeof ApiMessagesStreamRoute
   ApiMessagesThreadRoute: typeof ApiMessagesThreadRoute
   ApiPhoneLoginRoute: typeof ApiPhoneLoginRoute
   ApiPhoneStartRoute: typeof ApiPhoneStartRoute
@@ -556,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMessagesSendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/messages/stream': {
+      id: '/api/messages/stream'
+      path: '/api/messages/stream'
+      fullPath: '/api/messages/stream'
+      preLoaderRoute: typeof ApiMessagesStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/messages/thread': {
       id: '/api/messages/thread'
       path: '/api/messages/thread'
@@ -632,6 +652,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMessagesOpenRoute: ApiMessagesOpenRoute,
   ApiMessagesReplyRoute: ApiMessagesReplyRoute,
   ApiMessagesSendRoute: ApiMessagesSendRoute,
+  ApiMessagesStreamRoute: ApiMessagesStreamRoute,
   ApiMessagesThreadRoute: ApiMessagesThreadRoute,
   ApiPhoneLoginRoute: ApiPhoneLoginRoute,
   ApiPhoneStartRoute: ApiPhoneStartRoute,
