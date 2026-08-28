@@ -6,6 +6,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
+import { AgeGate } from "@/components/age-gate";
 import { queryClient } from "@/lib/query-client";
 import appCss from "../styles.css?url";
 import { NAME, DESCRIPTION } from "@/lib/brand";
@@ -50,6 +51,7 @@ function RootDocument() {
       </head>
       <body className="bg-bg text-fg">
         <QueryClientProvider client={queryClient}>
+          <AgeGate />
           <Outlet />
           <Toaster
             theme="dark"

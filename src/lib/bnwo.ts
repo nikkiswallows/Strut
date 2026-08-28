@@ -123,6 +123,7 @@ export const EMPTY = {
     kings: "No bulls in this radius. The Set will show. Keep the hole ready.",
     sissies: "No sissies on their knees nearby. Post a look in the Room so a king can find you.",
     whitebois: "No whitebois listed. If that's you, check Bottom and stop pretending.",
+    faggots: "No faggots in range yet. They kneel when called. Widen the radius.",
     trans: "No T-girls or trans women in range. The kings are still looking.",
     crossdressers: "No CDs nearby. Skirt on. Location on. Be seen.",
     femboys: "No femboys in range. Soft boys still have to show up.",

@@ -1,3 +1,4 @@
+import { DISCOVER_TABS } from "@/lib/types";
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
@@ -151,9 +152,26 @@ function mapPost(row: PostRow): FeedPost {
   };
 }
 
-export async function listFeedFor(userId: string) {
+export async function listFeedFor(userId: string, tabId?: string) {
   await ensureSeed();
   const sql = await getSql();
+  // Same identity cohorts as the deck tabs: pass a DISCOVER_TABS id to only
+  // see posts from that cohort (kings, sissies, faggots, wives, ...).
+  const tab = tabId ? DISCOVER_TABS.find((t) => t.id === tabId && t.match.length) : undefined;
+  const params: unknown[] = [userId];
+  let where = "";
+  if (tab) {
+    const labels = tab.match.map((l) => l.toLowerCase());
+    const ph = labels.map((_, i) => `$${i + 2}`).join(",");
+    where = ` where (
+      exists (
+        select 1 from jsonb_array_elements_text(coalesce(p.identities,'[]'::jsonb)) as v(ident)
+        where lower(v.ident) in (${ph})
+      )
+      or lower(coalesce(p.identity,'')) in (${ph})
+    )`;
+    params.push(...labels);
+  }
   const rows = await sql.query<PostRow>(
     `select po.id, po.user_id, po.body, po.photo_url, po.created_at,
             p.handle, p.display_name, p.photos,
@@ -161,9 +179,10 @@ export async function listFeedFor(userId: string) {
             exists(select 1 from post_likes pl where pl.post_id = po.id and pl.user_id = $1) as liked_by_me
      from posts po
      join profiles p on p.user_id = po.user_id
+     ${where}
      order by po.created_at desc
      limit 60`,
-    [userId],
+    params,
   );
   return rows.map(mapPost);
 }

@@ -10,16 +10,27 @@ import { app } from "@/lib/http";
 import { fetchMyProfile } from "@/lib/profile-api";
 import { queryClient } from "@/lib/query-client";
 import type { FeedPost } from "@/lib/types";
+import { DISCOVER_TABS } from "@/lib/types";
 import { uploadPhotoFile } from "@/lib/media";
 import { cn, timeAgo } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/feed")({ component: Feed });
 
+/** The Room filters by the same identity cohorts as the deck tabs. */
+const FEED_TABS = [
+  { id: "all", label: "All" },
+  ...DISCOVER_TABS.filter((t) => t.match.length).map((t) => ({ id: t.id, label: t.label })),
+] as const;
+
 function Feed() {
   const [body, setBody] = useState("");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [tab, setTab] = useState<string>("all");
   const me = useQuery({ queryKey: ["me"], queryFn: () => fetchMyProfile() });
-  const feed = useQuery({ queryKey: ["feed"], queryFn: () => app<FeedPost[]>("feed") });
+  const feed = useQuery({
+    queryKey: ["feed", tab],
+    queryFn: () => app<FeedPost[]>("feed", tab === "all" ? {} : { tab }),
+  });
 
   const post = useMutation({
     mutationFn: () => app("createPost", { body, photoUrl }),
@@ -101,7 +112,29 @@ function Feed() {
         </div>
       </form>
 
-      <div className="mt-6 space-y-4">
+      {/* Cohort filter — same identity groups as the deck */}
+      <div className="hide-scrollbar mt-5 flex gap-1.5 overflow-x-auto pb-1">
+        {FEED_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "h-9 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.96]",
+              tab === t.id ? "bg-fg text-bg" : "bg-elevated text-muted hover:text-fg",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {feed.data && feed.data.length === 0 ? (
+          <p className="rounded-xl border border-border bg-surface/60 p-6 text-center text-sm text-muted">
+            Nothing from this corner of the order yet.
+          </p>
+        ) : null}
         {(feed.data ?? []).map((item) => (
           <article key={item.id} className="rounded-xl border border-border bg-surface p-4">
             <div className="flex items-center gap-3">

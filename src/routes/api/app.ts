@@ -182,7 +182,7 @@ export const Route = createFileRoute("/api/app")({
               data = await listLikesFor(userId);
               break;
             case "feed":
-              data = await listFeedFor(userId);
+              data = await listFeedFor(userId, typeof body.tab === "string" ? body.tab : undefined);
               break;
             case "createPost": {
               if (!limited("post", POST_PER_HOUR)) {
