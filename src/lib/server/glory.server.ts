@@ -7,7 +7,8 @@ import {
   nextRank,
   rankFor,
 } from "@/lib/achievements";
-import type { GloryBoard, GloryStats, LockSession, Profile } from "@/lib/types";
+import { assertNotBlocked } from "@/lib/server/safety";
+import type { GloryBoard, GloryStats, LockSession, Profile, ServeClaim } from "@/lib/types";
 
 type ProfileRowLite = {
   user_id: string;
@@ -152,10 +153,63 @@ export async function gloryFor(userId: string): Promise<GloryBoard> {
       where (c.user_a = $1 or c.user_b = $1)
         and exists (
           select 1 from jsonb_array_elements_text(coalesce(k.identities,'[]'::jsonb)) as v(ident)
-          where lower(v.ident) in ('sissy','whiteboi','crossdresser','femboy')
+          where lower(v.ident) in ('sissy','fag','whiteboi','crossdresser','femboy')
         )`,
     [userId],
   );
+
+  // Serves — only bull-approved rows score; pending is display-only.
+  const servesApproved = await scalar(
+    `select count(*)::int n from serves where kneeler_id = $1 and status = 'approved'`,
+    [userId],
+  );
+  const servesPending = await scalar(
+    `select count(*)::int n from serves where kneeler_id = $1 and status = 'pending'`,
+    [userId],
+  );
+
+  // Claims waiting on the viewer's word (bulls only).
+  let serveApprovals: ServeClaim[] = [];
+  if (flags.isKing) {
+    const rows = await sql.query<{
+      id: number;
+      kneeler_id: string;
+      created_at: string;
+      handle: string;
+      display_name: string;
+      photos: unknown;
+    }>(
+      `select s.id, s.kneeler_id, s.created_at, p.handle, p.display_name, p.photos
+         from serves s
+         join profiles p on p.user_id = s.kneeler_id
+        where s.bull_id = $1 and s.status = 'pending'
+        order by s.created_at desc
+        limit 20`,
+      [userId],
+    );
+    serveApprovals = rows.map((r) => {
+      let photos: string[] = [];
+      if (Array.isArray(r.photos)) photos = r.photos.map(String);
+      else if (typeof r.photos === "string") {
+        try {
+          const parsed = JSON.parse(r.photos) as unknown;
+          if (Array.isArray(parsed)) photos = parsed.map(String);
+        } catch {
+          photos = [];
+        }
+      }
+      return {
+        id: Number(r.id),
+        kneeler: {
+          userId: r.kneeler_id,
+          handle: r.handle,
+          displayName: r.display_name,
+          photo: photos[0] ?? null,
+        },
+        createdAt: r.created_at,
+      };
+    });
+  }
 
   // Locks.
   const locks = await getLocks(sql, userId);
@@ -178,6 +232,8 @@ export async function gloryFor(userId: string): Promise<GloryBoard> {
     kingKneelerChats: kneelerChats,
     kneelerKingChats: kingChats,
     wifeKingChats: kingChats,
+    servesApproved,
+    servesPending,
     locksCompleted,
     lockedHours,
     currentLockHours,
@@ -207,7 +263,54 @@ export async function gloryFor(userId: string): Promise<GloryBoard> {
     earnedIds: earned,
     currentLock,
     locks,
+    serveApprovals,
   };
+}
+
+/**
+ * A kneeler claims they served a bull. The claim is pending until the bull
+ * rules on it — nothing self-reported ever scores.
+ */
+export async function claimServeFor(
+  userId: string,
+  bullId: string,
+): Promise<{ ok: true; pending: true }> {
+  if (!bullId || bullId === userId) throw new Error("Point at the king you served.");
+  const sql = await getSql();
+  const me = await getMyProfile(sql, userId);
+  if (!me || !isKneeler(normIds(me.identities))) {
+    throw new Error("Serve claims are for sissies, fags, whitebois, CDs and femboys.");
+  }
+  const target = await getMyProfile(sql, bullId);
+  if (!target || !isKing(normIds(target.identities))) {
+    throw new Error("That member is not a bull. Serves only count for kings.");
+  }
+  await assertNotBlocked(userId, bullId);
+  const pending = await sql.query<{ id: number }>(
+    `select id from serves where kneeler_id = $1 and bull_id = $2 and status = 'pending' limit 1`,
+    [userId, bullId],
+  );
+  if (pending[0]) throw new Error("Already claimed. Wait for his word.");
+  await sql.query(`insert into serves (kneeler_id, bull_id) values ($1, $2)`, [userId, bullId]);
+  return { ok: true, pending: true };
+}
+
+/** The bull rules on a pending serve claim addressed to him. */
+export async function decideServeFor(
+  userId: string,
+  serveId: number,
+  approve: boolean,
+): Promise<{ ok: true; approved: boolean }> {
+  if (!Number.isFinite(serveId) || serveId <= 0) throw new Error("Bad claim.");
+  const sql = await getSql();
+  const rows = await sql.query<{ id: number }>(
+    `update serves set status = $3, decided_at = now()
+      where id = $1 and bull_id = $2 and status = 'pending'
+      returning id`,
+    [serveId, userId, approve ? "approved" : "denied"],
+  );
+  if (!rows[0]) throw new Error("No pending claim to rule on.");
+  return { ok: true, approved: approve };
 }
 
 /** Start a chastity lock. Fails if one is already open. */

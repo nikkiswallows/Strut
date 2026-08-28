@@ -188,6 +188,21 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     ],
   },
   {
+    id: "kneeler-serve-bulls",
+    track: "kneeler",
+    icon: "bbc",
+    name: "Serve Bulls",
+    blurb: "Serves a king confirmed. You don't score this one — he does.",
+    stat: "servesApproved",
+    audience: "kneelers",
+    tiers: [
+      { at: 1, label: "First Serve" },
+      { at: 3, label: "Useful" },
+      { at: 10, label: "House Girl" },
+      { at: 25, label: "Property of the Set" },
+    ],
+  },
+  {
     id: "kneeler-locks",
     track: "kneeler",
     icon: "cage",

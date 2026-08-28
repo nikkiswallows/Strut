@@ -12,6 +12,14 @@ export function startLock(input: { pledgeHours?: number | null; note?: string | 
   });
 }
 
+export function claimServe(bullId: string) {
+  return app<{ ok: true; pending: true }>("serveClaim", { bullId });
+}
+
+export function decideServe(serveId: number, approve: boolean) {
+  return app<{ ok: true; approved: boolean }>("serveDecide", { serveId, approve });
+}
+
 export function releaseLock() {
   return app<{ ok: true; lock: LockSession | null }>("lockRelease");
 }

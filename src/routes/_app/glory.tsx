@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import { Lock, LockOpen } from "lucide-react";
 import { AchievementGlyph } from "@/components/achievement-icon";
 import { Cage, Crown, Key, Spade } from "@/components/graphics";
+import { Avatar } from "@/components/photo";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/query-client";
-import { fetchGlory, releaseLock, startLock } from "@/lib/glory-api";
+import { decideServe, fetchGlory, releaseLock, startLock } from "@/lib/glory-api";
 import { ACHIEVEMENTS, audienceApplies, evaluateAchievement } from "@/lib/achievements";
 import type { GloryBoard } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -122,6 +123,18 @@ function Glory() {
           </p>
         </div>
       )}
+
+      {/* Serve claims — a king's word moves the kneeler's "Serve Bulls" order */}
+      {flags.isKing && board.serveApprovals.length ? <ServeApprovalsCard board={board} /> : null}
+      {flags.isKneeler && stats.servesPending > 0 ? (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface/60 p-4 text-sm text-muted">
+          <Spade className="size-6 shrink-0 text-accent/70" />
+          <p>
+            {stats.servesPending} serve {stats.servesPending === 1 ? "claim" : "claims"} waiting on a
+            king's word. Only his approval moves <span className="text-fg">Serve Bulls</span>.
+          </p>
+        </div>
+      ) : null}
 
       {/* Achievement tracks */}
       {tracks.map((track) => {
@@ -323,6 +336,61 @@ function LockCard({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Pending serve claims addressed to a bull — his ruling is the only score. */
+function ServeApprovalsCard({ board }: { board: GloryBoard }) {
+  const decide = useMutation({
+    mutationFn: ({ serveId, approve }: { serveId: number; approve: boolean }) =>
+      decideServe(serveId, approve),
+    onSuccess: async (res) => {
+      await queryClient.invalidateQueries({ queryKey: ["glory"] });
+      toast.success(res.approved ? "Approved. She earned it." : "Denied. Standards.");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not rule on it."),
+  });
+
+  return (
+    <div className="mt-4 rounded-2xl border border-accent/30 bg-surface/60 p-4">
+      <div className="flex items-center gap-2">
+        <Crown className="size-5 text-accent" />
+        <h2 className="font-display text-lg tracking-wide text-fg">Claims of service</h2>
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        They say they served you. Your word is what makes it count.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {board.serveApprovals.map((claim) => (
+          <li
+            key={claim.id}
+            className="flex items-center gap-3 rounded-xl bg-elevated/60 px-3 py-2.5"
+          >
+            <Avatar src={claim.kneeler.photo} name={claim.kneeler.displayName} size="sm" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm text-fg">{claim.kneeler.displayName}</p>
+              <p className="truncate text-xs text-subtle">@{claim.kneeler.handle}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="accent"
+              disabled={decide.isPending}
+              onClick={() => decide.mutate({ serveId: claim.id, approve: true })}
+            >
+              Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={decide.isPending}
+              onClick={() => decide.mutate({ serveId: claim.id, approve: false })}
+            >
+              Deny
+            </Button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

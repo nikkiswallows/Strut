@@ -4,11 +4,13 @@ import { ChevronLeft, Heart, MessageCircle, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Decree } from "@/components/decree";
 import { PhotoViewer } from "@/components/photo-viewer";
+import { Spade } from "@/components/graphics";
 import { Button } from "@/components/ui/button";
-import { decreeFor } from "@/lib/bnwo";
+import { decreeFor, isKing, isKneeler } from "@/lib/bnwo";
 import { formatMiles } from "@/lib/geo";
 import { queryClient } from "@/lib/query-client";
 import { app } from "@/lib/http";
+import { claimServe } from "@/lib/glory-api";
 import { postOpenChat } from "@/lib/messages-api";
 import { fetchMyProfile } from "@/lib/profile-api";
 import type { Profile } from "@/lib/types";
@@ -52,6 +54,14 @@ function ProfilePage() {
   const message = useMutation({
     mutationFn: () => postOpenChat(profile.data!.userId),
     onSuccess: (res) => navigate({ to: "/inbox/$id", params: { id: String(res.id) } }),
+    onError: (err: Error) => toast.error(err.message),
+  });
+  const serve = useMutation({
+    mutationFn: () => claimServe(profile.data!.userId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["glory"] });
+      toast.success("Claimed. His word decides whether it counts.");
+    },
     onError: (err: Error) => toast.error(err.message),
   });
 
@@ -190,6 +200,17 @@ function ProfilePage() {
         )}
         {p.matched ? (
           <p className="mt-3 text-center text-sm text-accent">You matched. The chat is open.</p>
+        ) : null}
+        {!mine && isKing(p.identities) && me.data && isKneeler(me.data.identities ?? []) ? (
+          <Button
+            variant="outline"
+            className="mt-2 w-full"
+            onClick={() => serve.mutate()}
+            disabled={serve.isPending}
+          >
+            <Spade className="size-4 text-accent" />
+            I served this King
+          </Button>
         ) : null}
       </div>
     </div>

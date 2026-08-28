@@ -2,6 +2,7 @@ export const IDENTITIES = [
   "Trans woman",
   "T-Girl",
   "Sissy",
+  "Fag",
   "Whiteboi",
   "Crossdresser",
   "Femboy",
@@ -108,7 +109,7 @@ export const DISCOVER_TABS = [
   { id: "nearby", label: "Nearby", match: [] as string[] },
   { id: "kings", label: "Kings", match: ["Bull"] },
   { id: "men", label: "Men", match: ["Man", "Admirer"] },
-  { id: "sissies", label: "Sissies", match: ["Sissy"] },
+  { id: "sissies", label: "Sissies", match: ["Sissy", "Fag"] },
   { id: "whitebois", label: "Whitebois", match: ["Whiteboi"] },
   { id: "trans", label: "Trans", match: ["T-Girl", "Trans woman"] },
   { id: "crossdressers", label: "CDs", match: ["Crossdresser"] },
@@ -258,6 +259,10 @@ export type GloryStats = {
   kneelerKingChats: number;
   /** conversations a wife has with kings. */
   wifeKingChats: number;
+  /** serves a bull APPROVED — the only way "Serve Bulls" moves. */
+  servesApproved: number;
+  /** serve claims still waiting on a bull's word. */
+  servesPending: number;
   /** completed lock sessions. */
   locksCompleted: number;
   /** total hours served across all (completed + elapsed) locks. */
@@ -298,4 +303,17 @@ export type GloryBoard = {
   earnedIds: string[];
   currentLock: LockSession | null;
   locks: LockSession[];
+  /** pending serve claims addressed to the viewer (bulls only). */
+  serveApprovals: ServeClaim[];
+};
+
+export type ServeClaim = {
+  id: number;
+  kneeler: {
+    userId: string;
+    handle: string;
+    displayName: string;
+    photo: string | null;
+  };
+  createdAt: string;
 };
