@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppDiscoverRouteImport } from './routes/_app/discover'
@@ -19,6 +20,7 @@ import { Route as AppInboxRouteImport } from './routes/_app/inbox'
 import { Route as AppLikesRouteImport } from './routes/_app/likes'
 import { Route as AppMeRouteImport } from './routes/_app/me'
 import { Route as ApiAccountRouteImport } from './routes/api/account'
+import { Route as ApiAdminRouteImport } from './routes/api/admin'
 import { Route as ApiAppRouteImport } from './routes/api/app'
 import { Route as ApiConfigRouteImport } from './routes/api/config'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -48,6 +50,11 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -88,6 +95,11 @@ const AppMeRoute = AppMeRouteImport.update({
 const ApiAccountRoute = ApiAccountRouteImport.update({
   id: '/api/account',
   path: '/api/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminRoute = ApiAdminRouteImport.update({
+  id: '/api/admin',
+  path: '/api/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAppRoute = ApiAppRouteImport.update({
@@ -198,6 +210,7 @@ const ApiPhoneStatusRoute = ApiPhoneStatusRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/discover': typeof AppDiscoverRoute
@@ -206,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
   '/api/account': typeof ApiAccountRoute
+  '/api/admin': typeof ApiAdminRoute
   '/api/app': typeof ApiAppRoute
   '/api/config': typeof ApiConfigRoute
   '/api/health': typeof ApiHealthRoute
@@ -230,6 +244,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/discover': typeof AppDiscoverRoute
@@ -237,6 +252,7 @@ export interface FileRoutesByTo {
   '/likes': typeof AppLikesRoute
   '/me': typeof AppMeRoute
   '/api/account': typeof ApiAccountRoute
+  '/api/admin': typeof ApiAdminRoute
   '/api/app': typeof ApiAppRoute
   '/api/config': typeof ApiConfigRoute
   '/api/health': typeof ApiHealthRoute
@@ -263,6 +279,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/_app/discover': typeof AppDiscoverRoute
@@ -271,6 +288,7 @@ export interface FileRoutesById {
   '/_app/likes': typeof AppLikesRoute
   '/_app/me': typeof AppMeRoute
   '/api/account': typeof ApiAccountRoute
+  '/api/admin': typeof ApiAdminRoute
   '/api/app': typeof ApiAppRoute
   '/api/config': typeof ApiConfigRoute
   '/api/health': typeof ApiHealthRoute
@@ -297,6 +315,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/login'
     | '/onboarding'
     | '/discover'
@@ -305,6 +324,7 @@ export interface FileRouteTypes {
     | '/likes'
     | '/me'
     | '/api/account'
+    | '/api/admin'
     | '/api/app'
     | '/api/config'
     | '/api/health'
@@ -329,6 +349,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/login'
     | '/onboarding'
     | '/discover'
@@ -336,6 +357,7 @@ export interface FileRouteTypes {
     | '/likes'
     | '/me'
     | '/api/account'
+    | '/api/admin'
     | '/api/app'
     | '/api/config'
     | '/api/health'
@@ -361,6 +383,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_app'
+    | '/admin'
     | '/login'
     | '/onboarding'
     | '/_app/discover'
@@ -369,6 +392,7 @@ export interface FileRouteTypes {
     | '/_app/likes'
     | '/_app/me'
     | '/api/account'
+    | '/api/admin'
     | '/api/app'
     | '/api/config'
     | '/api/health'
@@ -395,9 +419,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  AdminRoute: typeof AdminRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   ApiAccountRoute: typeof ApiAccountRoute
+  ApiAdminRoute: typeof ApiAdminRoute
   ApiAppRoute: typeof ApiAppRoute
   ApiConfigRoute: typeof ApiConfigRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -432,6 +458,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -488,6 +521,13 @@ declare module '@tanstack/react-router' {
       path: '/api/account'
       fullPath: '/api/account'
       preLoaderRoute: typeof ApiAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin': {
+      id: '/api/admin'
+      path: '/api/admin'
+      fullPath: '/api/admin'
+      preLoaderRoute: typeof ApiAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/app': {
@@ -677,9 +717,11 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  AdminRoute: AdminRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   ApiAccountRoute: ApiAccountRoute,
+  ApiAdminRoute: ApiAdminRoute,
   ApiAppRoute: ApiAppRoute,
   ApiConfigRoute: ApiConfigRoute,
   ApiHealthRoute: ApiHealthRoute,

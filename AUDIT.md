@@ -1095,3 +1095,42 @@ M .env.example
  vite.config.ts                        |   5 +
  38 files changed, 1424 insertions(+), 227 deletions(-)
 ```
+
+---
+
+## Changelog — admin control panel (2026-08-27)
+
+A signed-in operator console at `/admin`: seed-profile generation on AI Horde,
+plus profile listing, suspension and deletion. Full write-up in
+[`docs/seed-profiles.md`](docs/seed-profiles.md).
+
+### Shipped
+
+| Area | Change |
+|---|---|
+| Admin identity | Email allowlist (`ADMIN_EMAILS`, default `admin@admin.com`) replaces the id-only `ADMIN_IDS` gate; ids still honoured. `ADMIN_DISABLED=1` 404s the whole surface. |
+| Bootstrap | `ensureAdminAccount()` writes Better Auth's `user` + `account` rows with Better Auth's own hasher, and an onboarded-but-suspended profile row. Idempotent, re-syncs the password every boot, cannot lock the operator out. |
+| Generation | Persona → Horde text (bio + every field) → Horde image (one photo) → **human edit** → approve. `seed_jobs.draft_edited` keeps the human's version separate from the model's. |
+| Persona logic | `coerceDraft()` decides identity/role/ethnicity/pronouns/looking-for from keyword rules. Bull ⇒ Top, sissy/whiteboi/femboy/cuck ⇒ Bottom. Explicit role words in the persona override inference; the model is only a hint. |
+| Moderation | `profiles.suspended` (migration 0020) — reversible, enforced **in SQL** on discover, search, profile-by-handle and the public landing strip. Delete keeps its two-click confirm. |
+| Audit | `suspend`, `unsuspend`, `seed_edit`, `admin_bootstrap` added to `account_events`. |
+
+### Bugs found and fixed while building it
+
+| Severity | Bug |
+|---|---|
+| **P0** | `approveSeedJob` wrote `pronouns`/`looking_for` (TEXT columns) with JS arrays and skipped the `identities`/`pronoun_list`/`looking_for_list` jsonb columns entirely — every approved profile would have been unrenderable. Now column-for-column identical to `saveProfile`. |
+| **P0** | Approved profiles stored the Horde's **presigned R2 URL, which expires in 30 minutes** (`X-Amz-Expires=1800`) and fails the photo-host allowlist. `persistHordeImage()` now downloads and re-hosts on completion. |
+| **P1** | `if ("error" in job)` in the poll handler matched every *successful* `SeedJob` (it has a nullable `error` field), 404-ing the entire review queue. Discriminates on `id` now. |
+| **P1** | `storePhotoObject()`'s no-Blob fallback hardcoded `data:image/jpeg` regardless of the sniffed type — WebP bytes served under a JPEG mime. |
+| **P1** | Text jobs at `max_length: 800` were rejected: the Horde requires the full kudos balance up front above 512 tokens. Capped at 512, with `bio` last in the JSON and a `repairJson()` pass so a truncated generation is still usable. |
+| **P2** | The image model list led with `WAI-NSFW-illustrious-SDXL`, an anime checkpoint with enough workers to win every routing decision; it returned solid black 1.1 KB frames with `censored: false`. Photoreal checkpoints now lead, anime families are excluded, and a 6 KB byte-size floor catches any blank frame that still lands. |
+| **P2** | Profile handles are unique and the model happily reuses them; `uniqueHandle()` now resolves collisions instead of throwing at approve time. |
+
+### Known risk, deliberately accepted
+
+`src/lib/server/secrets.server.ts` commits the AI Horde API key and the admin
+password as source literals, because the operator cannot set environment
+variables on their hosting side. **On a public repository these are public
+credentials.** Env vars override them; the console shows a standing red banner
+while they are in use. Rotate both when testing finishes.

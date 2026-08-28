@@ -13,7 +13,20 @@ import { getSql } from "@/lib/db";
  */
 export async function accountEvent(
   userId: string,
-  kind: "export" | "delete" | "age_attest" | "age_assure" | "block" | "unblock" | "report",
+  kind:
+    | "export"
+    | "delete"
+    | "age_attest"
+    | "age_assure"
+    | "block"
+    | "unblock"
+    | "report"
+    | "seed_create"
+    | "seed_purge"
+    | "seed_edit"
+    | "suspend"
+    | "unsuspend"
+    | "admin_bootstrap",
   detail?: Record<string, unknown>,
   request?: { ip?: string | null; userAgent?: string | null },
 ): Promise<void> {

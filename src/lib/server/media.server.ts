@@ -106,7 +106,10 @@ export async function storePhotoObject(input: {
       "Photo storage is not configured for large files. Add a Vercel Blob store (BLOB_READ_WRITE_TOKEN).",
     );
   }
-  return `data:image/jpeg;base64,${Buffer.from(input.bytes).toString("base64")}`;
+  // Declare the type we actually sniffed. Hardcoding `image/jpeg` here served
+  // WebP bytes under a JPEG mime — which is exactly what the Horde returns, and
+  // some browsers refuse to decode a data URI whose declared type is wrong.
+  return `data:${sniffed};base64,${Buffer.from(input.bytes).toString("base64")}`;
 }
 
 /**

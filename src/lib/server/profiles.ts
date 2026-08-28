@@ -36,7 +36,7 @@ export const getProfileForViewer = createServerFn({ method: "POST" })
               exists(select 1 from follows f where f.follower_id = $2 and f.following_id = profiles.user_id) as following,
               (select count(*)::int from likes l where l.to_user_id = profiles.user_id) as like_count
        from profiles
-       where handle = $1`,
+       where handle = $1 and not suspended`,
       [handle, context.userId],
     );
     const profile = rows[0] ? mapProfile(rows[0]) : null;
@@ -158,7 +158,10 @@ export async function listDiscoverForUser(
   const q = data.q.trim() ? `%${data.q.trim().toLowerCase()}%` : null;
 
   const params: unknown[] = [userId];
-  let where = `user_id <> $1 and onboarded = true`;
+  // `suspended` is the operator's reversible off-switch (migration 0020). It is
+  // applied here, in SQL, for the same reason blocks are: a filter that lives in
+  // JS is a filter some future code path forgets.
+  let where = `user_id <> $1 and onboarded = true and not suspended`;
 
   // Blocks are symmetrical and enforced in SQL so no code path can forget them:
   // if either party has blocked the other, the profile never enters the deck,
@@ -479,7 +482,7 @@ export async function getProfileForViewerUser(userId: string, handleRaw: string)
             exists(select 1 from follows f where f.follower_id = $2 and f.following_id = profiles.user_id) as following,
             (select count(*)::int from likes l where l.to_user_id = profiles.user_id) as like_count
      from profiles
-     where handle = $1`,
+     where handle = $1 and not suspended`,
     [handle, userId],
   );
   const profile = rows[0] ? mapProfile(rows[0]) : null;
@@ -517,7 +520,7 @@ export const listFeatured = createServerFn({ method: "GET" }).handler(async () =
   // member's coordinates to an anonymous caller is the leak this closes.
   const rows = await sql.query<ProfileRow>(
     `select ${PROFILE_COLS_PUBLIC} from profiles
-     where is_seed = true and onboarded = true
+     where is_seed = true and onboarded = true and not suspended
      order by id
      limit 24`,
   );
